@@ -53,12 +53,14 @@
 
   .links {
     display: flex;
-    gap: 24px;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 16px;
     opacity: 0;
     animation: fadeIn 1s ease forwards 1.4s;
   }
 
-  .links a {
+  .links a, .links span {
     font-size: 11px;
     letter-spacing: 3px;
     text-transform: uppercase;
@@ -73,6 +75,19 @@
   .links a:hover {
     border-color: rgba(196,145,94,0.3);
     color: rgba(196,145,94,0.9);
+  }
+  .links .coming-soon {
+    color: rgba(255,255,255,0.15);
+    border-color: rgba(255,255,255,0.05);
+    cursor: default;
+    position: relative;
+  }
+  .links .coming-soon .badge {
+    font-size: 7px;
+    letter-spacing: 2px;
+    color: rgba(196,145,94,0.35);
+    display: block;
+    margin-top: 4px;
   }
 
   @keyframes fadeIn {
@@ -108,6 +123,8 @@
   <div class="tagline">Music production &amp; creative tools</div>
   <div class="links">
     <a href="/ambience/">Ambience Synth</a>
+    <span class="coming-soon">Monitor Controller<span class="badge">Coming Soon</span></span>
+    <a href="https://timgosden.com">TimGosden.com</a>
   </div>
 </div>
 </body>
