@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "start": "serve public -l tcp://0.0.0.0:$PORT -s",
-    "dev": "serve public -l 3000 -s"
+    "start": "serve public -l tcp://0.0.0.0:$PORT",
+    "dev": "serve public -l 3000"
   },
   "dependencies": {
     "serve": "^14.2.0"
