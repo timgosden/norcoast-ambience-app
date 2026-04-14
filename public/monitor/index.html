@@ -4,8 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#060810">
-<title>Norcoast Audio</title>
-<meta name="description" content="Norcoast Audio — music production, audio engineering and creative tools.">
+<title>Monitor Controller — Norcoast Audio</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -30,8 +29,6 @@
     gap: 32px;
   }
 
-  .logo svg { opacity: 0; animation: fadeIn 1.2s ease forwards 0.2s; }
-
   .brand {
     font-size: 11px;
     letter-spacing: 6px;
@@ -39,7 +36,7 @@
     font-weight: 400;
     color: rgba(255,255,255,0.6);
     opacity: 0;
-    animation: fadeIn 1s ease forwards 0.6s;
+    animation: fadeIn 1s ease forwards 0.4s;
   }
 
   .tagline {
@@ -48,19 +45,10 @@
     color: rgba(255,255,255,0.4);
     letter-spacing: 1px;
     opacity: 0;
-    animation: fadeIn 1s ease forwards 1s;
+    animation: fadeIn 1s ease forwards 0.8s;
   }
 
-  .links {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 16px;
-    opacity: 0;
-    animation: fadeIn 1s ease forwards 1.4s;
-  }
-
-  .links a, .links span {
+  .back {
     font-size: 11px;
     letter-spacing: 3px;
     text-transform: uppercase;
@@ -71,10 +59,12 @@
     border: 1px solid rgba(196,145,94,0.25);
     border-radius: 50px;
     transition: border-color 0.3s, color 0.3s;
+    opacity: 0;
+    animation: fadeIn 1s ease forwards 1.2s;
   }
-  .links a:hover {
-    border-color: rgba(196,145,94,0.3);
-    color: rgba(196,145,94,0.9);
+  .back:hover {
+    border-color: rgba(196,145,94,0.5);
+    color: rgba(196,145,94,1);
   }
 
   @keyframes fadeIn {
@@ -82,7 +72,6 @@
     to { opacity: 1; transform: translateY(0); }
   }
 
-  /* Subtle background grain */
   body::after {
     content: '';
     position: fixed;
@@ -95,24 +84,9 @@
 </head>
 <body>
 <div class="container">
-  <div class="logo">
-    <svg width="80" height="80" viewBox="0 0 100 100" fill="none">
-      <circle cx="50" cy="50" r="46" stroke="rgba(196,145,94,0.3)" stroke-width="1.5"/>
-      <path d="M 20 50 Q 30 35, 40 50 Q 50 65, 60 50 Q 70 35, 80 50" stroke="rgba(196,145,94,0.7)" stroke-width="2" stroke-linecap="round" fill="none"/>
-      <path d="M 20 50 Q 30 40, 40 50 Q 50 60, 60 50 Q 70 40, 80 50" stroke="rgba(94,184,138,0.5)" stroke-width="1.5" stroke-linecap="round" fill="none"/>
-      <path d="M 25 50 Q 35 44, 45 50 Q 55 56, 65 50 Q 75 44, 85 50" stroke="rgba(212,107,138,0.4)" stroke-width="1" stroke-linecap="round" fill="none"/>
-      <text x="50" y="30" text-anchor="middle" fill="rgba(196,145,94,0.5)" font-family="'Open Sans',sans-serif" font-size="11" font-weight="600" letter-spacing="1">N</text>
-      <circle cx="50" cy="50" r="38" stroke="rgba(255,255,255,0.04)" stroke-width="0.5"/>
-      <path d="M 30 72 Q 50 82, 70 72" stroke="rgba(106,159,216,0.25)" stroke-width="1" stroke-linecap="round" fill="none"/>
-    </svg>
-  </div>
-  <div class="brand">Norcoast Audio</div>
-  <div class="tagline">Music production &amp; creative tools</div>
-  <div class="links">
-    <a href="/ambience/">Ambience Synth</a>
-    <a href="/monitor/">Monitor Controller</a>
-    <a href="https://timgosden.com">TimGosden.com</a>
-  </div>
+  <div class="brand">Monitor Controller</div>
+  <div class="tagline">Coming soon</div>
+  <a class="back" href="/">Norcoast Audio</a>
 </div>
 </body>
 </html>
