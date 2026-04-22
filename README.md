@@ -1,14 +1,19 @@
-# Norcoast Audio
+# Norcoast Ambience
 
-Static site for [norcoastaudio.com](https://norcoastaudio.com) — landing page + web tools.
+Standalone generative ambient synthesizer — web app + iOS wrapper.
+
+Live at [norcoastaudio.com](https://norcoastaudio.com) (linked from the main site).
 
 ## Structure
 
 ```
 public/
-  index.html          ← Landing page
-  ambience/
-    index.html        ← Norcoast Ambience synth
+  index.html        ← Ambience synth (self-contained, ~2MB)
+  manifest.json     ← PWA manifest (install to home screen)
+  sw.js             ← Service worker (offline support)
+  icons/
+    icon.svg
+    icon-maskable.svg
 ```
 
 ## Local dev
@@ -28,6 +33,14 @@ npm run dev
 
 The `start` script uses `serve` to host the `public/` directory. Railway provides `$PORT` automatically.
 
-## Adding the Ambience synth
+## Install on phone
 
-Replace `public/ambience/index.html` with the standalone Norcoast Ambience HTML file.
+**Android:** Open in Chrome → three-dot menu → Add to Home Screen
+
+**iPhone:** Open in Safari → Share → Add to Home Screen
+
+The app caches fully after first load and works offline.
+
+## iOS app
+
+The Xcode project wrapping the synth in a WKWebView lives in this repo alongside the web app. See `ios/` (coming).
