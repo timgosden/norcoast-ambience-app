@@ -6,6 +6,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#060810">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icons/icon.svg">
 <title>Norcoast Ambience</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -561,6 +563,9 @@ async function initAndStart(){
   buildGenericSlider('masterSlider','Master',volToFader(masterVol),'#c4915e',Math.round(masterVol*100)+'%',(r,v)=>{masterVol=faderToVol(r);v.textContent=Math.round(masterVol*100)+'%';master.gain.linearRampToValueAtTime(masterVol,ctx.currentTime+0.1);queueSave()});
   startVis();scheduleEvolve();
 }
+</script>
+<script>
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
 </script>
 </body>
 </html>
