@@ -2,7 +2,7 @@
   "name": "Norcoast Ambience",
   "short_name": "Ambience",
   "description": "Generative ambient synthesizer by Norcoast Audio",
-  "start_url": "/ambience/",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "background_color": "#060810",

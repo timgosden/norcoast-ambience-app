@@ -1,8 +1,6 @@
 const CACHE = 'norcoast-v1';
 const PRECACHE = [
   '/',
-  '/ambience/',
-  '/ambience/index.html',
   '/manifest.json',
   '/icons/icon.svg',
   '/icons/icon-maskable.svg',
