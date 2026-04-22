@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Full bleed background for maskable (no rounded corners) -->
+  <rect width="512" height="512" fill="#060810"/>
+  <!-- Content kept within inner 80% safe zone (approx 205-307 range centred) -->
+  <circle cx="256" cy="256" r="140" stroke="rgba(196,145,94,0.35)" stroke-width="6" fill="none"/>
+  <path d="M 116 256 Q 166 178 216 256 Q 266 334 316 256 Q 366 178 416 256"
+        stroke="rgba(196,145,94,0.82)" stroke-width="10" stroke-linecap="round" fill="none"/>
+  <path d="M 116 256 Q 166 208 216 256 Q 266 304 316 256 Q 366 208 416 256"
+        stroke="rgba(94,184,138,0.48)" stroke-width="7" stroke-linecap="round" fill="none"/>
+  <text x="256" y="172" text-anchor="middle" fill="rgba(196,145,94,0.55)"
+        font-family="sans-serif" font-size="52" font-weight="600" letter-spacing="4">N</text>
+</svg>
