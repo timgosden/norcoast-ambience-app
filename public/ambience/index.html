@@ -28,6 +28,7 @@
   .key-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;margin-bottom:12px}
   .key-btn{padding:8px 0;font-size:12px;font-family:'Open Sans',sans-serif;font-weight:400;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);color:rgba(255,255,255,0.85);border-radius:4px;cursor:pointer;transition:all 0.2s;text-align:center}
   .key-btn.active{background:rgba(196,145,94,0.15);border-color:rgba(196,145,94,0.3);color:#c4915e;font-weight:500}
+  .key-btn.active.paused{background:rgba(196,145,94,0.04);border-color:rgba(196,145,94,0.12);color:rgba(196,145,94,0.4)}
   .card{padding:12px;border-radius:8px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);margin-bottom:14px}
   .evolve-btn{width:100%;padding:8px 0;font-size:12px;font-family:'Open Sans',sans-serif;font-weight:400;border-radius:6px;cursor:pointer;margin-bottom:10px;letter-spacing:2px;transition:all 0.3s}
   .evolve-btn.on{background:rgba(196,145,94,0.18);border:1px solid rgba(196,145,94,0.35);color:#c4915e}
@@ -157,8 +158,10 @@ let textureOctUp=true;
 let staticNodes={},evolveNodes={},layerState={};
 let granularTimers=[],granularGain=null,reversedBuf=null;
 let evolveTimer=null,animFrame=null;
+let audioPaused=false;
 
 PAD_LAYERS.forEach(l=>{layerState[l.id]={active:true,volume:0}});
+loadSettings();
 
 // ─── WAVETABLES ───
 function makeWave(h){
@@ -432,10 +435,17 @@ function buildGenericSlider(cid,label,fPos,color,display,onInput){
 
 function buildKeys(){
   const row=document.getElementById('keyRow');row.innerHTML='';
-  NOTES.forEach(n=>{const btn=document.createElement('button');btn.className='key-btn'+(n===homeRoot?' active':'');btn.textContent=n;btn.onclick=()=>{
+  NOTES.forEach(n=>{const btn=document.createElement('button');btn.className='key-btn'+(n===homeRoot?' active':'')+(n===homeRoot&&audioPaused?' paused':'');btn.textContent=n;btn.onclick=()=>{
+    if(n===homeRoot){
+      audioPaused=!audioPaused;
+      if(audioPaused){master.gain.linearRampToValueAtTime(0,ctx.currentTime+0.4);btn.classList.add('paused')}
+      else{ctx.resume();master.gain.linearRampToValueAtTime(masterVol,ctx.currentTime+0.4);btn.classList.remove('paused')}
+      return;
+    }
     homeRoot=n;document.getElementById('stateRoot').textContent=n;
-    row.querySelectorAll('.key-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');
+    row.querySelectorAll('.key-btn').forEach(b=>b.classList.remove('active','paused'));btn.classList.add('active');
     PAD_LAYERS.forEach(l=>{if(layerState[l.id].active&&layerState[l.id].volume>0)startPad(l,layerState[l.id].volume,homeRoot,currentEvolve)});
+    saveSettings();
   };row.appendChild(btn)});
 }
 
@@ -457,11 +467,11 @@ function buildLayers(){
         else if(!staticNodes[l.id]){startPad(l,st.volume,homeRoot,currentEvolve)}
         else{const t=ctx.currentTime+0.5;if(staticNodes[l.id])staticNodes[l.id].gain.gain.linearRampToValueAtTime(st.volume,t);if(evolveNodes[l.id])evolveNodes[l.id].gain.gain.linearRampToValueAtTime(st.volume,t)}
       }
-      buildLayers();
+      saveSettings();buildLayers();
     });
 
     row.querySelector('input').addEventListener('input',e=>{
-      const raw=parseFloat(e.target.value);const vol=faderToVol(raw);const wasZero=st.volume===0;st.volume=vol;
+      const raw=parseFloat(e.target.value);const vol=faderToVol(raw);const wasZero=st.volume===0;st.volume=vol;queueSave();
       e.target.style.background='linear-gradient(to right,'+l.color+'55 '+raw*100+'%,rgba(255,255,255,0.04) '+raw*100+'%)';
       if(l.type==="granular"){
         if(vol>0&&wasZero){startGranular(vol)}
@@ -488,7 +498,7 @@ function buildLayers(){
       octBtn.style.cssText='flex:1;padding:6px 0;font-size:11px;font-family:Open Sans,sans-serif;font-weight:400;border-radius:5px;cursor:pointer;letter-spacing:1px;transition:all 0.3s;'
         +(textureOctUp?'background:rgba(160,128,96,0.15);border:1px solid rgba(160,128,96,0.3);color:#a08060':'background:rgba(255,255,255,0.008);border:1px solid rgba(255,255,255,0.03);color:rgba(255,255,255,0.25)');
       octBtn.textContent=textureOctUp?'+Octave On':'+Octave';
-      octBtn.onclick=()=>{textureOctUp=!textureOctUp;buildLayers()};
+      octBtn.onclick=()=>{textureOctUp=!textureOctUp;buildLayers();saveSettings()};
       octRow.appendChild(octBtn);
       cont.appendChild(octRow);
     }
@@ -516,7 +526,11 @@ function startVis(){
   draw();
 }
 
-function toggleEvolving(){evolving=!evolving;const btn=document.getElementById('evolveBtn');btn.className='evolve-btn '+(evolving?'on':'off');btn.textContent=evolving?'Evolving':'Static'}
+function toggleEvolving(){evolving=!evolving;const btn=document.getElementById('evolveBtn');btn.className='evolve-btn '+(evolving?'on':'off');btn.textContent=evolving?'Evolving':'Static';saveSettings()}
+
+function saveSettings(){try{const s={homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,reverbMix,delayMixVal,masterVol,textureOctUp,layers:{}};PAD_LAYERS.forEach(l=>{s.layers[l.id]={volume:layerState[l.id].volume}});localStorage.setItem('norcoast_v1',JSON.stringify(s))}catch(e){}}
+function loadSettings(){try{const raw=localStorage.getItem('norcoast_v1');if(!raw)return;const s=JSON.parse(raw);if(s.homeRoot)homeRoot=s.homeRoot;if(s.evolving!=null)evolving=s.evolving;if(s.evolveSpeed!=null)evolveSpeed=s.evolveSpeed;if(s.lpfValue!=null)lpfValue=s.lpfValue;if(s.hpfValue!=null)hpfValue=s.hpfValue;if(s.reverbMix!=null)reverbMix=s.reverbMix;if(s.delayMixVal!=null)delayMixVal=s.delayMixVal;if(s.masterVol!=null)masterVol=s.masterVol;if(s.textureOctUp!=null)textureOctUp=s.textureOctUp;if(s.layers)PAD_LAYERS.forEach(l=>{if(s.layers[l.id]!=null)layerState[l.id].volume=s.layers[l.id].volume??0})}catch(e){}}
+let _saveT=null;function queueSave(){clearTimeout(_saveT);_saveT=setTimeout(saveSettings,500)}
 
 // ─── START ───
 async function initAndStart(){
@@ -527,20 +541,24 @@ async function initAndStart(){
   await ctx.resume();
   await decodeSample();
 
-  // Start all pads at volume 0
-  PAD_LAYERS.forEach(l=>{if(l.type!=="granular")startPad(l,0,homeRoot,currentEvolve)});
+  // Start pads at saved (or default 0) volumes
+  PAD_LAYERS.forEach(l=>{if(l.type!=="granular")startPad(l,layerState[l.id].volume,homeRoot,currentEvolve)});
+  if(layerState.texture.volume>0)startGranular(layerState.texture.volume);
+  // Resume AudioContext when returning from background
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&ctx&&ctx.state==='suspended'&&!audioPaused)ctx.resume()});
+  window.addEventListener('focus',()=>{if(ctx&&ctx.state==='suspended'&&!audioPaused)ctx.resume()});
 
   // Fade out overlay
   prompt.style.opacity='0';
   setTimeout(()=>{prompt.remove()},600);
 
   buildKeys();buildLayers();
-  buildGenericSlider('speedSlider','Speed',volToFader(evolveSpeed),'#c4915e',Math.round(evolveSpeed*100)+'%',(r,v)=>{evolveSpeed=faderToVol(r);v.textContent=Math.round(evolveSpeed*100)+'%'});
-  buildGenericSlider('lpfSlider','Low Pass',lpfValue,'#d46b8a',formatHz(lpfFaderToHz(lpfValue)),(r,v)=>{lpfValue=r;const hz=lpfFaderToHz(r);v.textContent=formatHz(hz);globalLPF.frequency.linearRampToValueAtTime(hz,ctx.currentTime+0.1)});
-  buildGenericSlider('hpfSlider','High Pass',hpfValue,'#b07acc',formatHz(hpfFaderToHz(hpfValue)),(r,v)=>{hpfValue=r;const hz=hpfFaderToHz(r);v.textContent=formatHz(hz);globalHPF.frequency.linearRampToValueAtTime(hz,ctx.currentTime+0.1)});
-  buildGenericSlider('reverbSlider','Reverb',volToFader(reverbMix),'#6a9fd8',Math.round(reverbMix*100)+'%',(r,v)=>{reverbMix=faderToVol(r);v.textContent=Math.round(reverbMix*100)+'%';reverbGain.gain.value=reverbMix;dryGain.gain.value=1-reverbMix*0.35});
-  buildGenericSlider('delaySlider','Delay',volToFader(delayMixVal),'#5eb88a',Math.round(delayMixVal*100)+'%',(r,v)=>{delayMixVal=faderToVol(r);v.textContent=Math.round(delayMixVal*100)+'%';delayGainN.gain.value=delayMixVal});
-  buildGenericSlider('masterSlider','Master',volToFader(masterVol),'#c4915e',Math.round(masterVol*100)+'%',(r,v)=>{masterVol=faderToVol(r);v.textContent=Math.round(masterVol*100)+'%';master.gain.linearRampToValueAtTime(masterVol,ctx.currentTime+0.1)});
+  buildGenericSlider('speedSlider','Speed',volToFader(evolveSpeed),'#c4915e',Math.round(evolveSpeed*100)+'%',(r,v)=>{evolveSpeed=faderToVol(r);v.textContent=Math.round(evolveSpeed*100)+'%';queueSave()});
+  buildGenericSlider('lpfSlider','Low Pass',lpfValue,'#d46b8a',formatHz(lpfFaderToHz(lpfValue)),(r,v)=>{lpfValue=r;const hz=lpfFaderToHz(r);v.textContent=formatHz(hz);globalLPF.frequency.linearRampToValueAtTime(hz,ctx.currentTime+0.1);queueSave()});
+  buildGenericSlider('hpfSlider','High Pass',hpfValue,'#b07acc',formatHz(hpfFaderToHz(hpfValue)),(r,v)=>{hpfValue=r;const hz=hpfFaderToHz(r);v.textContent=formatHz(hz);globalHPF.frequency.linearRampToValueAtTime(hz,ctx.currentTime+0.1);queueSave()});
+  buildGenericSlider('reverbSlider','Reverb',volToFader(reverbMix),'#6a9fd8',Math.round(reverbMix*100)+'%',(r,v)=>{reverbMix=faderToVol(r);v.textContent=Math.round(reverbMix*100)+'%';reverbGain.gain.value=reverbMix;dryGain.gain.value=1-reverbMix*0.35;queueSave()});
+  buildGenericSlider('delaySlider','Delay',volToFader(delayMixVal),'#5eb88a',Math.round(delayMixVal*100)+'%',(r,v)=>{delayMixVal=faderToVol(r);v.textContent=Math.round(delayMixVal*100)+'%';delayGainN.gain.value=delayMixVal;queueSave()});
+  buildGenericSlider('masterSlider','Master',volToFader(masterVol),'#c4915e',Math.round(masterVol*100)+'%',(r,v)=>{masterVol=faderToVol(r);v.textContent=Math.round(masterVol*100)+'%';master.gain.linearRampToValueAtTime(masterVol,ctx.currentTime+0.1);queueSave()});
   startVis();scheduleEvolve();
 }
 </script>
