@@ -27,7 +27,7 @@ struct AmbienceWebView: UIViewRepresentable {
         guard let url = Bundle.main.url(
             forResource: "index",
             withExtension: "html",
-            subdirectory: "Web/ambience"
+            subdirectory: "public/ambience"
         ) else {
             return
         }
