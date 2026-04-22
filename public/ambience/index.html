@@ -5,33 +5,33 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#060810">
+<meta name="theme-color" content="#0e1a30">
 <title>Norcoast Ambience</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
   html,body{height:100%;overflow:hidden}
-  body{font-family:'Open Sans',sans-serif;background:linear-gradient(160deg,#060810,#0b0e16 40%,#070910);color:#fff;-webkit-tap-highlight-color:transparent;-webkit-font-smoothing:antialiased}
+  body{font-family:'Open Sans',sans-serif;background:linear-gradient(160deg,#0e1a30,#162038 40%,#0e1428);color:#fff;-webkit-tap-highlight-color:transparent;-webkit-font-smoothing:antialiased}
   #app{height:100vh;overflow-y:auto;-webkit-overflow-scrolling:touch}
   
   #main{padding:16px;padding-bottom:40px}
   .header{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:8px}
-  .header span{font-size:12px;letter-spacing:4px;text-transform:uppercase;color:rgba(255,255,255,0.2);font-weight:300}
+  .header span{font-size:12px;letter-spacing:4px;text-transform:uppercase;color:rgba(255,255,255,0.45);font-weight:300}
   .state{text-align:center;margin-bottom:10px;font-size:16px;letter-spacing:3px;font-weight:300}
   .state .root{color:#c4915e}
-  .state .sep{color:rgba(255,255,255,0.08);margin:0 8px}
-  .state .fifth{color:rgba(255,255,255,0.35)}
+  .state .sep{color:rgba(255,255,255,0.2);margin:0 8px}
+  .state .fifth{color:rgba(255,255,255,0.6)}
   .state .evolve{color:#6a9fd8}
   #visualiser{width:100%;height:52px;border-radius:6px;margin-bottom:14px;display:block}
-  .section-label{font-size:11px;color:rgba(255,255,255,0.35);font-weight:500;margin-bottom:6px}
+  .section-label{font-size:11px;color:rgba(255,255,255,0.55);font-weight:500;margin-bottom:6px}
   .key-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;margin-bottom:12px}
-  .key-btn{padding:8px 0;font-size:12px;font-family:'Open Sans',sans-serif;font-weight:400;background:rgba(255,255,255,0.015);border:1px solid rgba(255,255,255,0.04);color:rgba(255,255,255,0.35);border-radius:4px;cursor:pointer;transition:all 0.2s;text-align:center}
+  .key-btn{padding:8px 0;font-size:12px;font-family:'Open Sans',sans-serif;font-weight:400;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);color:rgba(255,255,255,0.6);border-radius:4px;cursor:pointer;transition:all 0.2s;text-align:center}
   .key-btn.active{background:rgba(196,145,94,0.15);border-color:rgba(196,145,94,0.3);color:#c4915e;font-weight:500}
-  .card{padding:12px;border-radius:8px;background:rgba(255,255,255,0.008);border:1px solid rgba(255,255,255,0.025);margin-bottom:14px}
+  .card{padding:12px;border-radius:8px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);margin-bottom:14px}
   .evolve-btn{width:100%;padding:8px 0;font-size:12px;font-family:'Open Sans',sans-serif;font-weight:400;border-radius:6px;cursor:pointer;margin-bottom:10px;letter-spacing:2px;transition:all 0.3s}
-  .evolve-btn.on{background:rgba(196,145,94,0.12);border:1px solid rgba(196,145,94,0.22);color:#c4915e}
-  .evolve-btn.off{background:rgba(255,255,255,0.01);border:1px solid rgba(255,255,255,0.04);color:rgba(255,255,255,0.3)}
+  .evolve-btn.on{background:rgba(196,145,94,0.18);border:1px solid rgba(196,145,94,0.35);color:#c4915e}
+  .evolve-btn.off{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);color:rgba(255,255,255,0.5)}
   .layer-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;padding:10px 12px;border-radius:8px;transition:all 0.4s}
   .layer-toggle{width:36px;height:36px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all 0.4s;background:transparent}
   .layer-toggle .dot{width:10px;height:10px;border-radius:50%;transition:all 0.4s}
@@ -39,20 +39,20 @@
   .layer-name{font-size:13px;font-weight:500;margin-bottom:4px;transition:color 0.3s}
   .slider-group{margin-bottom:12px}
   .slider-header{display:flex;justify-content:space-between;margin-bottom:4px}
-  .slider-label{font-size:11px;color:rgba(255,255,255,0.5);font-weight:400}
-  .slider-value{font-size:11px;color:rgba(255,255,255,0.3)}
+  .slider-label{font-size:11px;color:rgba(255,255,255,0.65);font-weight:400}
+  .slider-value{font-size:11px;color:rgba(255,255,255,0.5)}
   input[type="range"]{width:100%;height:4px;-webkit-appearance:none;appearance:none;border-radius:2px;outline:none;cursor:pointer;margin:0}
   input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:#fff;border:none;margin-top:-6px;box-shadow:0 1px 4px rgba(0,0,0,0.4)}
   .layer-row input[type="range"]{height:3px}
   .layer-row input[type="range"]::-webkit-slider-thumb{width:14px;height:14px;margin-top:-5px}
-  .footer{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:16px;opacity:0.15}
+  .footer{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:16px;opacity:0.3}
   .footer span{font-size:9px;letter-spacing:3px;text-transform:uppercase;font-weight:300}
 </style>
 </head>
 <body>
 <div id="app">
 <!-- Tap-to-start overlay -->
-<div id="audioPrompt" onclick="initAndStart()" style="position:fixed;top:0;left:0;right:0;bottom:0;z-index:100;display:flex;align-items:center;justify-content:center;background:rgba(6,8,16,0.92);cursor:pointer;transition:opacity 0.6s">
+<div id="audioPrompt" onclick="initAndStart()" style="position:fixed;top:0;left:0;right:0;bottom:0;z-index:100;display:flex;align-items:center;justify-content:center;background:rgba(14,26,48,0.95);cursor:pointer;transition:opacity 0.6s">
   <div style="text-align:center">
     <svg width="48" height="48" viewBox="0 0 100 100" fill="none">
       <circle cx="50" cy="50" r="46" stroke="rgba(196,145,94,0.3)" stroke-width="1.5"/>
