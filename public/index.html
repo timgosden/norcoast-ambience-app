@@ -1065,7 +1065,7 @@ function updatePerfSetlist(){
   if(keys.length===0){el.innerHTML='';return;}
   el.innerHTML=keys.map(n=>{
     const pd=ps[n];const active=(pd.homeRoot===homeRoot&&JSON.stringify([...enabledEvolveIdx])===JSON.stringify(pd.enabledEvolveIdx||[]));
-    return '<button class="setlist-chip'+(active?' active':'')+'" onclick="loadPreset(\''+n.replace(/'/g,"\\'")+'');updatePerfSetlist()">'+n+'</button>';
+    return '<button class="setlist-chip'+(active?' active':'')+'" onclick="loadPreset(\''+n.replace(/'/g,"\\'")+'\');updatePerfSetlist()">'+n+'</button>';
   }).join('');
 }
 // ─── MIDI ───
