@@ -89,6 +89,7 @@
   .slope-label{font-size:11px;color:rgba(255,255,255,0.35);letter-spacing:0.5px;flex:1}
   .slope-btn{padding:6px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:rgba(255,255,255,0.35);font-size:11px;cursor:pointer;transition:all 0.2s;letter-spacing:0.5px}
   .slope-btn.active{background:rgba(255,255,255,0.1);border-color:rgba(255,255,255,0.25);color:rgba(255,255,255,0.85)}
+  .oct-btn.active{background:rgba(196,145,94,0.18);border-color:rgba(196,145,94,0.5);color:#c4915e;box-shadow:0 0 12px rgba(196,145,94,0.15)}
   .preset-save-row{display:flex;gap:8px;margin:12px 0 4px}
   .preset-input{flex:1;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:10px 12px;color:rgba(255,255,255,0.85);font-size:13px;outline:none;font-family:'Open Sans',sans-serif}
   .preset-input::placeholder{color:rgba(255,255,255,0.2)}
@@ -107,6 +108,11 @@
   .preset-load-btn{padding:7px 14px;border-radius:7px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.55);font-size:11px;cursor:pointer;letter-spacing:0.5px}
   .preset-del-btn{padding:7px 10px;border-radius:7px;border:1px solid rgba(255,80,80,0.2);background:transparent;color:rgba(255,80,80,0.35);font-size:11px;cursor:pointer}
   .preset-empty{font-size:12px;color:rgba(255,255,255,0.2);padding:10px 0;text-align:center}
+  .cc-learn-btn{font-size:9px;padding:2px 6px;border-radius:8px;border:1px solid rgba(196,145,94,0.3);background:rgba(196,145,94,0.08);color:rgba(196,145,94,0.7);cursor:pointer;margin-right:4px;transition:all 0.15s;white-space:nowrap}
+  .cc-learn-btn.pending{border-color:rgba(196,145,94,0.8);background:rgba(196,145,94,0.2);color:rgba(196,145,94,1);animation:learnPulse 0.7s ease-in-out infinite alternate}
+  @keyframes learnPulse{from{opacity:0.6}to{opacity:1}}
+  .cc-badge{font-size:9px;padding:2px 5px;border-radius:6px;background:rgba(94,184,138,0.12);border:1px solid rgba(94,184,138,0.3);color:rgba(94,184,138,0.8);cursor:pointer;margin-right:4px}
+  .cc-badge:hover{background:rgba(220,60,60,0.15);border-color:rgba(220,80,80,0.4);color:rgba(220,100,100,0.9)}
   .midi-map-grid{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;padding:4px 0}
   .midi-cc{font-size:10px;color:rgba(196,145,94,0.7);letter-spacing:0.5px;font-weight:600;white-space:nowrap;padding:3px 0}
   .midi-lbl{font-size:10px;color:rgba(255,255,255,0.45);padding:3px 0}
@@ -192,17 +198,17 @@ function semiFreq(f,s){return f*Math.pow(2,s/12)}
 const C2=noteFreq("C",2); // base pitch of sample
 
 const CHORD_TYPES=[
-  {name:"5th",    semis:[7],        weight:5},
-  {name:"Oct",    semis:[12],       weight:5},
-  {name:"4th",    semis:[5],        weight:4},
-  {name:"9th",    semis:[14],       weight:3},
-  {name:"4+Oct",  semis:[5,12],     weight:2},
-  {name:"5+Oct",  semis:[7,12],     weight:2},
-  {name:"Sus",    semis:[5,7],      weight:2},
-  {name:"11th",   semis:[17],       weight:1},
+  {name:"5th",      semis:[7],        weight:5},
+  {name:"Oct",      semis:[12],       weight:5},
+  {name:"4th",      semis:[5],        weight:4},
+  {name:"Sus2",     semis:[2,7],      weight:4},
+  {name:"Sus4",     semis:[5,7],      weight:3},
+  {name:"5th+Oct",  semis:[7,12],     weight:3},
+  {name:"Maj7th",   semis:[11],       weight:3},
+  {name:"5th+9th",  semis:[7,14],     weight:3},
+  {name:"6th",      semis:[9],        weight:2},
+  {name:"5th+Maj7", semis:[7,11],     weight:2},
 ];
-// Alias for legacy references
-const EVOLVE_INTERVALS=CHORD_TYPES;
 
 const SCALE_MODES=[
   {name:"Chrom", steps:null},
@@ -237,14 +243,14 @@ let dulcimerBuf=null; // decoded audio buffer
 let homeRoot="C",evolving=true,evolveSpeed=0.5,currentEvolve=0,currentMode=0;
 let delayTimeVal=DELAY_Q;
 let lpfValue=0.7,hpfValue=0,densityValue=0.5;
-let reverbMix=0.6,reverbSize=0.78,reverbDamp=2600,delayMixVal=0.1,delayFeedback=0.4,masterVol=0.65;
+let reverbMix=0.6,reverbSize=0.78,reverbDamp=2600,delayMixVal=0.1,delayFeedback=0.4,masterVol=0.8;
 let textureOctUp=true;
 let staticNodes={},evolveNodes={},layerState={};
 let shimmerActive=false,shimmerGainNode=null,shimmerTimer=null,shimmerVol=0;
 let granularTimers=[],granularGain=null,reversedBuf=null;
 let evolveTimer=null,animFrame=null;
 let audioPaused=false;
-let enabledEvolveIdx=new Set([0,1,2,3,4,5,6,7]);
+let enabledEvolveIdx=new Set([0,1,2,3,4,5,6,7,8,9]);
 
 const DEFAULT_VOLUMES={foundation:0.55,pads:0.45,texture:0.3};
 PAD_LAYERS.forEach(l=>{layerState[l.id]={active:true,volume:DEFAULT_VOLUMES[l.id]??0}});
@@ -409,10 +415,6 @@ function stopGranular(){
   }
 }
 
-function updateGranularPitch(){
-  // Pitch changes happen naturally on next grain — no restart needed
-  // The grainStream function reads current homeRoot/currentEvolve each time
-}
 
 // ─── AUDIO INIT ───
 let _pitchShifterNode=null; // AudioWorkletNode created once worklet loads
@@ -459,7 +461,7 @@ async function initAudio(){
   eqHighNode.connect(delayNode);
   eqHighNode.connect(chorusGainNode);chorusGainNode.connect(dL);chorusGainNode.connect(dR);dL.connect(pL);dR.connect(pR);pL.connect(analyser);pR.connect(analyser);delayNode.connect(dLP);dLP.connect(delayFB);delayFB.connect(delayNode);dLP.connect(delayGainN);
   dryGain.connect(analyser);reverbGain.connect(analyser);delayGainN.connect(analyser);
-  shimmerNode=createShimmerReverb();eqHighNode.connect(shimmerNode.input);shimmerNode.output.connect(analyser);
+  shimmerNode=createShimmerReverb();eqHighNode.connect(shimmerNode.input);shimmerNode.stereoL.connect(analyser);shimmerNode.stereoR.connect(analyser);
   applyDelaySync();
   const limiter=ctx.createDynamicsCompressor();
   limiter.threshold.value=-3;limiter.knee.value=3;limiter.ratio.value=20;
@@ -508,29 +510,36 @@ function createShimmerReverb(){
   // Slow modulation on pre-delay (chorus character)
   const lfo=ctx.createOscillator();lfo.type='sine';lfo.frequency.value=0.09;
   const lg=ctx.createGain();lg.gain.value=0.012;lfo.connect(lg);lg.connect(preDel.delayTime);lfo.start();
-  // HP in feedback: bleeds bass each pass → high end sustained longer = shimmer feel
-  const hp=ctx.createBiquadFilter();hp.type='highpass';hp.frequency.value=380;hp.Q.value=0.5;
-  // LP to prevent aliasing from repeated octave-up pitching
-  const lp=ctx.createBiquadFilter();lp.type='lowpass';lp.frequency.value=7000;lp.Q.value=0.5;
+  // HP at 280 Hz: bleeds bass each pass → high end sustained longer = shimmer feel; warmer than 380
+  const hp=ctx.createBiquadFilter();hp.type='highpass';hp.frequency.value=280;hp.Q.value=0.5;
+  // LP at 4500 Hz: warm, anti-aliasing for repeated octave-up passes
+  const lp=ctx.createBiquadFilter();lp.type='lowpass';lp.frequency.value=4500;lp.Q.value=0.5;
   // 2-stage allpass for post-pitch-shift diffusion
   const ap2=[3200,6800].map(f=>{const n=ctx.createBiquadFilter();n.type='allpass';n.frequency.value=f;n.Q.value=7;return n;});
-  const fbG=ctx.createGain();fbG.gain.value=0.62;
-  // Routing:
-  // inputG → ap1 chain → preDel → hp → [pitchShifter if available] → lp → ap2 chain → fbG
-  // fbG → ap1[0]  (feedback)
-  // fbG → outputG (tap to output)
+  // Higher feedback → longer, denser tail (~6 s RT60)
+  const fbG=ctx.createGain();fbG.gain.value=0.80;
+  // Routing: inputG → ap1 chain → preDel → hp → [pitchShifter] → lp → ap2 chain → fbG
+  // fbG → ap1[0] (feedback) and fbG → outputG (output tap)
   inputG.connect(ap1[0]);
   ap1.forEach((n,i)=>{if(i<ap1.length-1)n.connect(ap1[i+1]);});
   ap1[ap1.length-1].connect(preDel);
   preDel.connect(hp);
-  // Pitch shifter in feedback — octave up each pass
   if(_pitchShifterNode){hp.connect(_pitchShifterNode);_pitchShifterNode.connect(lp);}
-  else{hp.connect(lp);}  // graceful fallback: shimmer without pitch shift
+  else{hp.connect(lp);}
   lp.connect(ap2[0]);ap2[0].connect(ap2[1]);
   ap2[1].connect(fbG);
-  fbG.connect(ap1[0]); // feedback
-  fbG.connect(outputG); // output tap
-  return{input:inputG,output:outputG};
+  fbG.connect(ap1[0]);
+  fbG.connect(outputG);
+  // Haas stereo spread: two panned copies with slight delay offset
+  const warmLP=ctx.createBiquadFilter();warmLP.type='lowpass';warmLP.frequency.value=5500;
+  const dL=ctx.createDelay(0.05);dL.delayTime.value=0.011;
+  const dR=ctx.createDelay(0.05);dR.delayTime.value=0.019;
+  const pL=ctx.createStereoPanner();pL.pan.value=-0.8;
+  const pR=ctx.createStereoPanner();pR.pan.value=0.8;
+  outputG.connect(warmLP);
+  warmLP.connect(dL);dL.connect(pL);
+  warmLP.connect(dR);dR.connect(pR);
+  return{input:inputG,output:outputG,stereoL:pL,stereoR:pR};
 }
 function startShimmer(vol){
   shimmerActive=true;
@@ -552,6 +561,7 @@ function stopShimmer(){
 
 function startPad(def,vol,root,ei){
   if(def.type==="granular"){startGranular(vol);return}
+  if(vol<=0){stopPad(def.id);return;}
   fadeOut(staticNodes[def.id],XFADE);fadeOut(evolveNodes[def.id],XFADE);
   staticNodes[def.id]=buildGroup(def,getStaticFreqs(root,def),vol,ATTACK);
   if(!def.rootOnly)evolveNodes[def.id]=buildGroup(def,getEvolveFreq(root,ei),vol,ATTACK);
@@ -566,13 +576,13 @@ function stopPad(id){
 function evolveVoice(ei){
   const ef=getEvolveFreq(homeRoot,ei);
   PAD_LAYERS.forEach(l=>{
-    if(l.type==="granular"){updateGranularPitch();return}
-    if(layerState[l.id].active&&layerState[l.id].volume>0&&!l.rootOnly){
+    if(l.type==="granular")return;
+    if(layerState[l.id].volume>0&&!l.rootOnly){
       fadeOut(evolveNodes[l.id],XFADE);
       evolveNodes[l.id]=buildGroup(l,ef,layerState[l.id].volume,XFADE);
     }
   });
-  if(shimmerActive)updateShimmerPitch();
+  
 }
 
 // ─── EVOLUTION ───
@@ -628,14 +638,26 @@ function wireEQSlider(c,id,fn){
 function toggleEQPanel(btn){
   const panel=document.getElementById('eqPanel');if(!panel)return;
   const open=panel.classList.toggle('open');btn.textContent=open?'EQ ▴':'EQ ▾';
-  if(open)setTimeout(drawEQCurve,50);
 }
 function volToFader(v){return Math.pow(Math.max(0,v),1/3)}
 function faderToVol(f){return f<0.02?0:f*f*f}
 
 // ─── UI ───
 function sliderRowHTML(id,lbl,color,val,display,disabled){
-  return '<div class="slider-row"'+(disabled?' style="opacity:0.38;pointer-events:none"':'')+' ><span class="slider-lbl">'+lbl+'</span><input type="range" min="0" max="1" step="0.003" value="'+val+'" data-sr="'+id+'" data-color="'+color+'" '+(disabled?'disabled ':'')+' style="background:linear-gradient(to right,'+color+'66 '+val*100+'%,rgba(255,255,255,0.06) '+val*100+'%);accent-color:'+color+'"><span class="slider-val" id="sr_'+id+'">'+display+'</span></div>';
+  const mapped=midiMappings[id];
+  let cc='';
+  if(midiLearnMode){
+    const pend=midiLearnPending===id;
+    cc='<button class="cc-learn-btn'+(pend?' pending':'')+'" onclick="startLearnForParam(\''+id+'\')">'+(pend?'Waiting…':'Map CC')+'</button>';
+    if(mapped)cc+='<span class="cc-badge" onclick="clearLearn(\''+id+'\')" title="Remove mapping">CC'+mapped+'</span>';
+  }else if(mapped){
+    cc='<span class="cc-badge" onclick="clearLearn(\''+id+'\')" title="Click to remove MIDI mapping">CC'+mapped+'</span>';
+  }
+  return '<div class="slider-row"'+(disabled?' style="opacity:0.38;pointer-events:none"':'')+'>'+
+    '<span class="slider-lbl">'+lbl+'</span>'+cc+
+    '<input type="range" min="0" max="1" step="0.003" value="'+val+'" data-sr="'+id+'" data-color="'+color+'" '+(disabled?'disabled ':'')+
+    ' style="background:linear-gradient(to right,'+color+'66 '+val*100+'%,rgba(255,255,255,0.06) '+val*100+'%);accent-color:'+color+'">'+
+    '<span class="slider-val" id="sr_'+id+'">'+display+'</span></div>';
 }
 function wireSR(c,id,fn){
   const inp=c.querySelector('input[data-sr="'+id+'"]');const val=c.querySelector('#sr_'+id);
@@ -664,10 +686,10 @@ function buildKeys(){
       }
       homeRoot=n;document.getElementById('stateRoot').textContent=n;
       PAD_LAYERS.forEach(l=>{
-        if(!layerState[l.id].active||layerState[l.id].volume<=0)return;
+        if(layerState[l.id].volume<=0)return;
         startPad(l,layerState[l.id].volume,homeRoot,currentEvolve);
       });
-      if(shimmerActive)updateShimmerPitch();
+      
       buildKeys();saveSettings();
     };
     row.appendChild(btn);
@@ -707,13 +729,18 @@ function toggleLayer(id){
 }
 function toggleChord(i){
   if(enabledEvolveIdx.has(i)){
-    if(enabledEvolveIdx.size<=1)return;
+    if(enabledEvolveIdx.size<=1){
+      // Flash the pill to signal it can't be removed
+      const pill=document.querySelector('.chord-pill[data-ci="'+i+'"]');
+      if(pill){pill.style.outline='2px solid rgba(196,145,94,0.7)';setTimeout(()=>pill.style.outline='',400);}
+      return;
+    }
     enabledEvolveIdx.delete(i);
     if(currentEvolve===i){
       const active=[...enabledEvolveIdx];
       currentEvolve=active[Math.floor(Math.random()*active.length)];
       evolveVoice(currentEvolve);
-      document.getElementById('stateEvolve').textContent=EVOLVE_INTERVALS[currentEvolve].name;
+      document.getElementById('stateEvolve').textContent=CHORD_TYPES[currentEvolve].name;
     }
   }else{
     enabledEvolveIdx.add(i);
@@ -734,7 +761,7 @@ function buildEditSheet(){
   const c=document.getElementById('editContent');c.innerHTML='';
   // ── Chords ──
   let h='<div class="edit-section"><div class="edit-title">Chords</div><div class="chord-pills">';
-  EVOLVE_INTERVALS.forEach((iv,i)=>{h+='<button class="chord-pill'+(enabledEvolveIdx.has(i)?' active':'')+'" data-ci="'+i+'" onclick="toggleChord('+i+')">'+iv.name+'</button>'});
+  CHORD_TYPES.forEach((iv,i)=>{h+='<button class="chord-pill'+(enabledEvolveIdx.has(i)?' active':'')+'" data-ci="'+i+'" onclick="toggleChord('+i+')">'+iv.name+'</button>'});
   h+='</div>';
   h+='</div><div class="edit-divider"></div>';
   // ── Layers ──
@@ -747,8 +774,7 @@ function buildEditSheet(){
     h+='<input type="range" min="0" max="1" step="0.003" value="'+fPos+'" data-lid="'+l.id+'" style="background:linear-gradient(to right,'+l.color+'55 '+fPos*100+'%,rgba(255,255,255,0.06) '+fPos*100+'%);accent-color:'+l.color+'">';
     h+='</div>';
   });
-  h+='<div class="slope-row" style="margin:6px 0 2px"><span class="slope-label">Texture Oct</span><button class="slope-btn'+(textureOctUp?' active':'')+'" onclick="toggleTextureOct()">+1 Oct</button></div>';
-  h+=sliderRowHTML('den','Spread','#7ab8d8',densityValue,Math.round(densityValue*100)+'%');
+  h+='<div class="slope-row" style="margin:6px 0 2px"><span class="slope-label">Texture Oct</span><button class="slope-btn oct-btn'+(textureOctUp?' active':'')+'" onclick="toggleTextureOct()">+1 Oct</button></div>';
   h+='</div><div class="edit-divider"></div>';
   // ── Effects ──
   const shF=volToFader(shimmerVol);
@@ -756,7 +782,7 @@ function buildEditSheet(){
   const rvSzSecs=(rvSz*11.5+0.5).toFixed(1)+'s';
   h+='<div class="edit-section">';
   h+='<div class="fx-section-header" style="background:rgba(106,159,216,0.08);border-left:3px solid #6a9fd8">Reverb</div>';
-  h+=sliderRowHTML('rev','Mix','#6a9fd8',volToFader(reverbMix),Math.round(reverbMix*100)+'%');
+  h+=sliderRowHTML('rev','Mix','#6a9fd8',reverbMix,Math.round(reverbMix*100)+'%');
   h+=sliderRowHTML('rvSz','Size','#6a9fd8',rvSz,rvSzSecs);
   h+=sliderRowHTML('rvDp','Damp','#6a9fd8',rvDp,formatHz(reverbDamp));
   h+='<div class="fx-section-header" style="background:rgba(94,184,138,0.08);border-left:3px solid #5eb88a">Delay</div>';
@@ -767,7 +793,7 @@ function buildEditSheet(){
   h+='</div>';
   if(!delaySync){const dtR=Math.log(delayTimeVal/0.05)/Math.log(2.0/0.05);h+=sliderRowHTML('dlyT','Time','#5eb88a',dtR,Math.round(delayTimeVal*1000)+'ms')}
   h+='<div class="fx-section-header" style="background:rgba(196,183,232,0.08);border-left:3px solid #c4b8e8">Modulation</div>';
-  h+=sliderRowHTML('chr','Chorus','#c4b8e8',volToFader(chorusMix),Math.round(chorusMix*100)+'%');
+  h+=sliderRowHTML('chr','Chorus','#c4b8e8',chorusMix,Math.round(chorusMix*100)+'%');
   h+=sliderRowHTML('shm','Shimmer','#d46b8a',shF,Math.round(shimmerVol*100)+'%');
   h+='</div><div class="edit-divider"></div>';
   // ── Tone / Filters ──
@@ -777,7 +803,6 @@ function buildEditSheet(){
   // EQ expandable panel
   h+='<button class="eq-toggle" onclick="toggleEQPanel(this)">EQ ▾</button>';
   h+='<div class="eq-panel" id="eqPanel">';
-  h+='<canvas id="eqCanvas" width="800" height="220"></canvas>';
   h+='<div class="eq-section-title">Low Shelf · 100 Hz</div>';
   h+=eqSliderRowHTML('eqL','Low',eqLowGain);
   h+='<div class="eq-section-title">Lo-Mid · 350 Hz</div>';
@@ -789,10 +814,19 @@ function buildEditSheet(){
   h+='</div>';
   h+='</div><div class="edit-divider"></div>';
   // ── MIDI map ──
-  h+='<div class="edit-section"><div class="edit-title">MIDI Map</div>';
-  h+='<div class="midi-map-grid">';
-  [['CC 1','Reverb Mix'],['CC 7 / 11','Master Vol'],['CC 21','Low Pass'],['CC 22','High Pass'],['CC 23','Delay Mix'],['CC 24','Shimmer'],['CC 25','Spread'],['CC 26','Chorus'],['CC 27','Reverb Size'],['CC 28','Delay Feedback'],['Note On','Root Key']].forEach(([cc,lbl])=>{h+='<div class="midi-cc">'+cc+'</div><div class="midi-lbl">'+lbl+'</div>';});
-  h+='</div></div><div class="edit-divider"></div>';
+  h+='<div class="edit-section"><div class="edit-title">MIDI</div>';
+  if(!midiReady){
+    h+='<div class="midi-lbl" style="margin-bottom:10px;color:rgba(255,255,255,0.3)">Press the MIDI button to connect a controller, then use Learn to map CCs to controls.</div>';
+  }
+  h+='<button class="slope-btn'+(midiLearnMode?' active':'')+'" onclick="toggleMIDILearn()" style="width:100%;padding:10px 0;margin-bottom:10px;font-size:12px;letter-spacing:1px">'+(midiLearnMode?'MIDI Learn: ON  (touch Map on any control)':'MIDI Learn: Off')+'</button>';
+  const mappedIds=Object.keys(midiMappings);
+  if(mappedIds.length>0){
+    h+='<div class="midi-map-grid">';
+    mappedIds.forEach(pid=>{h+='<div class="midi-cc">CC'+midiMappings[pid]+'</div><div class="midi-lbl">'+pid+'<button class="cc-learn-btn" onclick="clearLearn(\''+pid+'\')" style="margin-left:8px">✕</button></div>';});
+    h+='</div>';
+  }
+  h+='<div class="midi-lbl" style="margin-top:10px;color:rgba(255,255,255,0.2)">Note On → Root Key (always active)</div>';
+  h+='</div><div class="edit-divider"></div>';
   // ── Evolution ──
   h+='<div class="edit-section"><div class="edit-title">Evolution</div>';
   h+=sliderRowHTML('spd','Speed','#c4915e',volToFader(evolveSpeed),Math.round(evolveSpeed*100)+'%',evolveOnBeat);
@@ -836,26 +870,26 @@ function buildEditSheet(){
     });
   });
   // Wire Effects sliders
-  wireSR(c,'rev',r=>{reverbMix=faderToVol(r);reverbGain.gain.value=reverbMix;dryGain.gain.value=1-reverbMix*0.35;return Math.round(reverbMix*100)+'%'});
+  wireSR(c,'rev',r=>{reverbMix=r;reverbGain.gain.value=r;return Math.round(r*100)+'%'});
   wireSR(c,'rvSz',r=>{reverbSize=reverbSizeToFB(r);if(reverb&&reverb.fbGain)reverb.fbGain.gain.linearRampToValueAtTime(reverbSize,ctx.currentTime+0.1);const secs=(r*11.5+0.5).toFixed(1);return secs+'s'});
   wireSR(c,'rvDp',r=>{reverbDamp=dampFaderToHz(r);if(reverb&&reverb.damp){reverb.damp.frequency.linearRampToValueAtTime(reverbDamp,ctx.currentTime+0.1);reverb.damp2.frequency.linearRampToValueAtTime(reverbDamp*1.25,ctx.currentTime+0.1)}return formatHz(reverbDamp)});
   wireSR(c,'dly',r=>{delayMixVal=faderToVol(r);delayGainN.gain.value=delayMixVal;return Math.round(delayMixVal*100)+'%'});
   wireSR(c,'dlyFB',r=>{delayFeedback=r*0.85;if(delayFB)delayFB.gain.linearRampToValueAtTime(delayFeedback,ctx.currentTime+0.1);return Math.round(r*100)+'%'});
   wireSR(c,'dlyT',r=>{delayTimeVal=0.05*Math.pow(2.0/0.05,r);if(delayNode&&!delaySync)delayNode.delayTime.linearRampToValueAtTime(delayTimeVal,ctx.currentTime+0.1);return Math.round(delayTimeVal*1000)+'ms'});
   wireSR(c,'shm',r=>{const vol=faderToVol(r),was=shimmerVol;shimmerVol=vol;if(vol>0&&was===0)startShimmer(vol);else if(vol<=0)stopShimmer();else if(shimmerNode)shimmerNode.output.gain.linearRampToValueAtTime(vol*0.7,ctx.currentTime+0.1);return Math.round(vol*100)+'%'});
-  wireSR(c,'chr',r=>{chorusMix=faderToVol(r);if(chorusGainNode)chorusGainNode.gain.linearRampToValueAtTime(chorusMix*0.8,ctx.currentTime+0.1);return Math.round(chorusMix*100)+'%'});
+  wireSR(c,'chr',r=>{chorusMix=r;if(chorusGainNode)chorusGainNode.gain.linearRampToValueAtTime(r*0.8,ctx.currentTime+0.1);return Math.round(r*100)+'%'});
   // Wire Tone sliders
-  wireSR(c,'lpf',r=>{lpfValue=r;const hz=lpfFaderToHz(r);globalLPF.frequency.linearRampToValueAtTime(hz,ctx.currentTime+0.1);if(globalLPF2&&lpfSlope===24)globalLPF2.frequency.linearRampToValueAtTime(hz,ctx.currentTime+0.1);drawEQCurve();return formatHz(hz)});
-  wireSR(c,'lpfQ',r=>{lpfQ=sliderToQ(r);globalLPF.Q.linearRampToValueAtTime(lpfQ,ctx.currentTime+0.05);if(globalLPF2)globalLPF2.Q.linearRampToValueAtTime(lpfQ,ctx.currentTime+0.05);drawEQCurve();return lpfQ.toFixed(1)});
-  wireSR(c,'hpf',r=>{hpfValue=r;const hz=hpfFaderToHz(r);globalHPF.frequency.linearRampToValueAtTime(hz,ctx.currentTime+0.1);if(globalHPF2&&hpfSlope===24)globalHPF2.frequency.linearRampToValueAtTime(hz,ctx.currentTime+0.1);drawEQCurve();return formatHz(hz)});
-  wireSR(c,'hpfQ',r=>{hpfQ=sliderToQ(r);globalHPF.Q.linearRampToValueAtTime(hpfQ,ctx.currentTime+0.05);if(globalHPF2)globalHPF2.Q.linearRampToValueAtTime(hpfQ,ctx.currentTime+0.05);drawEQCurve();return hpfQ.toFixed(1)});
+  wireSR(c,'lpf',r=>{lpfValue=r;const hz=lpfFaderToHz(r);globalLPF.frequency.linearRampToValueAtTime(hz,ctx.currentTime+0.1);if(globalLPF2&&lpfSlope===24)globalLPF2.frequency.linearRampToValueAtTime(hz,ctx.currentTime+0.1);return formatHz(hz)});
+  wireSR(c,'lpfQ',r=>{lpfQ=sliderToQ(r);globalLPF.Q.linearRampToValueAtTime(lpfQ,ctx.currentTime+0.05);if(globalLPF2)globalLPF2.Q.linearRampToValueAtTime(lpfQ,ctx.currentTime+0.05);return lpfQ.toFixed(1)});
+  wireSR(c,'hpf',r=>{hpfValue=r;const hz=hpfFaderToHz(r);globalHPF.frequency.linearRampToValueAtTime(hz,ctx.currentTime+0.1);if(globalHPF2&&hpfSlope===24)globalHPF2.frequency.linearRampToValueAtTime(hz,ctx.currentTime+0.1);return formatHz(hz)});
+  wireSR(c,'hpfQ',r=>{hpfQ=sliderToQ(r);globalHPF.Q.linearRampToValueAtTime(hpfQ,ctx.currentTime+0.05);if(globalHPF2)globalHPF2.Q.linearRampToValueAtTime(hpfQ,ctx.currentTime+0.05);return hpfQ.toFixed(1)});
   // Wire EQ sliders
-  wireEQSlider(c,'eqL',db=>{eqLowGain=db;eqLowNode.gain.linearRampToValueAtTime(db,ctx.currentTime+0.05);drawEQCurve()});
-  wireEQSlider(c,'eqLM',db=>{eqLoMidGain=db;eqLoMidNode.gain.linearRampToValueAtTime(db,ctx.currentTime+0.05);drawEQCurve()});
-  wireEQSlider(c,'eqHM',db=>{eqHiMidGain=db;eqHiMidNode.gain.linearRampToValueAtTime(db,ctx.currentTime+0.05);drawEQCurve()});
-  wireEQSlider(c,'eqH',db=>{eqHighGain=db;eqHighNode.gain.linearRampToValueAtTime(db,ctx.currentTime+0.05);drawEQCurve()});
+  wireEQSlider(c,'eqL',db=>{eqLowGain=db;eqLowNode.gain.linearRampToValueAtTime(db,ctx.currentTime+0.05);});
+  wireEQSlider(c,'eqLM',db=>{eqLoMidGain=db;eqLoMidNode.gain.linearRampToValueAtTime(db,ctx.currentTime+0.05);});
+  wireEQSlider(c,'eqHM',db=>{eqHiMidGain=db;eqHiMidNode.gain.linearRampToValueAtTime(db,ctx.currentTime+0.05);});
+  wireEQSlider(c,'eqH',db=>{eqHighGain=db;eqHighNode.gain.linearRampToValueAtTime(db,ctx.currentTime+0.05);});
   // Wire other sliders
-  wireSR(c,'den',r=>{densityValue=r;clearTimeout(_densityRebuildT);_densityRebuildT=setTimeout(()=>{PAD_LAYERS.forEach(l=>{if(l.type!=="granular"&&layerState[l.id].volume>0)startPad(l,layerState[l.id].volume,homeRoot,currentEvolve)});},400);return Math.round(r*100)+'%'});
+
   wireSR(c,'gSz',r=>{grainSize=r;return Math.round(r*100)+'%'});
   wireSR(c,'gSpr',r=>{grainSpread=r;return Math.round(r*100)+'%'});
   wireSR(c,'spd',r=>{evolveSpeed=faderToVol(r);return Math.round(evolveSpeed*100)+'%'});
@@ -975,7 +1009,7 @@ function savePreset(name){
   if(!name.trim())return;const ps=getPresets();ps[name.trim()]=captureState();
   localStorage.setItem('norcoast_presets',JSON.stringify(ps));buildEditSheet();updatePerfSetlist();
 }
-function loadPreset(name){
+function loadPreset(name){try{
   const ps=getPresets();const s=ps[name];if(!s)return;
   if(s.homeRoot)homeRoot=s.homeRoot;if(s.evolving!=null)evolving=s.evolving;if(s.evolveSpeed!=null)evolveSpeed=s.evolveSpeed;
   if(s.lpfValue!=null)lpfValue=s.lpfValue;if(s.hpfValue!=null)hpfValue=s.hpfValue;if(s.lpfQ!=null)lpfQ=s.lpfQ;if(s.hpfQ!=null)hpfQ=s.hpfQ;
@@ -989,8 +1023,12 @@ function loadPreset(name){
   if(Array.isArray(s.enabledEvolveIdx))enabledEvolveIdx=new Set(s.enabledEvolveIdx);
   if(s.layers)PAD_LAYERS.forEach(l=>{if(s.layers[l.id]!=null)layerState[l.id].volume=s.layers[l.id].volume??0});
   // Apply audio nodes
+  if(s.lpfSlope!=null)lpfSlope=s.lpfSlope;
+  if(s.hpfSlope!=null)hpfSlope=s.hpfSlope;
   if(globalLPF){globalLPF.frequency.value=lpfFaderToHz(lpfValue);globalLPF.Q.value=lpfQ}
+  if(globalLPF2)globalLPF2.frequency.value=lpfSlope===24?lpfFaderToHz(lpfValue):22000;
   if(globalHPF){globalHPF.frequency.value=hpfFaderToHz(hpfValue);globalHPF.Q.value=hpfQ}
+  if(globalHPF2)globalHPF2.frequency.value=hpfSlope===24?hpfFaderToHz(hpfValue):20;
   if(eqLowNode)eqLowNode.gain.value=eqLowGain;if(eqLoMidNode)eqLoMidNode.gain.value=eqLoMidGain;if(eqHiMidNode)eqHiMidNode.gain.value=eqHiMidGain;if(eqHighNode)eqHighNode.gain.value=eqHighGain;if(chorusGainNode)chorusGainNode.gain.value=chorusMix*0.8;
   if(reverbGain){reverbGain.gain.value=reverbMix;dryGain.gain.value=1-reverbMix*0.35}
   if(reverb&&reverb.fbGain)reverb.fbGain.gain.value=reverbSize;
@@ -1003,10 +1041,11 @@ function loadPreset(name){
   if(!enabledEvolveIdx.has(currentEvolve)){currentEvolve=[...enabledEvolveIdx][0];evolveVoice(currentEvolve)}
   // Update UI
   document.getElementById('stateRoot').textContent=homeRoot;
-  document.getElementById('stateEvolve').textContent=EVOLVE_INTERVALS[currentEvolve].name;
+  document.getElementById('stateEvolve').textContent=CHORD_TYPES[currentEvolve].name;
   const eb=document.getElementById('evolveBtn');if(eb){eb.className='evolve-pill '+(evolving?'on':'off');eb.textContent=evolving?'Evolving':'Static'}
   buildKeys();saveSettings();buildEditSheet();
-}
+}catch(e){console.error('loadPreset:',e);}}
+
 function deletePreset(name){
   const ps=getPresets();delete ps[name];localStorage.setItem('norcoast_presets',JSON.stringify(ps));buildEditSheet();updatePerfSetlist();
 }
@@ -1053,7 +1092,7 @@ function fireClick(t){
 function toggleClick(){
   if(!ctx)return;
   if(clickActive)stopClick();else startClick();
-  const btn=document.getElementById('clickBtn');if(btn){btn.className='evolve-pill '+(clickActive?'on':'off');btn.textContent='Click'+(clickActive?' On':'')}
+  const btn=document.getElementById('clickBtn');if(btn){btn.className='evolve-pill '+(clickActive?'on':'off');btn.textContent=clickActive?'Click: On':'Click: Off'}
   // Re-draw BPM control if edit sheet open
   const bpmInp=document.getElementById('bpmInput');if(bpmInp)bpmInp.value=clickBPM;
 }
@@ -1142,12 +1181,46 @@ function updatePerfSetlist(){
   }).join('');
 }
 // ─── MIDI ───
-let midiReady=false;
+let midiReady=false,midiLearnMode=false,midiLearnPending=null,midiMappings={};
 const MIDI_NOTE_NAMES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+function loadMidiMappings(){try{midiMappings=JSON.parse(localStorage.getItem('norcoast_midi')||'{}')}catch(e){midiMappings={}}}
+function saveMidiMappings(){localStorage.setItem('norcoast_midi',JSON.stringify(midiMappings))}
+function toggleMIDILearn(){midiLearnMode=!midiLearnMode;midiLearnPending=null;if(document.getElementById('editSheet').classList.contains('open'))buildEditSheet()}
+function startLearnForParam(id){midiLearnPending=id;if(document.getElementById('editSheet').classList.contains('open'))buildEditSheet()}
+function clearLearn(id){delete midiMappings[id];saveMidiMappings();if(document.getElementById('editSheet').classList.contains('open'))buildEditSheet()}
+function applyMidiParam(id,val){
+  switch(id){
+    case'rev':reverbMix=val;if(reverbGain){reverbGain.gain.value=val;dryGain.gain.value=1-val*0.35}break;
+    case'rvSz':reverbSize=reverbSizeToFB(val);if(reverb&&reverb.fbGain)reverb.fbGain.gain.linearRampToValueAtTime(reverbSize,ctx.currentTime+0.1);break;
+    case'rvDp':reverbDamp=dampFaderToHz(val);if(reverb&&reverb.damp){reverb.damp.frequency.linearRampToValueAtTime(reverbDamp,ctx.currentTime+0.1);reverb.damp2.frequency.linearRampToValueAtTime(reverbDamp*1.25,ctx.currentTime+0.1)}break;
+    case'dly':delayMixVal=faderToVol(val);if(delayGainN)delayGainN.gain.value=delayMixVal;break;
+    case'dlyFB':delayFeedback=val*0.85;if(delayFB)delayFB.gain.linearRampToValueAtTime(delayFeedback,ctx.currentTime+0.1);break;
+    case'dlyT':delayTimeVal=0.05*Math.pow(2.0/0.05,val);if(delayNode&&!delaySync)delayNode.delayTime.linearRampToValueAtTime(delayTimeVal,ctx.currentTime+0.1);break;
+    case'chr':chorusMix=val;if(chorusGainNode)chorusGainNode.gain.linearRampToValueAtTime(val*0.8,ctx.currentTime+0.1);break;
+    case'shm':{const sv=faderToVol(val),wasS=shimmerVol;shimmerVol=sv;if(sv>0&&wasS===0)startShimmer(sv);else if(sv<=0)stopShimmer();else if(shimmerNode)shimmerNode.output.gain.linearRampToValueAtTime(sv*0.7,ctx.currentTime+0.1);break}
+    case'lpf':lpfValue=val;{const hz=lpfFaderToHz(val);if(globalLPF){globalLPF.frequency.linearRampToValueAtTime(hz,ctx.currentTime+0.1);if(globalLPF2&&lpfSlope===24)globalLPF2.frequency.linearRampToValueAtTime(hz,ctx.currentTime+0.1)}}break;
+    case'hpf':hpfValue=val;{const hz=hpfFaderToHz(val);if(globalHPF){globalHPF.frequency.linearRampToValueAtTime(hz,ctx.currentTime+0.1);if(globalHPF2&&hpfSlope===24)globalHPF2.frequency.linearRampToValueAtTime(hz,ctx.currentTime+0.1)}}break;
+    case'spd':evolveSpeed=faderToVol(val);break;
+    case'mst':masterVol=faderToVol(val);if(master)master.gain.linearRampToValueAtTime(masterVol,ctx.currentTime+0.1);break;
+  }
+  queueSave();
+}
 function handleMIDI(msg){
   const [s,d1,d2]=msg.data;const type=s&0xF0;
   if(type===0xB0){// CC
-    const r=d2/127;
+    const val=d2/127;
+    // Learn mode: capture this CC for the pending param
+    if(midiLearnMode&&midiLearnPending){
+      midiMappings[midiLearnPending]=d1;
+      saveMidiMappings();
+      midiLearnPending=null;
+      if(document.getElementById('editSheet').classList.contains('open'))buildEditSheet();
+      return;
+    }
+    // User-mapped CCs take priority
+    const userParam=Object.keys(midiMappings).find(p=>midiMappings[p]===d1);
+    if(userParam){applyMidiParam(userParam,val);return;}
+    // Hardcoded fallbacks
     ({1:r=>{reverbMix=r;if(reverbGain){reverbGain.gain.value=r;dryGain.gain.value=1-r*0.35}},
       7:r=>{masterVol=r;if(master)master.gain.linearRampToValueAtTime(r,ctx.currentTime+0.05)},
       11:r=>{masterVol=r;if(master)master.gain.linearRampToValueAtTime(r,ctx.currentTime+0.05)},
@@ -1159,7 +1232,7 @@ function handleMIDI(msg){
       26:r=>{chorusMix=faderToVol(r);if(chorusGainNode)chorusGainNode.gain.linearRampToValueAtTime(chorusMix*0.8,ctx.currentTime+0.05)},
       27:r=>{reverbSize=reverbSizeToFB(r);if(reverb&&reverb.fbGain)reverb.fbGain.gain.linearRampToValueAtTime(reverbSize,ctx.currentTime+0.1)},
       28:r=>{delayFeedback=r*0.85;if(delayFB)delayFB.gain.linearRampToValueAtTime(delayFeedback,ctx.currentTime+0.1)},
-    })[d1]?.(r);queueSave();
+    })[d1]?.(val);queueSave();
   }
   if(type===0x90&&d2>0){// Note On → change root (quantized to scale if mode set)
     let n=MIDI_NOTE_NAMES[d1%12];
@@ -1205,7 +1278,7 @@ async function initAndStart(){
     if(shimmerVol>0)startShimmer(shimmerVol);
     document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&ctx&&ctx.state==='suspended'&&!audioPaused)ctx.resume()});
     window.addEventListener('focus',()=>{if(ctx&&ctx.state==='suspended'&&!audioPaused)ctx.resume()});
-    buildKeys();startVis();scheduleEvolve();initMIDI();updatePerfSetlist();
+    loadMidiMappings();buildKeys();startVis();scheduleEvolve();initMIDI();updatePerfSetlist();
     {const eb=document.getElementById('evolveBtn');if(eb){eb.className='evolve-pill '+(evolving?'on':'off');eb.textContent=evolving?'Evolving':'Static'}}
     const _bd=document.getElementById('bpmDisplay');if(_bd)_bd.textContent=clickBPM;
     document.getElementById('stateEvolve').textContent=CHORD_TYPES[currentEvolve].name;
