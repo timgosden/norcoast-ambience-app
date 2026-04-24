@@ -91,8 +91,8 @@
   .preset-load-btn{padding:7px 14px;border-radius:7px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.55);font-size:11px;cursor:pointer;letter-spacing:0.5px}
   .preset-del-btn{padding:7px 10px;border-radius:7px;border:1px solid rgba(255,80,80,0.2);background:transparent;color:rgba(255,80,80,0.35);font-size:11px;cursor:pointer}
   .preset-empty{font-size:12px;color:rgba(255,255,255,0.2);padding:10px 0;text-align:center}
-  .midi-dot{font-size:10px;letter-spacing:1px;color:rgba(94,184,138,0.7);display:none}
-  .midi-dot.on{display:inline}
+  .midi-dot{font-size:9px;letter-spacing:1.5px;padding:5px 10px;border-radius:12px;border:1px solid transparent;color:transparent;display:none;cursor:default;transition:all 0.2s}
+  .midi-dot.on{display:inline;color:rgba(94,184,138,0.7);border-color:rgba(94,184,138,0.2);background:rgba(94,184,138,0.06)}
   .bpm-row{display:flex;align-items:center;gap:10px;margin:10px 0 4px}
   .bpm-label{font-size:12px;color:rgba(255,255,255,0.4);min-width:36px}
   .bpm-input{width:64px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:8px 10px;color:rgba(255,255,255,0.85);font-size:15px;font-family:'Open Sans',sans-serif;text-align:center;outline:none}
@@ -141,7 +141,7 @@
   <div class="perf-bottom">
     <button id="evolveBtn" class="evolve-pill on" onclick="toggleEvolving()">Evolving</button>
     <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
-    <span id="midiStatus" class="midi-dot"></span>
+    <span id="midiStatus" class="midi-dot">MIDI</span>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -424,7 +424,10 @@ function initAudio(){
   eqHighNode.connect(delayNode);
   eqHighNode.connect(chorusGainNode);chorusGainNode.connect(dL);chorusGainNode.connect(dR);dL.connect(pL);dR.connect(pR);pL.connect(analyser);pR.connect(analyser);delayNode.connect(dLP);dLP.connect(delayFB);delayFB.connect(delayNode);dLP.connect(delayGainN);
   dryGain.connect(analyser);reverbGain.connect(analyser);delayGainN.connect(analyser);
-  analyser.connect(ctx.destination);
+  const limiter=ctx.createDynamicsCompressor();
+  limiter.threshold.value=-3;limiter.knee.value=3;limiter.ratio.value=20;
+  limiter.attack.value=0.001;limiter.release.value=0.12;
+  analyser.connect(limiter);limiter.connect(ctx.destination);
 }
 
 // ─── SYNTH VOICE BUILDER ───
@@ -995,11 +998,14 @@ function handleMIDI(msg){
     ({1:r=>{reverbMix=r;if(reverbGain){reverbGain.gain.value=r;dryGain.gain.value=1-r*0.35}},
       7:r=>{masterVol=r;if(master)master.gain.linearRampToValueAtTime(r,ctx.currentTime+0.05)},
       11:r=>{masterVol=r;if(master)master.gain.linearRampToValueAtTime(r,ctx.currentTime+0.05)},
-      21:r=>{lpfValue=r;if(globalLPF)globalLPF.frequency.linearRampToValueAtTime(lpfFaderToHz(r),ctx.currentTime+0.05)},
-      22:r=>{hpfValue=r;if(globalHPF)globalHPF.frequency.linearRampToValueAtTime(hpfFaderToHz(r),ctx.currentTime+0.05)},
-      23:r=>{delayMixVal=r;if(delayGainN)delayGainN.gain.value=r},
-      24:r=>{shimmerVol=r;if(r>0&&!shimmerGainNode)startShimmer(r);else if(r<=0)stopShimmer();else if(shimmerGainNode)shimmerGainNode.gain.linearRampToValueAtTime(r,ctx.currentTime+0.05)},
+      21:r=>{lpfValue=r;if(globalLPF){globalLPF.frequency.linearRampToValueAtTime(lpfFaderToHz(r),ctx.currentTime+0.05);if(globalLPF2&&lpfSlope===24)globalLPF2.frequency.linearRampToValueAtTime(lpfFaderToHz(r),ctx.currentTime+0.05)}},
+      22:r=>{hpfValue=r;if(globalHPF){globalHPF.frequency.linearRampToValueAtTime(hpfFaderToHz(r),ctx.currentTime+0.05);if(globalHPF2&&hpfSlope===24)globalHPF2.frequency.linearRampToValueAtTime(hpfFaderToHz(r),ctx.currentTime+0.05)}},
+      23:r=>{delayMixVal=faderToVol(r);if(delayGainN)delayGainN.gain.value=delayMixVal},
+      24:r=>{shimmerVol=faderToVol(r);if(shimmerVol>0&&!shimmerGainNode)startShimmer(shimmerVol);else if(shimmerVol<=0)stopShimmer();else if(shimmerGainNode)shimmerGainNode.gain.linearRampToValueAtTime(shimmerVol,ctx.currentTime+0.05)},
       25:r=>{densityValue=r},
+      26:r=>{chorusMix=faderToVol(r);if(chorusGainNode)chorusGainNode.gain.linearRampToValueAtTime(chorusMix*0.8,ctx.currentTime+0.05)},
+      27:r=>{reverbSize=reverbSizeToFB(r);if(reverb&&reverb.fbGain)reverb.fbGain.gain.linearRampToValueAtTime(reverbSize,ctx.currentTime+0.1)},
+      28:r=>{delayFeedback=r*0.85;if(delayFB)delayFB.gain.linearRampToValueAtTime(delayFeedback,ctx.currentTime+0.1)},
     })[d1]?.(r);queueSave();
   }
   if(type===0x90&&d2>0){// Note On → change root (quantized to scale if mode set)
