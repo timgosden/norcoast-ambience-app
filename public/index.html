@@ -458,7 +458,6 @@ function stopShimmer(){
 
 function startPad(def,vol,root,ei){
   if(def.type==="granular"){startGranular(vol);return}
-  if(def.type==="shimmer"){startShimmer(vol);return}
   fadeOut(staticNodes[def.id],XFADE);fadeOut(evolveNodes[def.id],XFADE);
   staticNodes[def.id]=buildGroup(def,getStaticFreqs(root,def),vol,ATTACK);
   if(!def.rootOnly)evolveNodes[def.id]=buildGroup(def,getEvolveFreq(root,ei),vol,ATTACK);
@@ -466,7 +465,6 @@ function startPad(def,vol,root,ei){
 function stopPad(id){
   const def=PAD_LAYERS.find(l=>l.id===id);
   if(def&&def.type==="granular"){stopGranular();return}
-  if(def&&def.type==="shimmer"){stopShimmer();return}
   fadeOut(staticNodes[id],RELEASE);fadeOut(evolveNodes[id],RELEASE);
   delete staticNodes[id];delete evolveNodes[id];
 }
@@ -475,7 +473,6 @@ function evolveVoice(ei){
   const ef=getEvolveFreq(homeRoot,ei);
   PAD_LAYERS.forEach(l=>{
     if(l.type==="granular"){updateGranularPitch();return}
-    if(l.type==="shimmer")return;
     if(layerState[l.id].active&&layerState[l.id].volume>0&&!l.rootOnly){
       fadeOut(evolveNodes[l.id],XFADE);
       evolveNodes[l.id]=buildGroup(l,ef,layerState[l.id].volume,XFADE);
@@ -566,7 +563,6 @@ function buildKeys(){
       row.querySelectorAll('.key-btn').forEach(b=>b.classList.remove('active','paused'));btn.classList.add('active');
       PAD_LAYERS.forEach(l=>{
         if(!layerState[l.id].active||layerState[l.id].volume<=0)return;
-        if(l.type==="shimmer")return; // shimmer follows currentEvolve globally
         startPad(l,layerState[l.id].volume,homeRoot,currentEvolve);
       });
       saveSettings();
@@ -769,19 +765,44 @@ function drawEQCurve(){
 function startVis(){
   const canvas=document.getElementById('visualiser');const cx=canvas.getContext('2d');
   const bufLen=analyser.frequencyBinCount;const freqData=new Uint8Array(bufLen);
-  const timeData=new Uint8Array(bufLen);const sm=new Float32Array(bufLen);
-  const nyquist=ctx.sampleRate/2;const binStart=Math.floor(100/nyquist*bufLen);const binEnd=Math.ceil(1000/nyquist*bufLen);const visBins=binEnd-binStart;
+  const nyquist=ctx.sampleRate/2;
+  const fMin=40,fMax=9000;
+  let W=canvas.width,H=canvas.height;
+  const sm=new Float32Array(W);
   function draw(){
-    animFrame=requestAnimationFrame(draw);analyser.getByteFrequencyData(freqData);analyser.getByteTimeDomainData(timeData);
-    const w=canvas.width,h=canvas.height;cx.clearRect(0,0,w,h);
+    animFrame=requestAnimationFrame(draw);
+    W=canvas.width;H=canvas.height;
+    analyser.getByteFrequencyData(freqData);
+    cx.clearRect(0,0,W,H);
+    // Build smoothed log-frequency spectrum
+    for(let x=0;x<W;x++){
+      const f=fMin*Math.pow(fMax/fMin,x/(W-1));
+      const bi=Math.min(Math.round(f/nyquist*bufLen),bufLen-1);
+      sm[x]+=(freqData[bi]/255-sm[x])*0.18;
+    }
+    // Filled area
     cx.beginPath();
-    for(let i=0;i<visBins;i++){const bi=binStart+i;sm[bi]+=(freqData[bi]/255-sm[bi])*0.25;const x=(i/visBins)*w,y=h-sm[bi]*h*0.85;if(i===0)cx.moveTo(x,y);else cx.lineTo(x,y)}
-    cx.lineTo(w,h);cx.lineTo(0,h);cx.closePath();
-    const g1=cx.createLinearGradient(0,h*0.15,0,h);g1.addColorStop(0,"rgba(196,145,94,0.25)");g1.addColorStop(0.4,"rgba(140,120,100,0.12)");g1.addColorStop(1,"rgba(196,145,94,0)");cx.fillStyle=g1;cx.fill();
-    cx.beginPath();for(let i=0;i<visBins;i++){const bi=binStart+i;const x=(i/visBins)*w,y=h-sm[bi]*h*0.85;if(i===0)cx.moveTo(x,y);else cx.lineTo(x,y)}
-    cx.strokeStyle="rgba(196,145,94,0.35)";cx.lineWidth=1;cx.stroke();
-    cx.beginPath();const slW=w/bufLen;for(let i=0;i<bufLen;i++){const v=timeData[i]/128,y=(v*h)/2;if(i===0)cx.moveTo(0,y);else cx.lineTo(i*slW,y)}
-    cx.strokeStyle="rgba(255,255,255,0.06)";cx.lineWidth=0.8;cx.stroke();
+    for(let x=0;x<W;x++){const y=H-sm[x]*H*0.88;if(x===0)cx.moveTo(0,y);else cx.lineTo(x,y)}
+    cx.lineTo(W,H);cx.lineTo(0,H);cx.closePath();
+    const gFill=cx.createLinearGradient(0,0,W,0);
+    gFill.addColorStop(0,'rgba(94,184,138,0.14)');
+    gFill.addColorStop(0.28,'rgba(196,145,94,0.18)');
+    gFill.addColorStop(0.62,'rgba(180,118,200,0.13)');
+    gFill.addColorStop(1,'rgba(106,159,216,0.07)');
+    cx.fillStyle=gFill;cx.fill();
+    // Top edge line
+    cx.beginPath();
+    for(let x=0;x<W;x++){const y=H-sm[x]*H*0.88;if(x===0)cx.moveTo(0,y);else cx.lineTo(x,y)}
+    const gLine=cx.createLinearGradient(0,0,W,0);
+    gLine.addColorStop(0,'rgba(94,184,138,0.55)');
+    gLine.addColorStop(0.28,'rgba(196,145,94,0.65)');
+    gLine.addColorStop(0.62,'rgba(180,118,200,0.5)');
+    gLine.addColorStop(1,'rgba(106,159,216,0.3)');
+    cx.strokeStyle=gLine;cx.lineWidth=1.5;cx.stroke();
+    // Glow layer (wider, softer)
+    cx.beginPath();
+    for(let x=0;x<W;x++){const y=H-sm[x]*H*0.88;if(x===0)cx.moveTo(0,y);else cx.lineTo(x,y)}
+    cx.strokeStyle='rgba(196,145,94,0.06)';cx.lineWidth=6;cx.stroke();
   }
   draw();
 }
