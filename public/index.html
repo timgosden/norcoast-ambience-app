@@ -1118,8 +1118,8 @@ async function initMIDI(){
 // ─── START ───
 async function initAndStart(){
   const prompt=document.getElementById('audioPrompt');
-  if(!prompt) return; // already started
-  prompt.querySelector('div > div').textContent='Loading...';
+  if(!prompt) return;
+  const ls=document.getElementById('loadStatus');if(ls)ls.textContent='Loading…';
   initAudio();
   await ctx.resume();
   await decodeSample();
