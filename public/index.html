@@ -198,16 +198,16 @@ function semiFreq(f,s){return f*Math.pow(2,s/12)}
 const C2=noteFreq("C",2); // base pitch of sample
 
 const CHORD_TYPES=[
-  {name:"5th",    semis:[7],        weight:5},
-  {name:"Oct",    semis:[12],       weight:5},
-  {name:"4th",    semis:[5],        weight:4},
-  {name:"Sus2",   semis:[2,7],      weight:4},
-  {name:"Sus4",   semis:[5,7],      weight:3},
-  {name:"5+Oct",  semis:[7,12],     weight:3},
-  {name:"Maj7",   semis:[11],       weight:3},
-  {name:"Add9",   semis:[7,14],     weight:3},
-  {name:"6th",    semis:[9],        weight:2},
-  {name:"M7+5",   semis:[7,11],     weight:2},
+  {name:"5th",      semis:[7],        weight:5},
+  {name:"Oct",      semis:[12],       weight:5},
+  {name:"4th",      semis:[5],        weight:4},
+  {name:"Sus2",     semis:[2,7],      weight:4},
+  {name:"Sus4",     semis:[5,7],      weight:3},
+  {name:"5th+Oct",  semis:[7,12],     weight:3},
+  {name:"Maj7th",   semis:[11],       weight:3},
+  {name:"5th+9th",  semis:[7,14],     weight:3},
+  {name:"6th",      semis:[9],        weight:2},
+  {name:"5th+Maj7", semis:[7,11],     weight:2},
 ];
 // Alias for legacy references
 const EVOLVE_INTERVALS=CHORD_TYPES;
