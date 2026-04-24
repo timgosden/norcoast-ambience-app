@@ -73,6 +73,15 @@
   .eq-panel.open{display:block}
   #eqCanvas{width:100%;height:90px;display:block;border-radius:8px;background:rgba(0,0,0,0.25);margin-bottom:14px}
   .eq-section-title{font-size:10px;letter-spacing:2px;color:rgba(255,255,255,0.25);text-transform:uppercase;margin:14px 0 8px;padding-left:2px}
+  .preset-save-row{display:flex;gap:8px;margin:12px 0 4px}
+  .preset-input{flex:1;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:10px 12px;color:rgba(255,255,255,0.85);font-size:13px;outline:none;font-family:'Open Sans',sans-serif}
+  .preset-input::placeholder{color:rgba(255,255,255,0.2)}
+  .preset-save-btn{padding:10px 16px;border-radius:8px;border:1px solid rgba(196,145,94,0.35);background:rgba(196,145,94,0.1);color:#c4915e;font-size:12px;cursor:pointer;white-space:nowrap;letter-spacing:0.5px}
+  .preset-row{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,0.04)}
+  .preset-name{flex:1;font-size:13px;color:rgba(255,255,255,0.65)}
+  .preset-load-btn{padding:7px 14px;border-radius:7px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.55);font-size:11px;cursor:pointer;letter-spacing:0.5px}
+  .preset-del-btn{padding:7px 10px;border-radius:7px;border:1px solid rgba(255,80,80,0.2);background:transparent;color:rgba(255,80,80,0.35);font-size:11px;cursor:pointer}
+  .preset-empty{font-size:12px;color:rgba(255,255,255,0.2);padding:10px 0;text-align:center}
 </style>
 </head>
 <body>
@@ -646,6 +655,13 @@ function buildEditSheet(){
   // ── Master ──
   h+='<div class="edit-section"><div class="edit-title">Master</div>';
   h+=sliderRowHTML('mst','Volume','#c4915e',volToFader(masterVol),Math.round(masterVol*100)+'%');
+  h+='</div><div class="edit-divider"></div>';
+  // ── Setlist ──
+  const presets=getPresets();const presetNames=Object.keys(presets);
+  h+='<div class="edit-section"><div class="edit-title">Setlist</div>';
+  h+='<div class="preset-save-row"><input class="preset-input" id="presetNameInput" placeholder="Name this sound…" /><button class="preset-save-btn" onclick="savePreset(document.getElementById(\'presetNameInput\').value)">Save</button></div>';
+  if(presetNames.length===0){h+='<div class="preset-empty">No saved sounds yet</div>'}
+  else{presetNames.forEach(n=>{h+='<div class="preset-row"><span class="preset-name">'+n+'</span><button class="preset-load-btn" onclick="loadPreset(\''+n.replace(/'/g,"\\'")+'\')" >Load</button><button class="preset-del-btn" onclick="deletePreset(\''+n.replace(/'/g,"\\'")+'\')">✕</button></div>'})}
   h+='</div><div class="edit-bottom-pad"></div>';
   c.innerHTML=h;
   // Wire layer sliders
@@ -748,6 +764,46 @@ function toggleEvolving(){evolving=!evolving;const btn=document.getElementById('
 function saveSettings(){try{const s={homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,lpfQ,hpfQ,densityValue,eqLowGain,eqMidGain,eqHighGain,reverbMix,delayMixVal,shimmerVol,masterVol,textureOctUp,enabledEvolveIdx:[...enabledEvolveIdx],layers:{}};PAD_LAYERS.forEach(l=>{s.layers[l.id]={volume:layerState[l.id].volume}});localStorage.setItem('norcoast_v1',JSON.stringify(s))}catch(e){}}
 function loadSettings(){try{const raw=localStorage.getItem('norcoast_v1');if(!raw)return;const s=JSON.parse(raw);if(s.homeRoot)homeRoot=s.homeRoot;if(s.evolving!=null)evolving=s.evolving;if(s.evolveSpeed!=null)evolveSpeed=s.evolveSpeed;if(s.lpfValue!=null)lpfValue=s.lpfValue;if(s.hpfValue!=null)hpfValue=s.hpfValue;if(s.lpfQ!=null)lpfQ=s.lpfQ;if(s.hpfQ!=null)hpfQ=s.hpfQ;if(s.densityValue!=null)densityValue=s.densityValue;if(s.eqLowGain!=null)eqLowGain=s.eqLowGain;if(s.eqMidGain!=null)eqMidGain=s.eqMidGain;if(s.eqHighGain!=null)eqHighGain=s.eqHighGain;if(s.shimmerVol!=null)shimmerVol=s.shimmerVol;if(s.reverbMix!=null)reverbMix=s.reverbMix;if(s.delayMixVal!=null)delayMixVal=s.delayMixVal;if(s.masterVol!=null)masterVol=s.masterVol;if(s.textureOctUp!=null)textureOctUp=s.textureOctUp;if(Array.isArray(s.enabledEvolveIdx))enabledEvolveIdx=new Set(s.enabledEvolveIdx);if(s.layers)PAD_LAYERS.forEach(l=>{if(s.layers[l.id]!=null)layerState[l.id].volume=s.layers[l.id].volume??0})}catch(e){}}
 let _saveT=null;function queueSave(){clearTimeout(_saveT);_saveT=setTimeout(saveSettings,500)}
+
+// ─── PRESETS ───
+function getPresets(){try{return JSON.parse(localStorage.getItem('norcoast_presets')||'{}')}catch(e){return{}}}
+function captureState(){
+  const s={homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,lpfQ,hpfQ,densityValue,eqLowGain,eqMidGain,eqHighGain,reverbMix,delayMixVal,shimmerVol,masterVol,textureOctUp,enabledEvolveIdx:[...enabledEvolveIdx],layers:{}};
+  PAD_LAYERS.forEach(l=>{s.layers[l.id]={volume:layerState[l.id].volume}});return s;
+}
+function savePreset(name){
+  if(!name.trim())return;const ps=getPresets();ps[name.trim()]=captureState();
+  localStorage.setItem('norcoast_presets',JSON.stringify(ps));buildEditSheet();
+}
+function loadPreset(name){
+  const ps=getPresets();const s=ps[name];if(!s)return;
+  if(s.homeRoot)homeRoot=s.homeRoot;if(s.evolving!=null)evolving=s.evolving;if(s.evolveSpeed!=null)evolveSpeed=s.evolveSpeed;
+  if(s.lpfValue!=null)lpfValue=s.lpfValue;if(s.hpfValue!=null)hpfValue=s.hpfValue;if(s.lpfQ!=null)lpfQ=s.lpfQ;if(s.hpfQ!=null)hpfQ=s.hpfQ;
+  if(s.densityValue!=null)densityValue=s.densityValue;if(s.eqLowGain!=null)eqLowGain=s.eqLowGain;if(s.eqMidGain!=null)eqMidGain=s.eqMidGain;if(s.eqHighGain!=null)eqHighGain=s.eqHighGain;
+  if(s.reverbMix!=null)reverbMix=s.reverbMix;if(s.delayMixVal!=null)delayMixVal=s.delayMixVal;if(s.shimmerVol!=null)shimmerVol=s.shimmerVol;
+  if(s.masterVol!=null)masterVol=s.masterVol;if(s.textureOctUp!=null)textureOctUp=s.textureOctUp;
+  if(Array.isArray(s.enabledEvolveIdx))enabledEvolveIdx=new Set(s.enabledEvolveIdx);
+  if(s.layers)PAD_LAYERS.forEach(l=>{if(s.layers[l.id]!=null)layerState[l.id].volume=s.layers[l.id].volume??0});
+  // Apply audio nodes
+  if(globalLPF){globalLPF.frequency.value=lpfFaderToHz(lpfValue);globalLPF.Q.value=lpfQ}
+  if(globalHPF){globalHPF.frequency.value=hpfFaderToHz(hpfValue);globalHPF.Q.value=hpfQ}
+  if(eqLowNode)eqLowNode.gain.value=eqLowGain;if(eqMidNode)eqMidNode.gain.value=eqMidGain;if(eqHighNode)eqHighNode.gain.value=eqHighGain;
+  if(reverbGain){reverbGain.gain.value=reverbMix;dryGain.gain.value=1-reverbMix*0.35}
+  if(delayGainN)delayGainN.gain.value=delayMixVal;if(master)master.gain.value=masterVol;
+  // Restart layers
+  PAD_LAYERS.forEach(l=>{if(l.type!=="granular")startPad(l,layerState[l.id].volume,homeRoot,currentEvolve)});
+  if(layerState.texture&&layerState.texture.volume>0)startGranular(layerState.texture.volume);else stopGranular();
+  if(shimmerVol>0)startShimmer(shimmerVol);else stopShimmer();
+  if(!enabledEvolveIdx.has(currentEvolve)){currentEvolve=[...enabledEvolveIdx][0];evolveVoice(currentEvolve)}
+  // Update UI
+  document.getElementById('stateRoot').textContent=homeRoot;
+  document.getElementById('stateEvolve').textContent=EVOLVE_INTERVALS[currentEvolve].name;
+  const eb=document.getElementById('evolveBtn');if(eb){eb.className='evolve-pill '+(evolving?'on':'off');eb.textContent=evolving?'Evolving':'Static'}
+  buildKeys();saveSettings();buildEditSheet();
+}
+function deletePreset(name){
+  const ps=getPresets();delete ps[name];localStorage.setItem('norcoast_presets',JSON.stringify(ps));buildEditSheet();
+}
 
 // ─── START ───
 async function initAndStart(){
