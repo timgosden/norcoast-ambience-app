@@ -121,7 +121,7 @@
       </svg>
     </div>
     <div class="perf-state">
-      <span class="root" id="stateRoot">C</span><span class="sep">·</span><span class="evo" id="stateEvolve">Octave</span>
+      <span class="root" id="stateRoot">C</span><span class="sep">·</span><span class="evo" id="stateEvolve">Major</span>
     </div>
     <button class="edit-btn" onclick="openEdit()">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="5" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="12" cy="19" r="1.2"/></svg>
@@ -155,16 +155,20 @@ function noteFreq(n,o){return 440*Math.pow(2,(NOTES.indexOf(n)-9+(o-4)*12)/12)}
 function semiFreq(f,s){return f*Math.pow(2,s/12)}
 const C2=noteFreq("C",2); // base pitch of sample
 
-const EVOLVE_INTERVALS=[
-  {semi:12,name:"Octave",weight:5},
-  {semi:14,name:"9th",weight:3},
-  {semi:5,name:"Sus4",weight:1},
-  {semi:11,name:"Maj7",weight:1},
-  {semi:3,name:"min3",weight:1},
-  {semi:4,name:"Maj3",weight:1},
-  {semi:9,name:"6th",weight:1},
-  {semi:10,name:"b7",weight:1},
+const CHORD_TYPES=[
+  {name:"Major",  semis:[4],       weight:5},
+  {name:"Minor",  semis:[3],       weight:5},
+  {name:"Maj7",   semis:[4,11],    weight:3},
+  {name:"min7",   semis:[3,10],    weight:3},
+  {name:"Dom7",   semis:[4,10],    weight:2},
+  {name:"Add9",   semis:[2,4],     weight:2},
+  {name:"Sus2",   semis:[2],       weight:2},
+  {name:"Sus4",   semis:[5],       weight:2},
+  {name:"Lydian", semis:[4,6,11],  weight:1},
+  {name:"Dorian", semis:[3,7,10],  weight:1},
 ];
+// Alias for legacy references
+const EVOLVE_INTERVALS=CHORD_TYPES;
 
 const PAD_LAYERS=[
   {id:"foundation",name:"Foundation",color:"#5eb88a",type:"synth",
@@ -281,7 +285,8 @@ function grainStream(streamId){
 
   const rootFreq=noteFreq(homeRoot,ROOT_OCT);
   const fifthFreq=semiFreq(rootFreq,7);
-  const evolveFreq=semiFreq(rootFreq,EVOLVE_INTERVALS[currentEvolve].semi);
+  const chordSemis=CHORD_TYPES[currentEvolve].semis;
+  const evolveFreq=semiFreq(rootFreq,chordSemis[Math.floor(Math.random()*chordSemis.length)]);
 
   // Each stream targets a different pitch for harmonic spread
   // Streams 0-2: root, 5th, evolve at base octave
@@ -427,7 +432,7 @@ function fadeOut(nodes,time){
 }
 
 function getStaticFreqs(root,def){const r=noteFreq(root,ROOT_OCT);return def.rootOnly?[r]:[r,semiFreq(r,7)]}
-function getEvolveFreq(root,ei){return[semiFreq(noteFreq(root,ROOT_OCT),EVOLVE_INTERVALS[ei].semi)]}
+function getEvolveFreq(root,ei){const r=noteFreq(root,ROOT_OCT);return CHORD_TYPES[ei].semis.map(s=>semiFreq(r,s))}
 
 function startShimmer(vol){
   shimmerActive=true;
@@ -440,7 +445,9 @@ function startShimmer(vol){
     const root=noteFreq(homeRoot,ROOT_OCT);
     const octMult=[4,5,6,8][Math.random()*4|0];
     const base=root*octMult;
-    const f=Math.random()<0.45?base*Math.pow(2,EVOLVE_INTERVALS[currentEvolve].semi/12):base;
+    const shimSemis=CHORD_TYPES[currentEvolve].semis;
+    const shimSemi=shimSemis[Math.floor(Math.random()*shimSemis.length)];
+    const f=Math.random()<0.45?base*Math.pow(2,shimSemi/12):base;
     const w=Math.random()<0.6?'glass':'lush';
     const osc=ctx.createOscillator();osc.setPeriodicWave(waves[w]);
     osc.frequency.value=Math.min(f,ctx.sampleRate*0.45);
@@ -490,14 +497,13 @@ function evolveVoice(ei){
 // ─── EVOLUTION ───
 function scheduleEvolve(){
   if(evolveTimer)clearTimeout(evolveTimer);
-  const cur=currentEvolve;const isBrief=EVOLVE_INTERVALS[cur].semi===5||EVOLVE_INTERVALS[cur].semi===11;
-  const bMin=isBrief?5000:10000,bMax=isBrief?10000:22000;
-  const base=bMin+Math.random()*(bMax-bMin);const time=base*(1.5-evolveSpeed*0.8);
+  const cur=currentEvolve;
+  const base=10000+Math.random()*14000;const time=base*(1.5-evolveSpeed*0.8);
   evolveTimer=setTimeout(()=>{
     if(!evolving){scheduleEvolve();return}
-    const cands=EVOLVE_INTERVALS.map((_,i)=>i).filter(i=>i!==cur&&enabledEvolveIdx.has(i));
+    const cands=CHORD_TYPES.map((_,i)=>i).filter(i=>i!==cur&&enabledEvolveIdx.has(i));
     if(!cands.length){scheduleEvolve();return}
-    const wts=cands.map(i=>EVOLVE_INTERVALS[i].weight);const tot=wts.reduce((a,b)=>a+b,0);
+    const wts=cands.map(i=>CHORD_TYPES[i].weight);const tot=wts.reduce((a,b)=>a+b,0);
     let r=Math.random()*tot,next=cands[0];
     for(let i=0;i<cands.length;i++){r-=wts[i];if(r<=0){next=cands[i];break}}
     currentEvolve=next;document.getElementById('stateEvolve').textContent=EVOLVE_INTERVALS[next].name;
@@ -961,6 +967,7 @@ async function initAndStart(){
   setTimeout(()=>{prompt.remove()},600);
 
   buildKeys();startVis();scheduleEvolve();initMIDI();
+  document.getElementById('stateEvolve').textContent=CHORD_TYPES[currentEvolve].name;
 }
 </script>
 <script>
