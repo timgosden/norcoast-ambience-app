@@ -1,4 +1,4 @@
-const CACHE = 'norcoast-v6';
+const CACHE = 'norcoast-v7';
 const PRECACHE = [
   '/',
   '/manifest.json',
