@@ -323,8 +323,9 @@ function grainStream(streamId){
 
   const now=ctx.currentTime;
 
-  // Grain duration: 550ms-1s
-  const grainDur=0.55+Math.random()*0.45;
+  // Grain duration: scaled by grainSize (0=80ms, 0.5=550ms, 1=2000ms)
+  const baseGrain=0.08+grainSize*grainSize*1.92;
+  const grainDur=baseGrain*(0.7+Math.random()*0.6);
   const adjustedDur=grainDur/finalRate; // actual playback time
 
   // Use reversed buffer ~60% of the time for that reverse swell character
@@ -338,7 +339,8 @@ function grainStream(streamId){
 
   const src=ctx.createBufferSource();
   src.buffer=buf;
-  src.playbackRate.value=finalRate;
+  const pitchRandCents=(Math.random()-0.5)*grainSpread*80;
+  src.playbackRate.value=finalRate*Math.pow(2,pitchRandCents/1200);
 
   // Hann window envelope — smooth in, smooth out, no clicks
   const env=ctx.createGain();
@@ -528,8 +530,15 @@ function scheduleEvolve(){
     const wts=cands.map(i=>CHORD_TYPES[i].weight);const tot=wts.reduce((a,b)=>a+b,0);
     let r=Math.random()*tot,next=cands[0];
     for(let i=0;i<cands.length;i++){r-=wts[i];if(r<=0){next=cands[i];break}}
-    currentEvolve=next;document.getElementById('stateEvolve').textContent=EVOLVE_INTERVALS[next].name;
-    evolveVoice(next);scheduleEvolve();
+    if(evolveOnBeat&&clickActive){
+      // Queue for next bar downbeat — show preview with arrow
+      pendingEvolve=next;
+      document.getElementById('stateEvolve').textContent='→ '+CHORD_TYPES[next].name;
+      // Don't call scheduleEvolve here — fireClick will call it after applying
+    } else {
+      currentEvolve=next;document.getElementById('stateEvolve').textContent=CHORD_TYPES[next].name;
+      evolveVoice(next);scheduleEvolve();
+    }
   },time);
 }
 
@@ -684,6 +693,8 @@ function buildEditSheet(){
     h+='</div>';
   });
   h+=sliderRowHTML('den','Density','#7ab8d8',densityValue,Math.round(densityValue*100)+'%');
+  h+=sliderRowHTML('gSz','Grain Size','#a08060',grainSize,Math.round(grainSize*100)+'%');
+  h+=sliderRowHTML('gSpr','Grain Pitch','#a08060',grainSpread,Math.round(grainSpread*100)+'%');
   h+='</div><div class="edit-divider"></div>';
   // ── Effects ──
   const shF=volToFader(shimmerVol);
@@ -727,6 +738,9 @@ function buildEditSheet(){
   // ── Evolution ──
   h+='<div class="edit-section"><div class="edit-title">Evolution</div>';
   h+=sliderRowHTML('spd','Speed','#c4915e',volToFader(evolveSpeed),Math.round(evolveSpeed*100)+'%');
+  h+='<div class="slope-row"><span class="slope-label">Beat Sync</span><button class="slope-btn'+(evolveOnBeat?' active':'')+'" onclick="toggleEvolveOnBeat()">'+(evolveOnBeat?'On':'Off')+'</button>';
+  if(evolveOnBeat){[1,2,4,8].forEach(b=>{h+='<button class="slope-btn'+(evolveBars===b?' active':'')+'" onclick="setEvolveBars('+b+')" style="padding:6px 10px">'+b+'bar</button>'})}
+  h+='</div>';
   h+='<div class="bpm-row"><span class="bpm-label">BPM</span><button class="bpm-nudge" onclick="setBPM(clickBPM-1);document.getElementById(\'bpmInput\').value=clickBPM">−</button><input id="bpmInput" class="bpm-input" type="number" min="20" max="300" value="'+clickBPM+'" onchange="setBPM(this.value)" /><button class="bpm-nudge" onclick="setBPM(clickBPM+1);document.getElementById(\'bpmInput\').value=clickBPM">+</button><button class="bpm-tap" onclick="tapTempo()">TAP</button></div>';
   h+='</div><div class="edit-divider"></div>';
   // ── Master ──
@@ -785,6 +799,8 @@ function buildEditSheet(){
   wireEQSlider(c,'eqH',db=>{eqHighGain=db;eqHighNode.gain.linearRampToValueAtTime(db,ctx.currentTime+0.05);drawEQCurve()});
   // Wire other sliders
   wireSR(c,'den',r=>{densityValue=r;PAD_LAYERS.forEach(l=>{if(l.type==="synth"&&layerState[l.id].volume>0)startPad(l,layerState[l.id].volume,homeRoot,currentEvolve)});return Math.round(r*100)+'%'});
+  wireSR(c,'gSz',r=>{grainSize=r;return Math.round(r*100)+'%'});
+  wireSR(c,'gSpr',r=>{grainSpread=r;return Math.round(r*100)+'%'});
   wireSR(c,'spd',r=>{evolveSpeed=faderToVol(r);return Math.round(evolveSpeed*100)+'%'});
   wireSR(c,'mst',r=>{masterVol=faderToVol(r);master.gain.linearRampToValueAtTime(masterVol,ctx.currentTime+0.1);return Math.round(masterVol*100)+'%'});
 }
@@ -876,6 +892,8 @@ function startVis(){
 }
 
 function toggleEvolving(){evolving=!evolving;const btn=document.getElementById('evolveBtn');btn.className='evolve-pill '+(evolving?'on':'off');btn.textContent=evolving?'Evolving':'Static';saveSettings();if(evolving)scheduleEvolve()}
+function toggleEvolveOnBeat(){evolveOnBeat=!evolveOnBeat;if(!evolveOnBeat&&pendingEvolve>=0){currentEvolve=pendingEvolve;document.getElementById('stateEvolve').textContent=CHORD_TYPES[currentEvolve].name;evolveVoice(currentEvolve);pendingEvolve=-1;scheduleEvolve()}saveSettings();buildEditSheet()}
+function setEvolveBars(b){evolveBars=b;saveSettings();buildEditSheet()}
 
 function toggleSlope(type){
   if(type==='lpf'){
@@ -889,14 +907,14 @@ function toggleSlope(type){
   // Update slope buttons
   document.querySelectorAll('.slope-btn[data-slope="'+type+'"]').forEach(b=>{b.classList.toggle('active',parseInt(b.dataset.val)===(type==='lpf'?lpfSlope:hpfSlope))});
 }
-function saveSettings(){try{const s={homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,lpfQ,hpfQ,lpfSlope,hpfSlope,densityValue,eqLowGain,eqLoMidGain,eqHiMidGain,eqHighGain,chorusMix,reverbMix,reverbSize,reverbDamp,delayMixVal,delayFeedback,delaySync,delaySyncDiv,delayTimeVal,shimmerVol,masterVol,textureOctUp,clickBPM,currentMode,enabledEvolveIdx:[...enabledEvolveIdx],layers:{}};PAD_LAYERS.forEach(l=>{s.layers[l.id]={volume:layerState[l.id].volume}});localStorage.setItem('norcoast_v1',JSON.stringify(s))}catch(e){}}
-function loadSettings(){try{const raw=localStorage.getItem('norcoast_v1');if(!raw)return;const s=JSON.parse(raw);if(s.homeRoot)homeRoot=s.homeRoot;if(s.evolving!=null)evolving=s.evolving;if(s.evolveSpeed!=null)evolveSpeed=s.evolveSpeed;if(s.lpfValue!=null)lpfValue=s.lpfValue;if(s.hpfValue!=null)hpfValue=s.hpfValue;if(s.lpfQ!=null)lpfQ=s.lpfQ;if(s.hpfQ!=null)hpfQ=s.hpfQ;if(s.lpfSlope!=null)lpfSlope=s.lpfSlope;if(s.hpfSlope!=null)hpfSlope=s.hpfSlope;if(s.densityValue!=null)densityValue=s.densityValue;if(s.eqLowGain!=null)eqLowGain=s.eqLowGain;if(s.eqLoMidGain!=null)eqLoMidGain=s.eqLoMidGain;if(s.eqHiMidGain!=null)eqHiMidGain=s.eqHiMidGain;if(s.eqHighGain!=null)eqHighGain=s.eqHighGain;if(s.chorusMix!=null)chorusMix=s.chorusMix;if(s.shimmerVol!=null)shimmerVol=s.shimmerVol;if(s.reverbMix!=null)reverbMix=s.reverbMix;if(s.reverbSize!=null)reverbSize=s.reverbSize;if(s.reverbDamp!=null)reverbDamp=s.reverbDamp;if(s.delayMixVal!=null)delayMixVal=s.delayMixVal;if(s.delayFeedback!=null)delayFeedback=s.delayFeedback;if(s.delaySync!=null)delaySync=s.delaySync;if(s.delaySyncDiv)delaySyncDiv=s.delaySyncDiv;if(s.delayTimeVal!=null)delayTimeVal=s.delayTimeVal;if(s.masterVol!=null)masterVol=s.masterVol;if(s.textureOctUp!=null)textureOctUp=s.textureOctUp;if(s.clickBPM!=null)clickBPM=s.clickBPM;if(s.currentMode!=null)currentMode=s.currentMode;if(Array.isArray(s.enabledEvolveIdx))enabledEvolveIdx=new Set(s.enabledEvolveIdx);if(s.layers)PAD_LAYERS.forEach(l=>{if(s.layers[l.id]!=null)layerState[l.id].volume=s.layers[l.id].volume??0})}catch(e){}}
+function saveSettings(){try{const s={homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,lpfQ,hpfQ,lpfSlope,hpfSlope,densityValue,eqLowGain,eqLoMidGain,eqHiMidGain,eqHighGain,chorusMix,reverbMix,reverbSize,reverbDamp,delayMixVal,delayFeedback,delaySync,delaySyncDiv,delayTimeVal,shimmerVol,masterVol,textureOctUp,clickBPM,currentMode,evolveOnBeat,evolveBars,grainSize,grainSpread,enabledEvolveIdx:[...enabledEvolveIdx],layers:{}};PAD_LAYERS.forEach(l=>{s.layers[l.id]={volume:layerState[l.id].volume}});localStorage.setItem('norcoast_v1',JSON.stringify(s))}catch(e){}}
+function loadSettings(){try{const raw=localStorage.getItem('norcoast_v1');if(!raw)return;const s=JSON.parse(raw);if(s.homeRoot)homeRoot=s.homeRoot;if(s.evolving!=null)evolving=s.evolving;if(s.evolveSpeed!=null)evolveSpeed=s.evolveSpeed;if(s.lpfValue!=null)lpfValue=s.lpfValue;if(s.hpfValue!=null)hpfValue=s.hpfValue;if(s.lpfQ!=null)lpfQ=s.lpfQ;if(s.hpfQ!=null)hpfQ=s.hpfQ;if(s.lpfSlope!=null)lpfSlope=s.lpfSlope;if(s.hpfSlope!=null)hpfSlope=s.hpfSlope;if(s.densityValue!=null)densityValue=s.densityValue;if(s.eqLowGain!=null)eqLowGain=s.eqLowGain;if(s.eqLoMidGain!=null)eqLoMidGain=s.eqLoMidGain;if(s.eqHiMidGain!=null)eqHiMidGain=s.eqHiMidGain;if(s.eqHighGain!=null)eqHighGain=s.eqHighGain;if(s.chorusMix!=null)chorusMix=s.chorusMix;if(s.shimmerVol!=null)shimmerVol=s.shimmerVol;if(s.reverbMix!=null)reverbMix=s.reverbMix;if(s.reverbSize!=null)reverbSize=s.reverbSize;if(s.reverbDamp!=null)reverbDamp=s.reverbDamp;if(s.delayMixVal!=null)delayMixVal=s.delayMixVal;if(s.delayFeedback!=null)delayFeedback=s.delayFeedback;if(s.delaySync!=null)delaySync=s.delaySync;if(s.delaySyncDiv)delaySyncDiv=s.delaySyncDiv;if(s.delayTimeVal!=null)delayTimeVal=s.delayTimeVal;if(s.masterVol!=null)masterVol=s.masterVol;if(s.textureOctUp!=null)textureOctUp=s.textureOctUp;if(s.clickBPM!=null)clickBPM=s.clickBPM;if(s.currentMode!=null)currentMode=s.currentMode;if(s.evolveOnBeat!=null)evolveOnBeat=s.evolveOnBeat;if(s.evolveBars!=null)evolveBars=s.evolveBars;if(s.grainSize!=null)grainSize=s.grainSize;if(s.grainSpread!=null)grainSpread=s.grainSpread;if(Array.isArray(s.enabledEvolveIdx))enabledEvolveIdx=new Set(s.enabledEvolveIdx);if(s.layers)PAD_LAYERS.forEach(l=>{if(s.layers[l.id]!=null)layerState[l.id].volume=s.layers[l.id].volume??0})}catch(e){}}
 let _saveT=null;function queueSave(){clearTimeout(_saveT);_saveT=setTimeout(saveSettings,500)}
 
 // ─── PRESETS ───
 function getPresets(){try{return JSON.parse(localStorage.getItem('norcoast_presets')||'{}')}catch(e){return{}}}
 function captureState(){
-  const s={homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,lpfQ,hpfQ,lpfSlope,hpfSlope,densityValue,eqLowGain,eqLoMidGain,eqHiMidGain,eqHighGain,chorusMix,reverbMix,reverbSize,reverbDamp,delayMixVal,delayFeedback,delaySync,delaySyncDiv,delayTimeVal,shimmerVol,masterVol,textureOctUp,clickBPM,currentMode,enabledEvolveIdx:[...enabledEvolveIdx],layers:{}};
+  const s={homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,lpfQ,hpfQ,lpfSlope,hpfSlope,densityValue,eqLowGain,eqLoMidGain,eqHiMidGain,eqHighGain,chorusMix,reverbMix,reverbSize,reverbDamp,delayMixVal,delayFeedback,delaySync,delaySyncDiv,delayTimeVal,shimmerVol,masterVol,textureOctUp,clickBPM,currentMode,evolveOnBeat,evolveBars,grainSize,grainSpread,enabledEvolveIdx:[...enabledEvolveIdx],layers:{}};
   PAD_LAYERS.forEach(l=>{s.layers[l.id]={volume:layerState[l.id].volume}});return s;
 }
 function savePreset(name){
@@ -944,10 +962,12 @@ function exportPresets(btn){
 }
 
 // ─── CLICK TRACK ───
-let clickBPM=120,clickActive=false,clickNextTime=0,clickSchedId=null;
+let clickBPM=120,clickActive=false,clickNextTime=0,clickSchedId=null,clickBeat=0;
 let delaySync=false,delaySyncDiv='q.';
+let evolveOnBeat=false,evolveBars=4,pendingEvolve=-1;
+let grainSize=0.5,grainSpread=0.3;
 function startClick(){
-  if(clickActive)return;clickActive=true;
+  if(clickActive)return;clickActive=true;clickBeat=0;
   clickNextTime=ctx.currentTime+0.05;scheduleClicks();
 }
 function stopClick(){clickActive=false;if(clickSchedId){clearTimeout(clickSchedId);clickSchedId=null}}
@@ -957,10 +977,23 @@ function scheduleClicks(){
   clickSchedId=setTimeout(scheduleClicks,25);
 }
 function fireClick(t){
+  const beat=clickBeat++;
+  // Downbeat indicator — slightly louder on beat 1 of each bar
+  const isDown=(beat%evolveBars)===0;
   const osc=ctx.createOscillator();const env=ctx.createGain();
-  osc.type='sine';osc.frequency.value=1200;
-  env.gain.setValueAtTime(0.35,t);env.gain.exponentialRampToValueAtTime(0.001,t+0.018);
+  osc.type='sine';osc.frequency.value=isDown?1500:1200;
+  env.gain.setValueAtTime(isDown?0.45:0.28,t);env.gain.exponentialRampToValueAtTime(0.001,t+0.018);
   osc.connect(env);env.connect(ctx.destination);osc.start(t);osc.stop(t+0.025);
+  // Apply queued chord evolution on bar downbeat
+  if(evolveOnBeat&&pendingEvolve>=0&&isDown){
+    const ne=pendingEvolve;pendingEvolve=-1;
+    const delay=Math.max(0,(t-ctx.currentTime)*1000);
+    setTimeout(()=>{
+      currentEvolve=ne;
+      document.getElementById('stateEvolve').textContent=CHORD_TYPES[ne].name;
+      evolveVoice(ne);scheduleEvolve();
+    },delay);
+  }
 }
 function toggleClick(){
   if(!ctx)return;
