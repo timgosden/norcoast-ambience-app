@@ -13,108 +13,109 @@
 <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-  html,body{height:100%;overflow:hidden}
-  body{font-family:'Open Sans',sans-serif;background:linear-gradient(160deg,#060810,#0b0e16 40%,#070910);color:#fff;-webkit-tap-highlight-color:transparent;-webkit-font-smoothing:antialiased}
-  #app{height:100vh;overflow-y:auto;-webkit-overflow-scrolling:touch}
-  
-  #main{padding:16px;padding-bottom:40px}
-  .header{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:8px}
-  .header span{font-size:12px;letter-spacing:4px;text-transform:uppercase;color:rgba(255,255,255,0.85);font-weight:300}
-  .state{text-align:center;margin-bottom:10px;font-size:16px;letter-spacing:3px;font-weight:300}
-  .state .root{color:#c4915e}
-  .state .sep{color:rgba(255,255,255,0.35);margin:0 8px}
-  .state .fifth{color:rgba(255,255,255,0.9)}
-  .state .evolve{color:#6a9fd8}
-  #visualiser{width:100%;height:52px;border-radius:6px;margin-bottom:14px;display:block}
-  .section-label{font-size:11px;color:rgba(255,255,255,0.85);font-weight:500;margin-bottom:6px}
-  .key-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;margin-bottom:12px}
-  .key-btn{padding:8px 0;font-size:12px;font-family:'Open Sans',sans-serif;font-weight:400;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);color:rgba(255,255,255,0.85);border-radius:4px;cursor:pointer;transition:all 0.2s;text-align:center}
-  .key-btn.active{background:rgba(196,145,94,0.15);border-color:rgba(196,145,94,0.3);color:#c4915e;font-weight:500}
-  .key-btn.active.paused{background:rgba(196,145,94,0.04);border-color:rgba(196,145,94,0.12);color:rgba(196,145,94,0.4)}
-  .card{padding:12px;border-radius:8px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);margin-bottom:14px}
-  .evolve-btn{width:100%;padding:8px 0;font-size:12px;font-family:'Open Sans',sans-serif;font-weight:400;border-radius:6px;cursor:pointer;margin-bottom:10px;letter-spacing:2px;transition:all 0.3s}
-  .evolve-btn.on{background:rgba(196,145,94,0.18);border:1px solid rgba(196,145,94,0.35);color:#c4915e}
-  .evolve-btn.off{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);color:rgba(255,255,255,0.8)}
-  .layer-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;padding:10px 12px;border-radius:8px;transition:all 0.4s}
-  .layer-toggle{width:36px;height:36px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all 0.4s;background:transparent}
-  .layer-toggle .dot{width:10px;height:10px;border-radius:50%;transition:all 0.4s}
-  .layer-info{flex:1;min-width:0}
-  .layer-name{font-size:13px;font-weight:500;margin-bottom:4px;transition:color 0.3s}
-  .slider-group{margin-bottom:12px}
-  .slider-header{display:flex;justify-content:space-between;margin-bottom:4px}
-  .slider-label{font-size:11px;color:rgba(255,255,255,0.85);font-weight:400}
-  .slider-value{font-size:11px;color:rgba(255,255,255,0.7)}
-  input[type="range"]{width:100%;height:4px;-webkit-appearance:none;appearance:none;border-radius:2px;outline:none;cursor:pointer;margin:0}
-  input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:#fff;border:none;margin-top:-6px;box-shadow:0 1px 4px rgba(0,0,0,0.4)}
-  .layer-row input[type="range"]{height:3px}
-  .layer-row input[type="range"]::-webkit-slider-thumb{width:14px;height:14px;margin-top:-5px}
-  .footer{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:16px;opacity:0.3}
-  .footer span{font-size:9px;letter-spacing:3px;text-transform:uppercase;font-weight:300}
+  html,body{height:100%;overflow:hidden;background:#060810}
+  body{font-family:'Open Sans',sans-serif;color:#fff;-webkit-tap-highlight-color:transparent;-webkit-font-smoothing:antialiased;user-select:none;-webkit-user-select:none}
+  /* ── Performance layout ── */
+  #perf{position:fixed;inset:0;display:flex;flex-direction:column;background:linear-gradient(160deg,#060810,#0b0e16 40%,#070910);padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
+  .perf-top{display:flex;align-items:center;justify-content:space-between;padding:14px 20px 10px;flex-shrink:0}
+  .perf-logo{flex-shrink:0;width:36px;display:flex;align-items:center}
+  .perf-state{flex:1;text-align:center;font-weight:300}
+  .perf-state .root{color:#c4915e;font-size:18px;font-weight:500;letter-spacing:1px}
+  .perf-state .sep{color:rgba(255,255,255,0.2);margin:0 8px;font-size:14px}
+  .perf-state .evo{color:rgba(255,255,255,0.38);font-size:12px;letter-spacing:2px}
+  .edit-btn{width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;cursor:pointer;color:rgba(255,255,255,0.4);transition:all 0.2s;flex-shrink:0}
+  .edit-btn:active{background:rgba(255,255,255,0.12)}
+  /* ── Visualiser ── */
+  .perf-vis-wrap{flex:1;padding:8px 16px;min-height:0;display:flex;align-items:center}
+  #visualiser{width:100%;border-radius:8px;display:block}
+  /* ── Key grid ── */
+  .perf-keys{padding:0 12px;flex-shrink:0;display:grid;grid-template-columns:repeat(6,1fr);gap:7px}
+  .key-btn{height:64px;border-radius:14px;font-size:14px;font-family:'Open Sans',sans-serif;font-weight:500;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);cursor:pointer;transition:background 0.15s,border-color 0.15s,color 0.15s,box-shadow 0.15s;display:flex;align-items:center;justify-content:center;letter-spacing:0.5px}
+  .key-btn.sharp{color:rgba(255,255,255,0.38);font-size:12px}
+  .key-btn.active{background:rgba(196,145,94,0.18);border-color:rgba(196,145,94,0.45);color:#c4915e;box-shadow:0 0 20px rgba(196,145,94,0.12)}
+  .key-btn.active.paused{background:rgba(196,145,94,0.04);border-color:rgba(196,145,94,0.15);color:rgba(196,145,94,0.35);box-shadow:none}
+  /* ── Bottom bar ── */
+  .perf-bottom{display:flex;align-items:center;justify-content:center;padding:10px 20px 16px;flex-shrink:0}
+  .evolve-pill{padding:7px 20px;border-radius:20px;font-size:10px;letter-spacing:2.5px;text-transform:uppercase;font-weight:400;cursor:pointer;transition:all 0.3s}
+  .evolve-pill.on{background:rgba(106,159,216,0.1);border:1px solid rgba(106,159,216,0.25);color:rgba(106,159,216,0.75)}
+  .evolve-pill.off{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.25)}
+  /* ── Edit backdrop ── */
+  #editBackdrop{position:fixed;inset:0;background:rgba(0,0,0,0);pointer-events:none;z-index:40;transition:background 0.3s}
+  #editBackdrop.visible{background:rgba(0,0,0,0.52);pointer-events:all}
+  /* ── Edit sheet ── */
+  #editSheet{position:fixed;left:0;right:0;bottom:0;background:linear-gradient(180deg,#0e1122,#090c18);border-radius:22px 22px 0 0;border-top:1px solid rgba(255,255,255,0.1);transform:translateY(100%);transition:transform 0.4s cubic-bezier(0.32,0.72,0,1);max-height:82vh;overflow-y:auto;-webkit-overflow-scrolling:touch;z-index:50;padding-bottom:env(safe-area-inset-bottom)}
+  #editSheet.open{transform:translateY(0)}
+  .sheet-handle{width:40px;height:4px;background:rgba(255,255,255,0.18);border-radius:2px;margin:14px auto 0;cursor:pointer}
+  /* ── Edit content ── */
+  .edit-section{padding:22px 20px 0}
+  .edit-title{font-size:10px;letter-spacing:3px;text-transform:uppercase;color:rgba(255,255,255,0.28);font-weight:500;margin-bottom:14px}
+  .edit-divider{height:1px;background:rgba(255,255,255,0.06);margin:20px 0 0}
+  /* ── Chord pills ── */
+  .chord-pills{display:flex;flex-wrap:wrap;gap:8px;padding-bottom:4px}
+  .chord-pill{padding:10px 18px;border-radius:22px;font-size:12px;font-weight:500;letter-spacing:1px;cursor:pointer;transition:all 0.2s;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:rgba(255,255,255,0.38)}
+  .chord-pill.active{background:rgba(196,145,94,0.16);border-color:rgba(196,145,94,0.38);color:#c4915e}
+  /* ── Layer rows ── */
+  .edit-layer{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid rgba(255,255,255,0.05)}
+  .layer-dot-btn{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:all 0.3s;border:1.5px solid rgba(255,255,255,0.1);background:transparent}
+  .layer-dot{width:8px;height:8px;border-radius:50%;transition:all 0.3s}
+  .edit-layer-name{font-size:13px;font-weight:400;color:rgba(255,255,255,0.5);width:82px;flex-shrink:0;transition:color 0.3s}
+  /* ── Slider rows ── */
+  .slider-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.05)}
+  .slider-row:last-child{border-bottom:none}
+  .slider-lbl{font-size:12px;color:rgba(255,255,255,0.42);width:72px;flex-shrink:0}
+  .slider-val{font-size:11px;color:rgba(255,255,255,0.28);width:48px;text-align:right;flex-shrink:0}
+  input[type=range]{flex:1;height:3px;-webkit-appearance:none;appearance:none;border-radius:2px;outline:none;cursor:pointer;margin:0}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:#fff;margin-top:-8px;box-shadow:0 1px 4px rgba(0,0,0,0.45)}
+  .edit-bottom-pad{height:28px}
 </style>
 </head>
 <body>
-<div id="app">
-<!-- Tap-to-start overlay -->
-<div id="audioPrompt" onclick="initAndStart()" style="position:fixed;top:0;left:0;right:0;bottom:0;z-index:100;display:flex;align-items:center;justify-content:center;background:rgba(6,8,16,0.95);cursor:pointer;transition:opacity 0.6s">
+<!-- Tap-to-start -->
+<div id="audioPrompt" onclick="initAndStart()" style="position:fixed;top:0;left:0;right:0;bottom:0;z-index:100;display:flex;align-items:center;justify-content:center;background:rgba(6,8,16,0.97);cursor:pointer;transition:opacity 0.6s">
   <div style="text-align:center">
-    <svg width="48" height="48" viewBox="0 0 100 100" fill="none">
+    <svg width="52" height="52" viewBox="0 0 100 100" fill="none">
       <circle cx="50" cy="50" r="46" stroke="rgba(196,145,94,0.3)" stroke-width="1.5"/>
       <path d="M 20 50 Q 30 35, 40 50 Q 50 65, 60 50 Q 70 35, 80 50" stroke="rgba(196,145,94,0.7)" stroke-width="2" stroke-linecap="round" fill="none"/>
       <path d="M 20 50 Q 30 40, 40 50 Q 50 60, 60 50 Q 70 40, 80 50" stroke="rgba(94,184,138,0.5)" stroke-width="1.5" stroke-linecap="round" fill="none"/>
       <path d="M 25 50 Q 35 44, 45 50 Q 55 56, 65 50 Q 75 44, 85 50" stroke="rgba(212,107,138,0.4)" stroke-width="1" stroke-linecap="round" fill="none"/>
       <text x="50" y="30" text-anchor="middle" fill="rgba(196,145,94,0.5)" font-family="'Open Sans',sans-serif" font-size="11" font-weight="600" letter-spacing="1">N</text>
       <circle cx="50" cy="50" r="38" stroke="rgba(255,255,255,0.04)" stroke-width="0.5"/>
-      <path d="M 30 72 Q 50 82, 70 72" stroke="rgba(106,159,216,0.25)" stroke-width="1" stroke-linecap="round" fill="none"/>
     </svg>
-    <div style="font-size:11px;letter-spacing:3px;color:rgba(255,255,255,0.25);text-transform:uppercase;font-weight:300;margin-top:12px">Tap to start audio</div>
-    <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.15);margin-top:8px"></div>
+    <div style="font-size:11px;letter-spacing:3px;color:rgba(255,255,255,0.2);text-transform:uppercase;font-weight:300;margin-top:16px">Tap to start</div>
+    <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:8px"></div>
   </div>
 </div>
-<div id="main" style="padding:16px;padding-bottom:40px">
-  <div class="header">
-    <svg width="28" height="28" viewBox="0 0 100 100" fill="none">
-      <circle cx="50" cy="50" r="46" stroke="rgba(196,145,94,0.3)" stroke-width="1.5"/>
-      <path d="M 20 50 Q 30 35, 40 50 Q 50 65, 60 50 Q 70 35, 80 50" stroke="rgba(196,145,94,0.7)" stroke-width="2" stroke-linecap="round" fill="none"/>
-      <path d="M 20 50 Q 30 40, 40 50 Q 50 60, 60 50 Q 70 40, 80 50" stroke="rgba(94,184,138,0.5)" stroke-width="1.5" stroke-linecap="round" fill="none"/>
-      <path d="M 25 50 Q 35 44, 45 50 Q 55 56, 65 50 Q 75 44, 85 50" stroke="rgba(212,107,138,0.4)" stroke-width="1" stroke-linecap="round" fill="none"/>
-      <text x="50" y="30" text-anchor="middle" fill="rgba(196,145,94,0.5)" font-family="'Open Sans',sans-serif" font-size="11" font-weight="600" letter-spacing="1">N</text>
-      <circle cx="50" cy="50" r="38" stroke="rgba(255,255,255,0.04)" stroke-width="0.5"/>
-      <path d="M 30 72 Q 50 82, 70 72" stroke="rgba(106,159,216,0.25)" stroke-width="1" stroke-linecap="round" fill="none"/>
-    </svg>
-    <span>Norcoast Ambience</span>
+<!-- Performance mode -->
+<div id="perf">
+  <div class="perf-top">
+    <div class="perf-logo">
+      <svg width="28" height="28" viewBox="0 0 100 100" fill="none">
+        <circle cx="50" cy="50" r="46" stroke="rgba(196,145,94,0.3)" stroke-width="1.5"/>
+        <path d="M 20 50 Q 30 35, 40 50 Q 50 65, 60 50 Q 70 35, 80 50" stroke="rgba(196,145,94,0.7)" stroke-width="2" stroke-linecap="round" fill="none"/>
+        <path d="M 20 50 Q 30 40, 40 50 Q 50 60, 60 50 Q 70 40, 80 50" stroke="rgba(94,184,138,0.5)" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+      </svg>
+    </div>
+    <div class="perf-state">
+      <span class="root" id="stateRoot">C</span><span class="sep">·</span><span class="evo" id="stateEvolve">Octave</span>
+    </div>
+    <button class="edit-btn" onclick="openEdit()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="5" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="12" cy="19" r="1.2"/></svg>
+    </button>
   </div>
-  <div class="state">
-    <span class="root" id="stateRoot">C</span><span class="sep">·</span>
-    <span class="fifth">5th</span><span class="sep">·</span>
-    <span class="evolve" id="stateEvolve">Octave</span>
+  <div class="perf-vis-wrap">
+    <canvas id="visualiser" width="800" height="300"></canvas>
   </div>
-  <canvas id="visualiser" width="800" height="100"></canvas>
-  <div class="section-label">Key</div>
-  <div class="key-grid" id="keyRow"></div>
-  <div class="card">
-    <div class="section-label" style="margin-bottom:8px">Evolution</div>
-    <button class="evolve-btn on" id="evolveBtn" onclick="toggleEvolving()">Evolving</button>
-    <div id="speedSlider"></div>
-  </div>
-  <div class="section-label" style="margin-bottom:8px">Layers</div>
-  <div id="layerRows"></div>
-  <div class="card" style="margin-top:14px">
-    <div class="section-label" style="margin-bottom:10px">Effects</div>
-    <div id="lpfSlider"></div>
-    <div id="hpfSlider"></div>
-    <div id="reverbSlider"></div>
-    <div id="delaySlider"></div>
-  </div>
-  <div class="card"><div id="masterSlider"></div></div>
-  <div class="footer">
-    <svg width="16" height="16" viewBox="0 0 100 100" fill="none">
-      <circle cx="50" cy="50" r="46" stroke="rgba(196,145,94,0.3)" stroke-width="1.5"/>
-      <path d="M 20 50 Q 30 35, 40 50 Q 50 65, 60 50 Q 70 35, 80 50" stroke="rgba(196,145,94,0.7)" stroke-width="2" stroke-linecap="round" fill="none"/>
-      <path d="M 20 50 Q 30 40, 40 50 Q 50 60, 60 50 Q 70 40, 80 50" stroke="rgba(94,184,138,0.5)" stroke-width="1.5" stroke-linecap="round" fill="none"/>
-    </svg>
-    <span>Norcoast Audio</span>
+  <div class="perf-keys" id="keyRow"></div>
+  <div class="perf-bottom">
+    <button id="evolveBtn" class="evolve-pill on" onclick="toggleEvolving()">Evolving</button>
   </div>
 </div>
+<!-- Edit backdrop -->
+<div id="editBackdrop" onclick="closeEdit()"></div>
+<!-- Edit sheet -->
+<div id="editSheet">
+  <div class="sheet-handle" onclick="closeEdit()"></div>
+  <div id="editContent"></div>
 </div>
 
 <script>
@@ -132,6 +133,10 @@ const EVOLVE_INTERVALS=[
   {semi:14,name:"9th",weight:3},
   {semi:5,name:"Sus4",weight:1},
   {semi:11,name:"Maj7",weight:1},
+  {semi:3,name:"min3",weight:1},
+  {semi:4,name:"Maj3",weight:1},
+  {semi:9,name:"6th",weight:1},
+  {semi:10,name:"b7",weight:1},
 ];
 
 const PAD_LAYERS=[
@@ -161,6 +166,7 @@ let staticNodes={},evolveNodes={},layerState={};
 let granularTimers=[],granularGain=null,reversedBuf=null;
 let evolveTimer=null,animFrame=null;
 let audioPaused=false;
+let enabledEvolveIdx=new Set([0,1,2,3]);
 
 PAD_LAYERS.forEach(l=>{layerState[l.id]={active:true,volume:0}});
 loadSettings();
@@ -408,7 +414,8 @@ function scheduleEvolve(){
   const base=bMin+Math.random()*(bMax-bMin);const time=base*(1.5-evolveSpeed*0.8);
   evolveTimer=setTimeout(()=>{
     if(!evolving){scheduleEvolve();return}
-    const cands=EVOLVE_INTERVALS.map((_,i)=>i).filter(i=>i!==cur);
+    const cands=EVOLVE_INTERVALS.map((_,i)=>i).filter(i=>i!==cur&&enabledEvolveIdx.has(i));
+    if(!cands.length){scheduleEvolve();return}
     const wts=cands.map(i=>EVOLVE_INTERVALS[i].weight);const tot=wts.reduce((a,b)=>a+b,0);
     let r=Math.random()*tot,next=cands[0];
     for(let i=0;i<cands.length;i++){r-=wts[i];if(r<=0){next=cands[i];break}}
@@ -425,86 +432,148 @@ function volToFader(v){return Math.pow(Math.max(0,v),1/3)}
 function faderToVol(f){return f<0.02?0:f*f*f}
 
 // ─── UI ───
-function buildGenericSlider(cid,label,fPos,color,display,onInput){
-  const el=document.getElementById(cid);
-  el.innerHTML='<div class="slider-group"><div class="slider-header"><span class="slider-label">'+label+'</span><span class="slider-value" id="'+cid+'_val">'+display+'</span></div><input type="range" min="0" max="1" step="0.003" value="'+fPos+'" style="background:linear-gradient(to right,'+color+' '+fPos*100+'%,rgba(255,255,255,0.06) '+fPos*100+'%);accent-color:'+color+'"></div>';
-  el.querySelector('input').addEventListener('input',e=>{
-    const raw=parseFloat(e.target.value);
-    e.target.style.background='linear-gradient(to right,'+color+' '+raw*100+'%,rgba(255,255,255,0.06) '+raw*100+'%)';
-    onInput(raw,document.getElementById(cid+'_val'));
+function sliderRowHTML(id,lbl,color,val,display){
+  return '<div class="slider-row"><span class="slider-lbl">'+lbl+'</span><input type="range" min="0" max="1" step="0.003" value="'+val+'" data-sr="'+id+'" data-color="'+color+'" style="background:linear-gradient(to right,'+color+'66 '+val*100+'%,rgba(255,255,255,0.06) '+val*100+'%);accent-color:'+color+'"><span class="slider-val" id="sr_'+id+'">'+display+'</span></div>';
+}
+function wireSR(c,id,fn){
+  const inp=c.querySelector('input[data-sr="'+id+'"]');const val=c.querySelector('#sr_'+id);
+  if(!inp||!val)return;
+  inp.addEventListener('input',e=>{
+    const raw=parseFloat(e.target.value),color=inp.dataset.color;
+    val.textContent=fn(raw);
+    inp.style.background='linear-gradient(to right,'+color+'66 '+raw*100+'%,rgba(255,255,255,0.06) '+raw*100+'%)';
+    queueSave();
   });
 }
 
 function buildKeys(){
   const row=document.getElementById('keyRow');row.innerHTML='';
-  NOTES.forEach(n=>{const btn=document.createElement('button');btn.className='key-btn'+(n===homeRoot?' active':'')+(n===homeRoot&&audioPaused?' paused':'');btn.textContent=n;btn.onclick=()=>{
-    if(n===homeRoot){
-      audioPaused=!audioPaused;
-      if(audioPaused){master.gain.linearRampToValueAtTime(0,ctx.currentTime+0.4);btn.classList.add('paused')}
-      else{ctx.resume();master.gain.linearRampToValueAtTime(masterVol,ctx.currentTime+0.4);btn.classList.remove('paused')}
-      return;
-    }
-    homeRoot=n;document.getElementById('stateRoot').textContent=n;
-    row.querySelectorAll('.key-btn').forEach(b=>b.classList.remove('active','paused'));btn.classList.add('active');
-    PAD_LAYERS.forEach(l=>{if(layerState[l.id].active&&layerState[l.id].volume>0)startPad(l,layerState[l.id].volume,homeRoot,currentEvolve)});
-    saveSettings();
-  };row.appendChild(btn)});
+  const sharps=new Set(['C#','D#','F#','G#','A#']);
+  NOTES.forEach(n=>{
+    const btn=document.createElement('button');
+    btn.className='key-btn'+(sharps.has(n)?' sharp':'')+(n===homeRoot?' active':'')+(n===homeRoot&&audioPaused?' paused':'');
+    btn.textContent=n;
+    btn.onclick=()=>{
+      if(n===homeRoot){
+        audioPaused=!audioPaused;
+        if(audioPaused){master.gain.linearRampToValueAtTime(0,ctx.currentTime+0.4);btn.classList.add('paused')}
+        else{ctx.resume();master.gain.linearRampToValueAtTime(masterVol,ctx.currentTime+0.4);btn.classList.remove('paused')}
+        return;
+      }
+      homeRoot=n;document.getElementById('stateRoot').textContent=n;
+      row.querySelectorAll('.key-btn').forEach(b=>b.classList.remove('active','paused'));btn.classList.add('active');
+      PAD_LAYERS.forEach(l=>{if(layerState[l.id].active&&layerState[l.id].volume>0)startPad(l,layerState[l.id].volume,homeRoot,currentEvolve)});
+      saveSettings();
+    };
+    row.appendChild(btn);
+  });
 }
 
-function buildLayers(){
-  const cont=document.getElementById('layerRows');cont.innerHTML='';
-  PAD_LAYERS.forEach(l=>{
-    const st=layerState[l.id];const row=document.createElement('div');row.className='layer-row';
-    const fPos=volToFader(st.volume);const ac=st.active&&st.volume>0;
-    row.style.background=ac?l.color+'0a':'rgba(255,255,255,0.015)';
-    row.style.border='1px solid '+(ac?l.color+'30':'rgba(255,255,255,0.04)');
-    row.innerHTML='<button class="layer-toggle" style="border:1.5px solid '+l.color+'40;background:'+(ac?l.color+'15':'transparent')+'"><div class="dot" style="background:'+(ac?l.color:'rgba(255,255,255,0.12)')+';box-shadow:'+(ac?'0 0 14px '+l.color+'50':'none')+'"></div></button><div class="layer-info"><div class="layer-name" style="color:'+(ac?l.color:'rgba(255,255,255,0.45)')+'">'+l.name+'</div><input type="range" min="0" max="1" step="0.003" value="'+fPos+'" style="background:linear-gradient(to right,'+l.color+'55 '+fPos*100+'%,rgba(255,255,255,0.04) '+fPos*100+'%);accent-color:'+l.color+'"></div>';
-
-    row.querySelector('.layer-toggle').addEventListener('click',()=>{
-      if(st.volume>0){st._prevVol=st.volume;st.volume=0;
-        if(l.type==="granular"){stopGranular();if(granularGain)granularGain.gain.linearRampToValueAtTime(0,ctx.currentTime+0.5)}
-        else{const t=ctx.currentTime+0.15;if(staticNodes[l.id])staticNodes[l.id].gain.gain.linearRampToValueAtTime(0,t);if(evolveNodes[l.id])evolveNodes[l.id].gain.gain.linearRampToValueAtTime(0,t)}
-      }else{st.volume=st._prevVol||0.5;
-        if(l.type==="granular"){startGranular(st.volume)}
-        else if(!staticNodes[l.id]){startPad(l,st.volume,homeRoot,currentEvolve)}
-        else{const t=ctx.currentTime+0.5;if(staticNodes[l.id])staticNodes[l.id].gain.gain.linearRampToValueAtTime(st.volume,t);if(evolveNodes[l.id])evolveNodes[l.id].gain.gain.linearRampToValueAtTime(st.volume,t)}
-      }
-      saveSettings();buildLayers();
-    });
-
-    row.querySelector('input').addEventListener('input',e=>{
-      const raw=parseFloat(e.target.value);const vol=faderToVol(raw);const wasZero=st.volume===0;st.volume=vol;queueSave();
-      e.target.style.background='linear-gradient(to right,'+l.color+'55 '+raw*100+'%,rgba(255,255,255,0.04) '+raw*100+'%)';
-      if(l.type==="granular"){
-        if(vol>0&&wasZero){startGranular(vol)}
-        else if(vol<=0){stopGranular()}
-        else if(granularGain){granularGain.gain.linearRampToValueAtTime(vol*0.8,ctx.currentTime+0.1)}
-      }else{
-        if(vol>0&&wasZero&&!staticNodes[l.id]){startPad(l,vol,homeRoot,currentEvolve)}
-        else{const t=ctx.currentTime+0.08;if(staticNodes[l.id])staticNodes[l.id].gain.gain.linearRampToValueAtTime(vol,t);if(evolveNodes[l.id])evolveNodes[l.id].gain.gain.linearRampToValueAtTime(vol,t)}
-      }
-      const isA=vol>0;
-      row.style.background=isA?l.color+'0a':'rgba(255,255,255,0.015)';
-      row.style.border='1px solid '+(isA?l.color+'30':'rgba(255,255,255,0.04)');
-      row.querySelector('.layer-toggle').style.background=isA?l.color+'15':'transparent';
-      const dot=row.querySelector('.dot');dot.style.background=isA?l.color:'rgba(255,255,255,0.12)';dot.style.boxShadow=isA?'0 0 14px '+l.color+'50':'none';
-      row.querySelector('.layer-name').style.color=isA?l.color:'rgba(255,255,255,0.45)';
-    });
-    cont.appendChild(row);
-
-    // Add +Octave toggle for texture layer
-    if(l.type==="granular"){
-      const octRow=document.createElement('div');
-      octRow.style.cssText='display:flex;gap:6px;margin-bottom:8px;margin-top:-4px;padding:0 12px';
-      const octBtn=document.createElement('button');
-      octBtn.style.cssText='flex:1;padding:6px 0;font-size:11px;font-family:Open Sans,sans-serif;font-weight:400;border-radius:5px;cursor:pointer;letter-spacing:1px;transition:all 0.3s;'
-        +(textureOctUp?'background:rgba(160,128,96,0.15);border:1px solid rgba(160,128,96,0.3);color:#a08060':'background:rgba(255,255,255,0.008);border:1px solid rgba(255,255,255,0.03);color:rgba(255,255,255,0.25)');
-      octBtn.textContent=textureOctUp?'+Octave On':'+Octave';
-      octBtn.onclick=()=>{textureOctUp=!textureOctUp;buildLayers();saveSettings()};
-      octRow.appendChild(octBtn);
-      cont.appendChild(octRow);
+function openEdit(){
+  buildEditSheet();
+  document.getElementById('editSheet').classList.add('open');
+  document.getElementById('editBackdrop').classList.add('visible');
+}
+function closeEdit(){
+  document.getElementById('editSheet').classList.remove('open');
+  document.getElementById('editBackdrop').classList.remove('visible');
+}
+function toggleLayer(id){
+  const l=PAD_LAYERS.find(x=>x.id===id),st=layerState[id];
+  if(st.volume>0){
+    st._prevVol=st.volume;st.volume=0;
+    if(l.type==="granular"){stopGranular();if(granularGain)granularGain.gain.linearRampToValueAtTime(0,ctx.currentTime+0.5)}
+    else{const t=ctx.currentTime+0.15;if(staticNodes[id])staticNodes[id].gain.gain.linearRampToValueAtTime(0,t);if(evolveNodes[id])evolveNodes[id].gain.gain.linearRampToValueAtTime(0,t)}
+  }else{
+    st.volume=st._prevVol||0.5;
+    if(l.type==="granular")startGranular(st.volume);
+    else if(!staticNodes[id])startPad(l,st.volume,homeRoot,currentEvolve);
+    else{const t=ctx.currentTime+0.5;if(staticNodes[id])staticNodes[id].gain.gain.linearRampToValueAtTime(st.volume,t);if(evolveNodes[id])evolveNodes[id].gain.gain.linearRampToValueAtTime(st.volume,t)}
+  }
+  // update dot + slider in-place
+  const row=document.querySelector('.edit-layer[data-lid="'+id+'"]');
+  if(row){
+    const on=st.volume>0;const fPos=volToFader(st.volume);
+    const inp=row.querySelector('input[type=range]');if(inp){inp.value=fPos;inp.style.background='linear-gradient(to right,'+l.color+'55 '+fPos*100+'%,rgba(255,255,255,0.06) '+fPos*100+'%)'}
+    const db=row.querySelector('.layer-dot-btn');if(db){db.style.borderColor=on?l.color+'55':'rgba(255,255,255,0.1)';db.style.background=on?l.color+'15':'transparent'}
+    const dot=row.querySelector('.layer-dot');if(dot){dot.style.background=on?l.color:'rgba(255,255,255,0.15)';dot.style.boxShadow=on?'0 0 10px '+l.color+'50':'none'}
+    const nm=row.querySelector('.edit-layer-name');if(nm)nm.style.color=on?'rgba(255,255,255,0.8)':'rgba(255,255,255,0.35)';
+  }
+  saveSettings();
+}
+function toggleChord(i){
+  if(enabledEvolveIdx.has(i)){
+    if(enabledEvolveIdx.size<=1)return;
+    enabledEvolveIdx.delete(i);
+    if(currentEvolve===i){
+      const active=[...enabledEvolveIdx];
+      currentEvolve=active[Math.floor(Math.random()*active.length)];
+      evolveVoice(currentEvolve);
+      document.getElementById('stateEvolve').textContent=EVOLVE_INTERVALS[currentEvolve].name;
     }
+  }else{
+    enabledEvolveIdx.add(i);
+  }
+  document.querySelectorAll('.chord-pill').forEach(p=>{
+    const ci=parseInt(p.dataset.ci);p.classList.toggle('active',enabledEvolveIdx.has(ci));
   });
+  saveSettings();
+}
+function buildEditSheet(){
+  const c=document.getElementById('editContent');c.innerHTML='';
+  // ── Chords ──
+  let h='<div class="edit-section"><div class="edit-title">Chords</div><div class="chord-pills">';
+  EVOLVE_INTERVALS.forEach((iv,i)=>{h+='<button class="chord-pill'+(enabledEvolveIdx.has(i)?' active':'')+'" data-ci="'+i+'" onclick="toggleChord('+i+')">'+iv.name+'</button>'});
+  h+='</div></div><div class="edit-divider"></div>';
+  // ── Layers ──
+  h+='<div class="edit-section"><div class="edit-title">Layers</div>';
+  PAD_LAYERS.forEach(l=>{
+    const st=layerState[l.id];const fPos=volToFader(st.volume);const on=st.volume>0;
+    h+='<div class="edit-layer" data-lid="'+l.id+'">';
+    h+='<button class="layer-dot-btn" style="border-color:'+(on?l.color+'55':'rgba(255,255,255,0.1)')+';background:'+(on?l.color+'15':'transparent')+'" onclick="toggleLayer(\''+l.id+'\')"><div class="layer-dot" style="background:'+(on?l.color:'rgba(255,255,255,0.15)')+';box-shadow:'+(on?'0 0 10px '+l.color+'50':'none')+'"></div></button>';
+    h+='<span class="edit-layer-name" style="color:'+(on?'rgba(255,255,255,0.8)':'rgba(255,255,255,0.35)')+'">'+l.name+'</span>';
+    h+='<input type="range" min="0" max="1" step="0.003" value="'+fPos+'" data-lid="'+l.id+'" style="background:linear-gradient(to right,'+l.color+'55 '+fPos*100+'%,rgba(255,255,255,0.06) '+fPos*100+'%);accent-color:'+l.color+'">';
+    h+='</div>';
+  });
+  h+='</div><div class="edit-divider"></div>';
+  // ── FX ──
+  h+='<div class="edit-section"><div class="edit-title">Effects</div>';
+  h+=sliderRowHTML('rev','Reverb','#6a9fd8',volToFader(reverbMix),Math.round(reverbMix*100)+'%');
+  h+=sliderRowHTML('dly','Delay','#5eb88a',volToFader(delayMixVal),Math.round(delayMixVal*100)+'%');
+  h+=sliderRowHTML('lpf','Low Pass','#d46b8a',lpfValue,formatHz(lpfFaderToHz(lpfValue)));
+  h+=sliderRowHTML('hpf','High Pass','#b07acc',hpfValue,formatHz(hpfFaderToHz(hpfValue)));
+  h+='</div><div class="edit-divider"></div>';
+  // ── Evolution ──
+  h+='<div class="edit-section"><div class="edit-title">Evolution</div>';
+  h+=sliderRowHTML('spd','Speed','#c4915e',volToFader(evolveSpeed),Math.round(evolveSpeed*100)+'%');
+  h+='</div><div class="edit-divider"></div>';
+  // ── Master ──
+  h+='<div class="edit-section"><div class="edit-title">Master</div>';
+  h+=sliderRowHTML('mst','Volume','#c4915e',volToFader(masterVol),Math.round(masterVol*100)+'%');
+  h+='</div><div class="edit-bottom-pad"></div>';
+  c.innerHTML=h;
+  // Wire layer sliders
+  PAD_LAYERS.forEach(l=>{
+    const inp=c.querySelector('input[data-lid="'+l.id+'"]');if(!inp)return;
+    inp.addEventListener('input',e=>{
+      const raw=parseFloat(e.target.value),vol=faderToVol(raw),wasZero=layerState[l.id].volume===0;
+      layerState[l.id].volume=vol;queueSave();
+      inp.style.background='linear-gradient(to right,'+l.color+'55 '+raw*100+'%,rgba(255,255,255,0.06) '+raw*100+'%)';
+      if(l.type==="granular"){if(vol>0&&wasZero)startGranular(vol);else if(vol<=0)stopGranular();else if(granularGain)granularGain.gain.linearRampToValueAtTime(vol*0.8,ctx.currentTime+0.1)}
+      else{if(vol>0&&wasZero&&!staticNodes[l.id])startPad(l,vol,homeRoot,currentEvolve);else{const t=ctx.currentTime+0.08;if(staticNodes[l.id])staticNodes[l.id].gain.gain.linearRampToValueAtTime(vol,t);if(evolveNodes[l.id])evolveNodes[l.id].gain.gain.linearRampToValueAtTime(vol,t)}}
+      const row=inp.closest('.edit-layer'),on=vol>0;
+      const db=row.querySelector('.layer-dot-btn');db.style.borderColor=on?l.color+'55':'rgba(255,255,255,0.1)';db.style.background=on?l.color+'15':'transparent';
+      const dot=row.querySelector('.layer-dot');dot.style.background=on?l.color:'rgba(255,255,255,0.15)';dot.style.boxShadow=on?'0 0 10px '+l.color+'50':'none';
+      row.querySelector('.edit-layer-name').style.color=on?'rgba(255,255,255,0.8)':'rgba(255,255,255,0.35)';
+    });
+  });
+  // Wire FX/master sliders
+  wireSR(c,'rev',r=>{reverbMix=faderToVol(r);reverbGain.gain.value=reverbMix;dryGain.gain.value=1-reverbMix*0.35;return Math.round(reverbMix*100)+'%'});
+  wireSR(c,'dly',r=>{delayMixVal=faderToVol(r);delayGainN.gain.value=delayMixVal;return Math.round(delayMixVal*100)+'%'});
+  wireSR(c,'lpf',r=>{lpfValue=r;const hz=lpfFaderToHz(r);globalLPF.frequency.linearRampToValueAtTime(hz,ctx.currentTime+0.1);return formatHz(hz)});
+  wireSR(c,'hpf',r=>{hpfValue=r;const hz=hpfFaderToHz(r);globalHPF.frequency.linearRampToValueAtTime(hz,ctx.currentTime+0.1);return formatHz(hz)});
+  wireSR(c,'spd',r=>{evolveSpeed=faderToVol(r);return Math.round(evolveSpeed*100)+'%'});
+  wireSR(c,'mst',r=>{masterVol=faderToVol(r);master.gain.linearRampToValueAtTime(masterVol,ctx.currentTime+0.1);return Math.round(masterVol*100)+'%'});
 }
 
 // ─── VISUALISER ───
@@ -528,10 +597,10 @@ function startVis(){
   draw();
 }
 
-function toggleEvolving(){evolving=!evolving;const btn=document.getElementById('evolveBtn');btn.className='evolve-btn '+(evolving?'on':'off');btn.textContent=evolving?'Evolving':'Static';saveSettings()}
+function toggleEvolving(){evolving=!evolving;const btn=document.getElementById('evolveBtn');btn.className='evolve-pill '+(evolving?'on':'off');btn.textContent=evolving?'Evolving':'Static';saveSettings();if(evolving)scheduleEvolve()}
 
-function saveSettings(){try{const s={homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,reverbMix,delayMixVal,masterVol,textureOctUp,layers:{}};PAD_LAYERS.forEach(l=>{s.layers[l.id]={volume:layerState[l.id].volume}});localStorage.setItem('norcoast_v1',JSON.stringify(s))}catch(e){}}
-function loadSettings(){try{const raw=localStorage.getItem('norcoast_v1');if(!raw)return;const s=JSON.parse(raw);if(s.homeRoot)homeRoot=s.homeRoot;if(s.evolving!=null)evolving=s.evolving;if(s.evolveSpeed!=null)evolveSpeed=s.evolveSpeed;if(s.lpfValue!=null)lpfValue=s.lpfValue;if(s.hpfValue!=null)hpfValue=s.hpfValue;if(s.reverbMix!=null)reverbMix=s.reverbMix;if(s.delayMixVal!=null)delayMixVal=s.delayMixVal;if(s.masterVol!=null)masterVol=s.masterVol;if(s.textureOctUp!=null)textureOctUp=s.textureOctUp;if(s.layers)PAD_LAYERS.forEach(l=>{if(s.layers[l.id]!=null)layerState[l.id].volume=s.layers[l.id].volume??0})}catch(e){}}
+function saveSettings(){try{const s={homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,reverbMix,delayMixVal,masterVol,textureOctUp,enabledEvolveIdx:[...enabledEvolveIdx],layers:{}};PAD_LAYERS.forEach(l=>{s.layers[l.id]={volume:layerState[l.id].volume}});localStorage.setItem('norcoast_v1',JSON.stringify(s))}catch(e){}}
+function loadSettings(){try{const raw=localStorage.getItem('norcoast_v1');if(!raw)return;const s=JSON.parse(raw);if(s.homeRoot)homeRoot=s.homeRoot;if(s.evolving!=null)evolving=s.evolving;if(s.evolveSpeed!=null)evolveSpeed=s.evolveSpeed;if(s.lpfValue!=null)lpfValue=s.lpfValue;if(s.hpfValue!=null)hpfValue=s.hpfValue;if(s.reverbMix!=null)reverbMix=s.reverbMix;if(s.delayMixVal!=null)delayMixVal=s.delayMixVal;if(s.masterVol!=null)masterVol=s.masterVol;if(s.textureOctUp!=null)textureOctUp=s.textureOctUp;if(Array.isArray(s.enabledEvolveIdx))enabledEvolveIdx=new Set(s.enabledEvolveIdx);if(s.layers)PAD_LAYERS.forEach(l=>{if(s.layers[l.id]!=null)layerState[l.id].volume=s.layers[l.id].volume??0})}catch(e){}}
 let _saveT=null;function queueSave(){clearTimeout(_saveT);_saveT=setTimeout(saveSettings,500)}
 
 // ─── START ───
@@ -554,14 +623,7 @@ async function initAndStart(){
   prompt.style.opacity='0';
   setTimeout(()=>{prompt.remove()},600);
 
-  buildKeys();buildLayers();
-  buildGenericSlider('speedSlider','Speed',volToFader(evolveSpeed),'#c4915e',Math.round(evolveSpeed*100)+'%',(r,v)=>{evolveSpeed=faderToVol(r);v.textContent=Math.round(evolveSpeed*100)+'%';queueSave()});
-  buildGenericSlider('lpfSlider','Low Pass',lpfValue,'#d46b8a',formatHz(lpfFaderToHz(lpfValue)),(r,v)=>{lpfValue=r;const hz=lpfFaderToHz(r);v.textContent=formatHz(hz);globalLPF.frequency.linearRampToValueAtTime(hz,ctx.currentTime+0.1);queueSave()});
-  buildGenericSlider('hpfSlider','High Pass',hpfValue,'#b07acc',formatHz(hpfFaderToHz(hpfValue)),(r,v)=>{hpfValue=r;const hz=hpfFaderToHz(r);v.textContent=formatHz(hz);globalHPF.frequency.linearRampToValueAtTime(hz,ctx.currentTime+0.1);queueSave()});
-  buildGenericSlider('reverbSlider','Reverb',volToFader(reverbMix),'#6a9fd8',Math.round(reverbMix*100)+'%',(r,v)=>{reverbMix=faderToVol(r);v.textContent=Math.round(reverbMix*100)+'%';reverbGain.gain.value=reverbMix;dryGain.gain.value=1-reverbMix*0.35;queueSave()});
-  buildGenericSlider('delaySlider','Delay',volToFader(delayMixVal),'#5eb88a',Math.round(delayMixVal*100)+'%',(r,v)=>{delayMixVal=faderToVol(r);v.textContent=Math.round(delayMixVal*100)+'%';delayGainN.gain.value=delayMixVal;queueSave()});
-  buildGenericSlider('masterSlider','Master',volToFader(masterVol),'#c4915e',Math.round(masterVol*100)+'%',(r,v)=>{masterVol=faderToVol(r);v.textContent=Math.round(masterVol*100)+'%';master.gain.linearRampToValueAtTime(masterVol,ctx.currentTime+0.1);queueSave()});
-  startVis();scheduleEvolve();
+  buildKeys();startVis();scheduleEvolve();
 }
 </script>
 <script>
