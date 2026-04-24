@@ -128,7 +128,7 @@
   </svg>
   <div style="font-size:10px;letter-spacing:5px;color:rgba(196,145,94,0.5);text-transform:uppercase;font-family:'Open Sans',sans-serif;margin-bottom:8px;animation:splashFade 0.8s ease-out 1.2s both">Norcoast Audio</div>
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
-  <div style="font-size:10px;letter-spacing:3px;color:rgba(255,255,255,0.22);text-transform:uppercase;font-family:'Open Sans',sans-serif;animation:splashPulse 2.5s ease-in-out 2s infinite">tap to begin</div>
+  <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
 </div>
 <style>
@@ -1119,27 +1119,27 @@ async function initMIDI(){
 async function initAndStart(){
   const prompt=document.getElementById('audioPrompt');
   if(!prompt) return;
+  prompt.onclick=null; // prevent double-tap
   const ls=document.getElementById('loadStatus');if(ls)ls.textContent='Loading…';
-  initAudio();
-  await ctx.resume();
-  await decodeSample();
-
-  // Start pads at saved (or default 0) volumes
-  PAD_LAYERS.forEach(l=>{
-    if(l.type==="granular"){if(layerState[l.id].volume>0)startGranular(layerState[l.id].volume);return}
-    startPad(l,layerState[l.id].volume,homeRoot,currentEvolve);
-  });
-  if(shimmerVol>0)startShimmer(shimmerVol);
-  // Resume AudioContext when returning from background
-  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&ctx&&ctx.state==='suspended'&&!audioPaused)ctx.resume()});
-  window.addEventListener('focus',()=>{if(ctx&&ctx.state==='suspended'&&!audioPaused)ctx.resume()});
-
-  // Fade out overlay
-  prompt.style.opacity='0';
-  setTimeout(()=>{prompt.remove()},600);
-
-  buildKeys();startVis();scheduleEvolve();initMIDI();updatePerfSetlist();const _bd=document.getElementById('bpmDisplay');if(_bd)_bd.textContent=clickBPM;
-  document.getElementById('stateEvolve').textContent=CHORD_TYPES[currentEvolve].name;
+  try{
+    initAudio();
+    await ctx.resume();
+    await decodeSample();
+    PAD_LAYERS.forEach(l=>{
+      if(l.type==="granular"){if(layerState[l.id].volume>0)startGranular(layerState[l.id].volume);return}
+      startPad(l,layerState[l.id].volume,homeRoot,currentEvolve);
+    });
+    if(shimmerVol>0)startShimmer(shimmerVol);
+    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&ctx&&ctx.state==='suspended'&&!audioPaused)ctx.resume()});
+    window.addEventListener('focus',()=>{if(ctx&&ctx.state==='suspended'&&!audioPaused)ctx.resume()});
+    buildKeys();startVis();scheduleEvolve();initMIDI();updatePerfSetlist();
+    const _bd=document.getElementById('bpmDisplay');if(_bd)_bd.textContent=clickBPM;
+    document.getElementById('stateEvolve').textContent=CHORD_TYPES[currentEvolve].name;
+  }catch(e){if(ls)ls.textContent='Error: '+e.message;}
+  finally{
+    prompt.style.opacity='0';
+    setTimeout(()=>{try{prompt.remove()}catch(_){}},700);
+  }
 }
 </script>
 <script>
