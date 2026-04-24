@@ -81,8 +81,12 @@
   .preset-input{flex:1;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:10px 12px;color:rgba(255,255,255,0.85);font-size:13px;outline:none;font-family:'Open Sans',sans-serif}
   .preset-input::placeholder{color:rgba(255,255,255,0.2)}
   .preset-save-btn{padding:10px 16px;border-radius:8px;border:1px solid rgba(196,145,94,0.35);background:rgba(196,145,94,0.1);color:#c4915e;font-size:12px;cursor:pointer;white-space:nowrap;letter-spacing:0.5px}
+  .preset-export-btn{width:100%;margin-top:12px;padding:9px 0;border-radius:8px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.03);color:rgba(255,255,255,0.3);font-size:11px;letter-spacing:1px;cursor:pointer;transition:all 0.2s}
+  .preset-export-btn:hover{background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.6)}
   .preset-row{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,0.04)}
-  .preset-name{flex:1;font-size:13px;color:rgba(255,255,255,0.65)}
+  .preset-info{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}
+  .preset-name{font-size:13px;color:rgba(255,255,255,0.65);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .preset-meta{font-size:10px;color:rgba(255,255,255,0.25);letter-spacing:0.5px}
   .preset-load-btn{padding:7px 14px;border-radius:7px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.55);font-size:11px;cursor:pointer;letter-spacing:0.5px}
   .preset-del-btn{padding:7px 10px;border-radius:7px;border:1px solid rgba(255,80,80,0.2);background:transparent;color:rgba(255,80,80,0.35);font-size:11px;cursor:pointer}
   .preset-empty{font-size:12px;color:rgba(255,255,255,0.2);padding:10px 0;text-align:center}
@@ -657,6 +661,9 @@ function buildEditSheet(){
   h+='<div class="edit-section"><div class="edit-title">Effects</div>';
   h+=sliderRowHTML('rev','Reverb','#6a9fd8',volToFader(reverbMix),Math.round(reverbMix*100)+'%');
   h+=sliderRowHTML('dly','Delay','#5eb88a',volToFader(delayMixVal),Math.round(delayMixVal*100)+'%');
+  h+='<div class="slope-row"><span class="slope-label">Delay BPM</span><button class="slope-btn'+(delaySync?' active':'')+'" onclick="toggleDelaySync()">'+(delaySync?'Sync On':'Sync Off')+'</button>';
+  if(delaySync){['q.','q','1/8.','1/8'].forEach(d=>{h+='<button class="slope-btn'+(delaySyncDiv===d?' active':'')+'" onclick="setDelaySyncDiv(\''+d+'\')" style="padding:6px 8px">'+d+'</button>'})}
+  h+='</div>';
   h+=sliderRowHTML('shm','Shimmer','#d46b8a',shF,Math.round(shimmerVol*100)+'%');
   h+=sliderRowHTML('chr','Chorus','#c4b8e8',volToFader(chorusMix),Math.round(chorusMix*100)+'%');
   h+='</div><div class="edit-divider"></div>';
@@ -697,7 +704,15 @@ function buildEditSheet(){
   h+='<div class="edit-section"><div class="edit-title">Setlist</div>';
   h+='<div class="preset-save-row"><input class="preset-input" id="presetNameInput" placeholder="Name this sound…" /><button class="preset-save-btn" onclick="savePreset(document.getElementById(\'presetNameInput\').value)">Save</button></div>';
   if(presetNames.length===0){h+='<div class="preset-empty">No saved sounds yet</div>'}
-  else{presetNames.forEach(n=>{h+='<div class="preset-row"><span class="preset-name">'+n+'</span><button class="preset-load-btn" onclick="loadPreset(\''+n.replace(/'/g,"\\'")+'\')" >Load</button><button class="preset-del-btn" onclick="deletePreset(\''+n.replace(/'/g,"\\'")+'\')">✕</button></div>'})}
+  else{
+    presetNames.forEach(n=>{
+      const pd=presets[n];const ns=n.replace(/'/g,"\\'");
+      const cn=pd.enabledEvolveIdx&&pd.enabledEvolveIdx.length>0?CHORD_TYPES[pd.enabledEvolveIdx[0]]?.name:'';
+      const meta=[pd.homeRoot||'',cn,pd.clickBPM?pd.clickBPM+' bpm':''].filter(Boolean).join(' · ');
+      h+='<div class="preset-row"><div class="preset-info"><span class="preset-name">'+n+'</span>'+(meta?'<span class="preset-meta">'+meta+'</span>':'')+'</div><button class="preset-load-btn" onclick="loadPreset(\''+ns+'\')">Load</button><button class="preset-del-btn" onclick="deletePreset(\''+ns+'\')">✕</button></div>';
+    });
+    h+='<button class="preset-export-btn" onclick="exportPresets(this)">Export All</button>';
+  }
   h+='</div><div class="edit-bottom-pad"></div>';
   c.innerHTML=h;
   // Wire layer sliders
@@ -836,14 +851,14 @@ function toggleSlope(type){
   // Update slope buttons
   document.querySelectorAll('.slope-btn[data-slope="'+type+'"]').forEach(b=>{b.classList.toggle('active',parseInt(b.dataset.val)===(type==='lpf'?lpfSlope:hpfSlope))});
 }
-function saveSettings(){try{const s={homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,lpfQ,hpfQ,lpfSlope,hpfSlope,densityValue,eqLowGain,eqLoMidGain,eqHiMidGain,eqHighGain,chorusMix,reverbMix,delayMixVal,shimmerVol,masterVol,textureOctUp,enabledEvolveIdx:[...enabledEvolveIdx],layers:{}};PAD_LAYERS.forEach(l=>{s.layers[l.id]={volume:layerState[l.id].volume}});localStorage.setItem('norcoast_v1',JSON.stringify(s))}catch(e){}}
-function loadSettings(){try{const raw=localStorage.getItem('norcoast_v1');if(!raw)return;const s=JSON.parse(raw);if(s.homeRoot)homeRoot=s.homeRoot;if(s.evolving!=null)evolving=s.evolving;if(s.evolveSpeed!=null)evolveSpeed=s.evolveSpeed;if(s.lpfValue!=null)lpfValue=s.lpfValue;if(s.hpfValue!=null)hpfValue=s.hpfValue;if(s.lpfQ!=null)lpfQ=s.lpfQ;if(s.hpfQ!=null)hpfQ=s.hpfQ;if(s.lpfSlope!=null)lpfSlope=s.lpfSlope;if(s.hpfSlope!=null)hpfSlope=s.hpfSlope;if(s.densityValue!=null)densityValue=s.densityValue;if(s.eqLowGain!=null)eqLowGain=s.eqLowGain;if(s.eqLoMidGain!=null)eqLoMidGain=s.eqLoMidGain;if(s.eqHiMidGain!=null)eqHiMidGain=s.eqHiMidGain;if(s.eqHighGain!=null)eqHighGain=s.eqHighGain;if(s.chorusMix!=null)chorusMix=s.chorusMix;if(s.shimmerVol!=null)shimmerVol=s.shimmerVol;if(s.reverbMix!=null)reverbMix=s.reverbMix;if(s.delayMixVal!=null)delayMixVal=s.delayMixVal;if(s.masterVol!=null)masterVol=s.masterVol;if(s.textureOctUp!=null)textureOctUp=s.textureOctUp;if(Array.isArray(s.enabledEvolveIdx))enabledEvolveIdx=new Set(s.enabledEvolveIdx);if(s.layers)PAD_LAYERS.forEach(l=>{if(s.layers[l.id]!=null)layerState[l.id].volume=s.layers[l.id].volume??0})}catch(e){}}
+function saveSettings(){try{const s={homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,lpfQ,hpfQ,lpfSlope,hpfSlope,densityValue,eqLowGain,eqLoMidGain,eqHiMidGain,eqHighGain,chorusMix,reverbMix,delayMixVal,delaySync,delaySyncDiv,shimmerVol,masterVol,textureOctUp,clickBPM,enabledEvolveIdx:[...enabledEvolveIdx],layers:{}};PAD_LAYERS.forEach(l=>{s.layers[l.id]={volume:layerState[l.id].volume}});localStorage.setItem('norcoast_v1',JSON.stringify(s))}catch(e){}}
+function loadSettings(){try{const raw=localStorage.getItem('norcoast_v1');if(!raw)return;const s=JSON.parse(raw);if(s.homeRoot)homeRoot=s.homeRoot;if(s.evolving!=null)evolving=s.evolving;if(s.evolveSpeed!=null)evolveSpeed=s.evolveSpeed;if(s.lpfValue!=null)lpfValue=s.lpfValue;if(s.hpfValue!=null)hpfValue=s.hpfValue;if(s.lpfQ!=null)lpfQ=s.lpfQ;if(s.hpfQ!=null)hpfQ=s.hpfQ;if(s.lpfSlope!=null)lpfSlope=s.lpfSlope;if(s.hpfSlope!=null)hpfSlope=s.hpfSlope;if(s.densityValue!=null)densityValue=s.densityValue;if(s.eqLowGain!=null)eqLowGain=s.eqLowGain;if(s.eqLoMidGain!=null)eqLoMidGain=s.eqLoMidGain;if(s.eqHiMidGain!=null)eqHiMidGain=s.eqHiMidGain;if(s.eqHighGain!=null)eqHighGain=s.eqHighGain;if(s.chorusMix!=null)chorusMix=s.chorusMix;if(s.shimmerVol!=null)shimmerVol=s.shimmerVol;if(s.reverbMix!=null)reverbMix=s.reverbMix;if(s.delayMixVal!=null)delayMixVal=s.delayMixVal;if(s.delaySync!=null)delaySync=s.delaySync;if(s.delaySyncDiv)delaySyncDiv=s.delaySyncDiv;if(s.masterVol!=null)masterVol=s.masterVol;if(s.textureOctUp!=null)textureOctUp=s.textureOctUp;if(s.clickBPM!=null)clickBPM=s.clickBPM;if(Array.isArray(s.enabledEvolveIdx))enabledEvolveIdx=new Set(s.enabledEvolveIdx);if(s.layers)PAD_LAYERS.forEach(l=>{if(s.layers[l.id]!=null)layerState[l.id].volume=s.layers[l.id].volume??0})}catch(e){}}
 let _saveT=null;function queueSave(){clearTimeout(_saveT);_saveT=setTimeout(saveSettings,500)}
 
 // ─── PRESETS ───
 function getPresets(){try{return JSON.parse(localStorage.getItem('norcoast_presets')||'{}')}catch(e){return{}}}
 function captureState(){
-  const s={homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,lpfQ,hpfQ,densityValue,eqLowGain,eqLoMidGain,eqHiMidGain,eqHighGain,chorusMix,reverbMix,delayMixVal,shimmerVol,masterVol,textureOctUp,enabledEvolveIdx:[...enabledEvolveIdx],layers:{}};
+  const s={homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,lpfQ,hpfQ,lpfSlope,hpfSlope,densityValue,eqLowGain,eqLoMidGain,eqHiMidGain,eqHighGain,chorusMix,reverbMix,delayMixVal,delaySync,delaySyncDiv,shimmerVol,masterVol,textureOctUp,clickBPM,enabledEvolveIdx:[...enabledEvolveIdx],layers:{}};
   PAD_LAYERS.forEach(l=>{s.layers[l.id]={volume:layerState[l.id].volume}});return s;
 }
 function savePreset(name){
@@ -856,7 +871,9 @@ function loadPreset(name){
   if(s.lpfValue!=null)lpfValue=s.lpfValue;if(s.hpfValue!=null)hpfValue=s.hpfValue;if(s.lpfQ!=null)lpfQ=s.lpfQ;if(s.hpfQ!=null)hpfQ=s.hpfQ;
   if(s.densityValue!=null)densityValue=s.densityValue;if(s.eqLowGain!=null)eqLowGain=s.eqLowGain;if(s.eqLoMidGain!=null)eqLoMidGain=s.eqLoMidGain;if(s.eqHiMidGain!=null)eqHiMidGain=s.eqHiMidGain;if(s.eqHighGain!=null)eqHighGain=s.eqHighGain;if(s.chorusMix!=null)chorusMix=s.chorusMix;
   if(s.reverbMix!=null)reverbMix=s.reverbMix;if(s.delayMixVal!=null)delayMixVal=s.delayMixVal;if(s.shimmerVol!=null)shimmerVol=s.shimmerVol;
+  if(s.delaySync!=null)delaySync=s.delaySync;if(s.delaySyncDiv)delaySyncDiv=s.delaySyncDiv;
   if(s.masterVol!=null)masterVol=s.masterVol;if(s.textureOctUp!=null)textureOctUp=s.textureOctUp;
+  if(s.clickBPM!=null){clickBPM=s.clickBPM;if(clickActive){stopClick();startClick()}}
   if(Array.isArray(s.enabledEvolveIdx))enabledEvolveIdx=new Set(s.enabledEvolveIdx);
   if(s.layers)PAD_LAYERS.forEach(l=>{if(s.layers[l.id]!=null)layerState[l.id].volume=s.layers[l.id].volume??0});
   // Apply audio nodes
@@ -864,7 +881,7 @@ function loadPreset(name){
   if(globalHPF){globalHPF.frequency.value=hpfFaderToHz(hpfValue);globalHPF.Q.value=hpfQ}
   if(eqLowNode)eqLowNode.gain.value=eqLowGain;if(eqLoMidNode)eqLoMidNode.gain.value=eqLoMidGain;if(eqHiMidNode)eqHiMidNode.gain.value=eqHiMidGain;if(eqHighNode)eqHighNode.gain.value=eqHighGain;if(chorusGainNode)chorusGainNode.gain.value=chorusMix*0.8;
   if(reverbGain){reverbGain.gain.value=reverbMix;dryGain.gain.value=1-reverbMix*0.35}
-  if(delayGainN)delayGainN.gain.value=delayMixVal;if(master)master.gain.value=masterVol;
+  if(delayGainN)delayGainN.gain.value=delayMixVal;applyDelaySync();if(master)master.gain.value=masterVol;
   // Restart layers
   PAD_LAYERS.forEach(l=>{if(l.type!=="granular")startPad(l,layerState[l.id].volume,homeRoot,currentEvolve)});
   if(layerState.texture&&layerState.texture.volume>0)startGranular(layerState.texture.volume);else stopGranular();
@@ -879,9 +896,14 @@ function loadPreset(name){
 function deletePreset(name){
   const ps=getPresets();delete ps[name];localStorage.setItem('norcoast_presets',JSON.stringify(ps));buildEditSheet();
 }
+function exportPresets(btn){
+  const json=JSON.stringify(getPresets(),null,2);
+  navigator.clipboard.writeText(json).then(()=>{btn.textContent='Copied!';setTimeout(()=>btn.textContent='Export All',2000)}).catch(()=>{btn.textContent='Copy failed';setTimeout(()=>btn.textContent='Export All',2000)});
+}
 
 // ─── CLICK TRACK ───
 let clickBPM=120,clickActive=false,clickNextTime=0,clickSchedId=null;
+let delaySync=false,delaySyncDiv='q.';
 function startClick(){
   if(clickActive)return;clickActive=true;
   clickNextTime=ctx.currentTime+0.05;scheduleClicks();
@@ -905,7 +927,11 @@ function toggleClick(){
   // Re-draw BPM control if edit sheet open
   const bpmInp=document.getElementById('bpmInput');if(bpmInp)bpmInp.value=clickBPM;
 }
-function setBPM(v){clickBPM=Math.max(20,Math.min(300,parseInt(v)||120));if(clickActive){stopClick();startClick()}}
+function setBPM(v){clickBPM=Math.max(20,Math.min(300,parseInt(v)||120));if(clickActive){stopClick();startClick()}applyDelaySync();}
+function getDelayTime(){const beat=60/clickBPM;const divs={'q.':beat*1.5,'q':beat,'1/8.':beat*0.75,'1/8':beat*0.5};return Math.min(divs[delaySyncDiv]||beat*1.5,1.9)}
+function applyDelaySync(){if(!delaySync||!delayNode)return;delayNode.delayTime.linearRampToValueAtTime(getDelayTime(),ctx.currentTime+0.1)}
+function toggleDelaySync(){delaySync=!delaySync;applyDelaySync();saveSettings();buildEditSheet()}
+function setDelaySyncDiv(d){delaySyncDiv=d;applyDelaySync();saveSettings();buildEditSheet()}
 
 // ─── MIDI ───
 let midiReady=false;
