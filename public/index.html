@@ -209,8 +209,6 @@ const CHORD_TYPES=[
   {name:"6th",      semis:[9],        weight:2},
   {name:"5th+Maj7", semis:[7,11],     weight:2},
 ];
-// Alias for legacy references
-const EVOLVE_INTERVALS=CHORD_TYPES;
 
 const SCALE_MODES=[
   {name:"Chrom", steps:null},
@@ -417,10 +415,6 @@ function stopGranular(){
   }
 }
 
-function updateGranularPitch(){
-  // Pitch changes happen naturally on next grain — no restart needed
-  // The grainStream function reads current homeRoot/currentEvolve each time
-}
 
 // ─── AUDIO INIT ───
 let _pitchShifterNode=null; // AudioWorkletNode created once worklet loads
@@ -582,8 +576,8 @@ function stopPad(id){
 function evolveVoice(ei){
   const ef=getEvolveFreq(homeRoot,ei);
   PAD_LAYERS.forEach(l=>{
-    if(l.type==="granular"){updateGranularPitch();return}
-    if(layerState[l.id].active&&layerState[l.id].volume>0&&!l.rootOnly){
+    if(l.type==="granular")return;
+    if(layerState[l.id].volume>0&&!l.rootOnly){
       fadeOut(evolveNodes[l.id],XFADE);
       evolveNodes[l.id]=buildGroup(l,ef,layerState[l.id].volume,XFADE);
     }
@@ -692,7 +686,7 @@ function buildKeys(){
       }
       homeRoot=n;document.getElementById('stateRoot').textContent=n;
       PAD_LAYERS.forEach(l=>{
-        if(!layerState[l.id].active||layerState[l.id].volume<=0)return;
+        if(layerState[l.id].volume<=0)return;
         startPad(l,layerState[l.id].volume,homeRoot,currentEvolve);
       });
       
@@ -735,13 +729,18 @@ function toggleLayer(id){
 }
 function toggleChord(i){
   if(enabledEvolveIdx.has(i)){
-    if(enabledEvolveIdx.size<=1)return;
+    if(enabledEvolveIdx.size<=1){
+      // Flash the pill to signal it can't be removed
+      const pill=document.querySelector('.chord-pill[data-ci="'+i+'"]');
+      if(pill){pill.style.outline='2px solid rgba(196,145,94,0.7)';setTimeout(()=>pill.style.outline='',400);}
+      return;
+    }
     enabledEvolveIdx.delete(i);
     if(currentEvolve===i){
       const active=[...enabledEvolveIdx];
       currentEvolve=active[Math.floor(Math.random()*active.length)];
       evolveVoice(currentEvolve);
-      document.getElementById('stateEvolve').textContent=EVOLVE_INTERVALS[currentEvolve].name;
+      document.getElementById('stateEvolve').textContent=CHORD_TYPES[currentEvolve].name;
     }
   }else{
     enabledEvolveIdx.add(i);
@@ -762,7 +761,7 @@ function buildEditSheet(){
   const c=document.getElementById('editContent');c.innerHTML='';
   // ── Chords ──
   let h='<div class="edit-section"><div class="edit-title">Chords</div><div class="chord-pills">';
-  EVOLVE_INTERVALS.forEach((iv,i)=>{h+='<button class="chord-pill'+(enabledEvolveIdx.has(i)?' active':'')+'" data-ci="'+i+'" onclick="toggleChord('+i+')">'+iv.name+'</button>'});
+  CHORD_TYPES.forEach((iv,i)=>{h+='<button class="chord-pill'+(enabledEvolveIdx.has(i)?' active':'')+'" data-ci="'+i+'" onclick="toggleChord('+i+')">'+iv.name+'</button>'});
   h+='</div>';
   h+='</div><div class="edit-divider"></div>';
   // ── Layers ──
@@ -1024,8 +1023,12 @@ function loadPreset(name){try{
   if(Array.isArray(s.enabledEvolveIdx))enabledEvolveIdx=new Set(s.enabledEvolveIdx);
   if(s.layers)PAD_LAYERS.forEach(l=>{if(s.layers[l.id]!=null)layerState[l.id].volume=s.layers[l.id].volume??0});
   // Apply audio nodes
+  if(s.lpfSlope!=null)lpfSlope=s.lpfSlope;
+  if(s.hpfSlope!=null)hpfSlope=s.hpfSlope;
   if(globalLPF){globalLPF.frequency.value=lpfFaderToHz(lpfValue);globalLPF.Q.value=lpfQ}
+  if(globalLPF2)globalLPF2.frequency.value=lpfSlope===24?lpfFaderToHz(lpfValue):22000;
   if(globalHPF){globalHPF.frequency.value=hpfFaderToHz(hpfValue);globalHPF.Q.value=hpfQ}
+  if(globalHPF2)globalHPF2.frequency.value=hpfSlope===24?hpfFaderToHz(hpfValue):20;
   if(eqLowNode)eqLowNode.gain.value=eqLowGain;if(eqLoMidNode)eqLoMidNode.gain.value=eqLoMidGain;if(eqHiMidNode)eqHiMidNode.gain.value=eqHiMidGain;if(eqHighNode)eqHighNode.gain.value=eqHighGain;if(chorusGainNode)chorusGainNode.gain.value=chorusMix*0.8;
   if(reverbGain){reverbGain.gain.value=reverbMix;dryGain.gain.value=1-reverbMix*0.35}
   if(reverb&&reverb.fbGain)reverb.fbGain.gain.value=reverbSize;
@@ -1038,7 +1041,7 @@ function loadPreset(name){try{
   if(!enabledEvolveIdx.has(currentEvolve)){currentEvolve=[...enabledEvolveIdx][0];evolveVoice(currentEvolve)}
   // Update UI
   document.getElementById('stateRoot').textContent=homeRoot;
-  document.getElementById('stateEvolve').textContent=EVOLVE_INTERVALS[currentEvolve].name;
+  document.getElementById('stateEvolve').textContent=CHORD_TYPES[currentEvolve].name;
   const eb=document.getElementById('evolveBtn');if(eb){eb.className='evolve-pill '+(evolving?'on':'off');eb.textContent=evolving?'Evolving':'Static'}
   buildKeys();saveSettings();buildEditSheet();
 }catch(e){console.error('loadPreset:',e);}}
@@ -1089,7 +1092,7 @@ function fireClick(t){
 function toggleClick(){
   if(!ctx)return;
   if(clickActive)stopClick();else startClick();
-  const btn=document.getElementById('clickBtn');if(btn){btn.className='evolve-pill '+(clickActive?'on':'off');btn.textContent='Click'+(clickActive?' On':'')}
+  const btn=document.getElementById('clickBtn');if(btn){btn.className='evolve-pill '+(clickActive?'on':'off');btn.textContent=clickActive?'Click: On':'Click: Off'}
   // Re-draw BPM control if edit sheet open
   const bpmInp=document.getElementById('bpmInput');if(bpmInp)bpmInp.value=clickBPM;
 }
