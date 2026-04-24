@@ -67,6 +67,12 @@
   input[type=range]{flex:1;height:3px;-webkit-appearance:none;appearance:none;border-radius:2px;outline:none;cursor:pointer;margin:0}
   input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:#fff;margin-top:-8px;box-shadow:0 1px 4px rgba(0,0,0,0.45)}
   .edit-bottom-pad{height:28px}
+  .eq-toggle{width:100%;padding:10px 0;margin:10px 0 0;border-radius:10px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:rgba(255,255,255,0.5);font-size:12px;letter-spacing:1px;cursor:pointer;transition:all 0.2s}
+  .eq-toggle:hover{background:rgba(255,255,255,0.07);color:rgba(255,255,255,0.8)}
+  .eq-panel{display:none;margin-top:14px}
+  .eq-panel.open{display:block}
+  #eqCanvas{width:100%;height:90px;display:block;border-radius:8px;background:rgba(0,0,0,0.25);margin-bottom:14px}
+  .eq-section-title{font-size:10px;letter-spacing:2px;color:rgba(255,255,255,0.25);text-transform:uppercase;margin:14px 0 8px;padding-left:2px}
 </style>
 </head>
 <body>
@@ -147,27 +153,27 @@ const PAD_LAYERS=[
     timbres:[{wave:"lush",count:6,ds:10,gain:0.032,pan:0.6},{wave:"warm",count:4,ds:7,gain:0.025,pan:0.4},{wave:"choir",count:3,ds:14,gain:0.015,pan:0.75}],
     fBase:1200,fMod:400,fRate:0.055,aMod:0.1,aRate:0.08,octaves:[0,1]},
   {id:"texture",name:"Texture",color:"#a08060",type:"granular"},
-  {id:"shimmer",name:"Shimmer",color:"#d46b8a",type:"shimmer"},
 ];
 
 const ATTACK=4,RELEASE=5,XFADE=3,ROOT_OCT=3,DELAY_Q=60/70;
 
 // ─── STATE ───
 let ctx,waves,master,reverb,reverbGain,dryGain,delayNode,delayGainN,delayFB,analyser;
-let globalLPF,globalHPF;
+let globalLPF,globalHPF,eqLowNode,eqMidNode,eqHighNode;
+let lpfQ=0.7,hpfQ=0.7,eqLowGain=0,eqMidGain=0,eqHighGain=0;
 let dulcimerBuf=null; // decoded audio buffer
 let homeRoot="C",evolving=true,evolveSpeed=0.5,currentEvolve=0;
 let lpfValue=0.7,hpfValue=0,densityValue=0.5;
 let reverbMix=0.6,delayMixVal=0.1,masterVol=0.65;
 let textureOctUp=true;
 let staticNodes={},evolveNodes={},layerState={};
-let shimmerActive=false,shimmerGainNode=null,shimmerTimer=null;
+let shimmerActive=false,shimmerGainNode=null,shimmerTimer=null,shimmerVol=0;
 let granularTimers=[],granularGain=null,reversedBuf=null;
 let evolveTimer=null,animFrame=null;
 let audioPaused=false;
 let enabledEvolveIdx=new Set([0,1,2,3]);
 
-const DEFAULT_VOLUMES={foundation:0.55,pads:0.45,texture:0.3,shimmer:0};
+const DEFAULT_VOLUMES={foundation:0.55,pads:0.45,texture:0.3};
 PAD_LAYERS.forEach(l=>{layerState[l.id]={active:true,volume:DEFAULT_VOLUMES[l.id]??0}});
 loadSettings();
 
@@ -339,8 +345,11 @@ function initAudio(){
   const s=ctx.createBufferSource();s.buffer=sb;s.connect(ctx.destination);s.start(0);
   initWaves();
   master=ctx.createGain();master.gain.value=masterVol;
-  globalLPF=ctx.createBiquadFilter();globalLPF.type="lowpass";globalLPF.frequency.value=lpfFaderToHz(lpfValue);globalLPF.Q.value=0.5;
-  globalHPF=ctx.createBiquadFilter();globalHPF.type="highpass";globalHPF.frequency.value=hpfFaderToHz(hpfValue);globalHPF.Q.value=0.5;
+  globalLPF=ctx.createBiquadFilter();globalLPF.type="lowpass";globalLPF.frequency.value=lpfFaderToHz(lpfValue);globalLPF.Q.value=lpfQ;
+  globalHPF=ctx.createBiquadFilter();globalHPF.type="highpass";globalHPF.frequency.value=hpfFaderToHz(hpfValue);globalHPF.Q.value=hpfQ;
+  eqLowNode=ctx.createBiquadFilter();eqLowNode.type="lowshelf";eqLowNode.frequency.value=200;eqLowNode.gain.value=eqLowGain;
+  eqMidNode=ctx.createBiquadFilter();eqMidNode.type="peaking";eqMidNode.frequency.value=1000;eqMidNode.Q.value=1;eqMidNode.gain.value=eqMidGain;
+  eqHighNode=ctx.createBiquadFilter();eqHighNode.type="highshelf";eqHighNode.frequency.value=6000;eqHighNode.gain.value=eqHighGain;
   reverb=initReverb();
   reverbGain=ctx.createGain();reverbGain.gain.value=reverbMix;
   dryGain=ctx.createGain();dryGain.gain.value=0.55;
@@ -350,8 +359,9 @@ function initAudio(){
   const dLP=ctx.createBiquadFilter();dLP.type="lowpass";dLP.frequency.value=1800;
   analyser=ctx.createAnalyser();analyser.fftSize=1024;analyser.smoothingTimeConstant=0.7;
   master.connect(globalHPF);globalHPF.connect(globalLPF);
-  globalLPF.connect(dryGain);globalLPF.connect(reverb.input);reverb.output.connect(reverbGain);
-  globalLPF.connect(delayNode);delayNode.connect(dLP);dLP.connect(delayFB);delayFB.connect(delayNode);dLP.connect(delayGainN);
+  globalLPF.connect(eqLowNode);eqLowNode.connect(eqMidNode);eqMidNode.connect(eqHighNode);
+  eqHighNode.connect(dryGain);eqHighNode.connect(reverb.input);reverb.output.connect(reverbGain);
+  eqHighNode.connect(delayNode);delayNode.connect(dLP);dLP.connect(delayFB);delayFB.connect(delayNode);dLP.connect(delayGainN);
   dryGain.connect(analyser);reverbGain.connect(analyser);delayGainN.connect(analyser);
   analyser.connect(ctx.destination);
 }
@@ -465,6 +475,31 @@ function scheduleEvolve(){
 function lpfFaderToHz(v){return Math.exp(Math.log(100)+v*v*(Math.log(20000)-Math.log(100)))}
 function hpfFaderToHz(v){if(v<0.01)return 20;return Math.exp(Math.log(20)+v*(Math.log(500)-Math.log(20)))}
 function formatHz(hz){return hz>=1000?(hz/1000).toFixed(1)+'kHz':Math.round(hz)+'Hz'}
+function formatDb(db){return(db>0?'+':db<0?'':'')+db.toFixed(1)+'dB'}
+function qToSlider(q){return(q-0.1)/11.9}
+function sliderToQ(r){return 0.1+r*11.9}
+function eqGainToSlider(db){return(db+12)/24}
+function sliderToEqGain(r){return(r-0.5)*24}
+function eqGradient(raw,color){
+  const pct=raw*100;
+  return raw>=0.5?'linear-gradient(to right,rgba(255,255,255,0.06) 50%,'+color+'66 50%,'+color+'66 '+pct+'%,rgba(255,255,255,0.06) '+pct+'%)':'linear-gradient(to right,rgba(255,255,255,0.06) '+pct+'%,'+color+'66 '+pct+'%,'+color+'66 50%,rgba(255,255,255,0.06) 50%)';}
+function eqSliderRowHTML(id,lbl,val){
+  const r=eqGainToSlider(val),color=val>=0?'#c4915e':'#6a9fd8';
+  return'<div class="slider-row"><span class="slider-lbl">'+lbl+'</span><input type="range" min="0" max="1" step="0.005" value="'+r+'" data-eq="'+id+'" style="background:'+eqGradient(r,color)+';accent-color:'+color+'"><span class="slider-val" id="eq_'+id+'">'+formatDb(val)+'</span></div>';
+}
+function wireEQSlider(c,id,fn){
+  const inp=c.querySelector('input[data-eq="'+id+'"]');const valEl=c.querySelector('#eq_'+id);
+  if(!inp||!valEl)return;
+  inp.addEventListener('input',e=>{
+    const raw=parseFloat(e.target.value),db=sliderToEqGain(raw),color=db>=0?'#c4915e':'#6a9fd8';
+    valEl.textContent=formatDb(db);inp.style.background=eqGradient(raw,color);fn(db);queueSave();
+  });
+}
+function toggleEQPanel(btn){
+  const panel=document.getElementById('eqPanel');if(!panel)return;
+  const open=panel.classList.toggle('open');btn.textContent=open?'EQ ▴':'EQ ▾';
+  if(open)setTimeout(drawEQCurve,50);
+}
 function volToFader(v){return Math.pow(Math.max(0,v),1/3)}
 function faderToVol(f){return f<0.02?0:f*f*f}
 
@@ -524,12 +559,10 @@ function toggleLayer(id){
   if(st.volume>0){
     st._prevVol=st.volume;st.volume=0;
     if(l.type==="granular"){stopGranular();if(granularGain)granularGain.gain.linearRampToValueAtTime(0,ctx.currentTime+0.5)}
-    else if(l.type==="shimmer"){stopShimmer()}
     else{const t=ctx.currentTime+0.15;if(staticNodes[id])staticNodes[id].gain.gain.linearRampToValueAtTime(0,t);if(evolveNodes[id])evolveNodes[id].gain.gain.linearRampToValueAtTime(0,t)}
   }else{
     st.volume=st._prevVol||0.5;
     if(l.type==="granular")startGranular(st.volume);
-    else if(l.type==="shimmer")startShimmer(st.volume);
     else if(!staticNodes[id])startPad(l,st.volume,homeRoot,currentEvolve);
     else{const t=ctx.currentTime+0.5;if(staticNodes[id])staticNodes[id].gain.gain.linearRampToValueAtTime(st.volume,t);if(evolveNodes[id])evolveNodes[id].gain.gain.linearRampToValueAtTime(st.volume,t)}
   }
@@ -580,12 +613,31 @@ function buildEditSheet(){
   });
   h+=sliderRowHTML('den','Density','#7ab8d8',densityValue,Math.round(densityValue*100)+'%');
   h+='</div><div class="edit-divider"></div>';
-  // ── FX ──
+  // ── Effects ──
+  const shF=volToFader(shimmerVol);
   h+='<div class="edit-section"><div class="edit-title">Effects</div>';
   h+=sliderRowHTML('rev','Reverb','#6a9fd8',volToFader(reverbMix),Math.round(reverbMix*100)+'%');
   h+=sliderRowHTML('dly','Delay','#5eb88a',volToFader(delayMixVal),Math.round(delayMixVal*100)+'%');
+  h+=sliderRowHTML('shm','Shimmer','#d46b8a',shF,Math.round(shimmerVol*100)+'%');
+  h+='</div><div class="edit-divider"></div>';
+  // ── Tone / Filters ──
+  const lpfQ_r=qToSlider(lpfQ),hpfQ_r=qToSlider(hpfQ);
+  h+='<div class="edit-section"><div class="edit-title">Tone</div>';
   h+=sliderRowHTML('lpf','Low Pass','#d46b8a',lpfValue,formatHz(lpfFaderToHz(lpfValue)));
+  h+=sliderRowHTML('lpfQ','LP Resonance','#d46b8a',lpfQ_r,lpfQ.toFixed(1));
   h+=sliderRowHTML('hpf','High Pass','#b07acc',hpfValue,formatHz(hpfFaderToHz(hpfValue)));
+  h+=sliderRowHTML('hpfQ','HP Resonance','#b07acc',hpfQ_r,hpfQ.toFixed(1));
+  // EQ expandable panel
+  h+='<button class="eq-toggle" onclick="toggleEQPanel(this)">EQ ▾</button>';
+  h+='<div class="eq-panel" id="eqPanel">';
+  h+='<canvas id="eqCanvas" width="600" height="180"></canvas>';
+  h+='<div class="eq-section-title">Low Shelf · 200 Hz</div>';
+  h+=eqSliderRowHTML('eqL','Low',eqLowGain);
+  h+='<div class="eq-section-title">Mid · 700 Hz</div>';
+  h+=eqSliderRowHTML('eqM','Mid',eqMidGain);
+  h+='<div class="eq-section-title">High Shelf · 6 kHz</div>';
+  h+=eqSliderRowHTML('eqH','High',eqHighGain);
+  h+='</div>';
   h+='</div><div class="edit-divider"></div>';
   // ── Evolution ──
   h+='<div class="edit-section"><div class="edit-title">Evolution</div>';
@@ -604,7 +656,6 @@ function buildEditSheet(){
       layerState[l.id].volume=vol;queueSave();
       inp.style.background='linear-gradient(to right,'+l.color+'55 '+raw*100+'%,rgba(255,255,255,0.06) '+raw*100+'%)';
       if(l.type==="granular"){if(vol>0&&wasZero)startGranular(vol);else if(vol<=0)stopGranular();else if(granularGain)granularGain.gain.linearRampToValueAtTime(vol*0.8,ctx.currentTime+0.1)}
-      else if(l.type==="shimmer"){if(vol>0&&wasZero)startShimmer(vol);else if(vol<=0)stopShimmer();else if(shimmerGainNode)shimmerGainNode.gain.linearRampToValueAtTime(vol,ctx.currentTime+0.1)}
       else{if(vol>0&&wasZero&&!staticNodes[l.id])startPad(l,vol,homeRoot,currentEvolve);else{const t=ctx.currentTime+0.08;if(staticNodes[l.id])staticNodes[l.id].gain.gain.linearRampToValueAtTime(vol,t);if(evolveNodes[l.id])evolveNodes[l.id].gain.gain.linearRampToValueAtTime(vol,t)}}
       const row=inp.closest('.edit-layer'),on=vol>0;
       const db=row.querySelector('.layer-dot-btn');db.style.borderColor=on?l.color+'55':'rgba(255,255,255,0.1)';db.style.background=on?l.color+'15':'transparent';
@@ -612,14 +663,63 @@ function buildEditSheet(){
       row.querySelector('.edit-layer-name').style.color=on?'rgba(255,255,255,0.8)':'rgba(255,255,255,0.35)';
     });
   });
-  // Wire FX/master sliders
+  // Wire Effects sliders
   wireSR(c,'rev',r=>{reverbMix=faderToVol(r);reverbGain.gain.value=reverbMix;dryGain.gain.value=1-reverbMix*0.35;return Math.round(reverbMix*100)+'%'});
   wireSR(c,'dly',r=>{delayMixVal=faderToVol(r);delayGainN.gain.value=delayMixVal;return Math.round(delayMixVal*100)+'%'});
-  wireSR(c,'lpf',r=>{lpfValue=r;const hz=lpfFaderToHz(r);globalLPF.frequency.linearRampToValueAtTime(hz,ctx.currentTime+0.1);return formatHz(hz)});
-  wireSR(c,'hpf',r=>{hpfValue=r;const hz=hpfFaderToHz(r);globalHPF.frequency.linearRampToValueAtTime(hz,ctx.currentTime+0.1);return formatHz(hz)});
-  wireSR(c,'den',r=>{densityValue=r;queueSave();PAD_LAYERS.forEach(l=>{if(l.type==="synth"&&layerState[l.id].volume>0)startPad(l,layerState[l.id].volume,homeRoot,currentEvolve)});return Math.round(r*100)+'%'});
+  wireSR(c,'shm',r=>{const vol=faderToVol(r),was=shimmerVol;shimmerVol=vol;if(vol>0&&was===0)startShimmer(vol);else if(vol<=0)stopShimmer();else if(shimmerGainNode)shimmerGainNode.gain.linearRampToValueAtTime(vol,ctx.currentTime+0.1);return Math.round(vol*100)+'%'});
+  // Wire Tone sliders
+  wireSR(c,'lpf',r=>{lpfValue=r;const hz=lpfFaderToHz(r);globalLPF.frequency.linearRampToValueAtTime(hz,ctx.currentTime+0.1);drawEQCurve();return formatHz(hz)});
+  wireSR(c,'lpfQ',r=>{lpfQ=sliderToQ(r);globalLPF.Q.linearRampToValueAtTime(lpfQ,ctx.currentTime+0.05);drawEQCurve();return lpfQ.toFixed(1)});
+  wireSR(c,'hpf',r=>{hpfValue=r;const hz=hpfFaderToHz(r);globalHPF.frequency.linearRampToValueAtTime(hz,ctx.currentTime+0.1);drawEQCurve();return formatHz(hz)});
+  wireSR(c,'hpfQ',r=>{hpfQ=sliderToQ(r);globalHPF.Q.linearRampToValueAtTime(hpfQ,ctx.currentTime+0.05);drawEQCurve();return hpfQ.toFixed(1)});
+  // Wire EQ sliders
+  wireEQSlider(c,'eqL',db=>{eqLowGain=db;eqLowNode.gain.linearRampToValueAtTime(db,ctx.currentTime+0.05);drawEQCurve()});
+  wireEQSlider(c,'eqM',db=>{eqMidGain=db;eqMidNode.gain.linearRampToValueAtTime(db,ctx.currentTime+0.05);drawEQCurve()});
+  wireEQSlider(c,'eqH',db=>{eqHighGain=db;eqHighNode.gain.linearRampToValueAtTime(db,ctx.currentTime+0.05);drawEQCurve()});
+  // Wire other sliders
+  wireSR(c,'den',r=>{densityValue=r;PAD_LAYERS.forEach(l=>{if(l.type==="synth"&&layerState[l.id].volume>0)startPad(l,layerState[l.id].volume,homeRoot,currentEvolve)});return Math.round(r*100)+'%'});
   wireSR(c,'spd',r=>{evolveSpeed=faderToVol(r);return Math.round(evolveSpeed*100)+'%'});
   wireSR(c,'mst',r=>{masterVol=faderToVol(r);master.gain.linearRampToValueAtTime(masterVol,ctx.currentTime+0.1);return Math.round(masterVol*100)+'%'});
+}
+
+function drawEQCurve(){
+  const canvas=document.getElementById('eqCanvas');
+  if(!canvas||!globalLPF)return;
+  const W=canvas.width,H=canvas.height;
+  const cxt=canvas.getContext('2d');
+  const N=W;
+  const freqs=new Float32Array(N);
+  for(let i=0;i<N;i++)freqs[i]=20*Math.pow(1000,i/(N-1));
+  const mag=new Float32Array(N),ph=new Float32Array(N);
+  const db=new Float32Array(N);
+  [globalHPF,globalLPF,eqLowNode,eqMidNode,eqHighNode].forEach(f=>{
+    if(!f)return;f.getFrequencyResponse(freqs,mag,ph);
+    for(let i=0;i<N;i++)db[i]+=20*Math.log10(Math.max(0.0001,mag[i]));
+  });
+  const dBRange=24,midY=H*0.5;
+  cxt.clearRect(0,0,W,H);
+  // Grid lines
+  [-12,-6,0,6,12].forEach(g=>{
+    const y=midY-g/dBRange*midY*0.88;
+    cxt.beginPath();cxt.moveTo(0,y);cxt.lineTo(W,y);
+    cxt.strokeStyle=g===0?'rgba(255,255,255,0.12)':'rgba(255,255,255,0.05)';cxt.lineWidth=1;cxt.stroke();
+    if(g!==0){cxt.fillStyle='rgba(255,255,255,0.2)';cxt.font='9px sans-serif';cxt.fillText((g>0?'+':'')+g,4,y-2)}
+  });
+  // Frequency labels
+  [[100,'100'],[1000,'1k'],[10000,'10k']].forEach(([f,lbl])=>{
+    const x=Math.log10(f/20)/Math.log10(1000)*W;
+    cxt.fillStyle='rgba(255,255,255,0.18)';cxt.font='9px sans-serif';cxt.fillText(lbl,x-8,H-3);
+  });
+  // Fill
+  cxt.beginPath();
+  for(let i=0;i<N;i++){const y=midY-Math.max(-dBRange,Math.min(dBRange,db[i]))/dBRange*midY*0.88;if(i===0)cxt.moveTo(0,y);else cxt.lineTo(i,y)}
+  cxt.lineTo(W,H);cxt.lineTo(0,H);cxt.closePath();
+  const g2=cxt.createLinearGradient(0,0,0,H);g2.addColorStop(0,'rgba(196,145,94,0.28)');g2.addColorStop(1,'rgba(196,145,94,0.02)');
+  cxt.fillStyle=g2;cxt.fill();
+  // Line
+  cxt.beginPath();
+  for(let i=0;i<N;i++){const y=midY-Math.max(-dBRange,Math.min(dBRange,db[i]))/dBRange*midY*0.88;if(i===0)cxt.moveTo(0,y);else cxt.lineTo(i,y)}
+  cxt.strokeStyle='rgba(196,145,94,0.85)';cxt.lineWidth=1.5;cxt.stroke();
 }
 
 // ─── VISUALISER ───
@@ -645,8 +745,8 @@ function startVis(){
 
 function toggleEvolving(){evolving=!evolving;const btn=document.getElementById('evolveBtn');btn.className='evolve-pill '+(evolving?'on':'off');btn.textContent=evolving?'Evolving':'Static';saveSettings();if(evolving)scheduleEvolve()}
 
-function saveSettings(){try{const s={homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,densityValue,reverbMix,delayMixVal,masterVol,textureOctUp,enabledEvolveIdx:[...enabledEvolveIdx],layers:{}};PAD_LAYERS.forEach(l=>{s.layers[l.id]={volume:layerState[l.id].volume}});localStorage.setItem('norcoast_v1',JSON.stringify(s))}catch(e){}}
-function loadSettings(){try{const raw=localStorage.getItem('norcoast_v1');if(!raw)return;const s=JSON.parse(raw);if(s.homeRoot)homeRoot=s.homeRoot;if(s.evolving!=null)evolving=s.evolving;if(s.evolveSpeed!=null)evolveSpeed=s.evolveSpeed;if(s.lpfValue!=null)lpfValue=s.lpfValue;if(s.hpfValue!=null)hpfValue=s.hpfValue;if(s.densityValue!=null)densityValue=s.densityValue;if(s.reverbMix!=null)reverbMix=s.reverbMix;if(s.delayMixVal!=null)delayMixVal=s.delayMixVal;if(s.masterVol!=null)masterVol=s.masterVol;if(s.textureOctUp!=null)textureOctUp=s.textureOctUp;if(Array.isArray(s.enabledEvolveIdx))enabledEvolveIdx=new Set(s.enabledEvolveIdx);if(s.layers)PAD_LAYERS.forEach(l=>{if(s.layers[l.id]!=null)layerState[l.id].volume=s.layers[l.id].volume??0})}catch(e){}}
+function saveSettings(){try{const s={homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,lpfQ,hpfQ,densityValue,eqLowGain,eqMidGain,eqHighGain,reverbMix,delayMixVal,shimmerVol,masterVol,textureOctUp,enabledEvolveIdx:[...enabledEvolveIdx],layers:{}};PAD_LAYERS.forEach(l=>{s.layers[l.id]={volume:layerState[l.id].volume}});localStorage.setItem('norcoast_v1',JSON.stringify(s))}catch(e){}}
+function loadSettings(){try{const raw=localStorage.getItem('norcoast_v1');if(!raw)return;const s=JSON.parse(raw);if(s.homeRoot)homeRoot=s.homeRoot;if(s.evolving!=null)evolving=s.evolving;if(s.evolveSpeed!=null)evolveSpeed=s.evolveSpeed;if(s.lpfValue!=null)lpfValue=s.lpfValue;if(s.hpfValue!=null)hpfValue=s.hpfValue;if(s.lpfQ!=null)lpfQ=s.lpfQ;if(s.hpfQ!=null)hpfQ=s.hpfQ;if(s.densityValue!=null)densityValue=s.densityValue;if(s.eqLowGain!=null)eqLowGain=s.eqLowGain;if(s.eqMidGain!=null)eqMidGain=s.eqMidGain;if(s.eqHighGain!=null)eqHighGain=s.eqHighGain;if(s.shimmerVol!=null)shimmerVol=s.shimmerVol;if(s.reverbMix!=null)reverbMix=s.reverbMix;if(s.delayMixVal!=null)delayMixVal=s.delayMixVal;if(s.masterVol!=null)masterVol=s.masterVol;if(s.textureOctUp!=null)textureOctUp=s.textureOctUp;if(Array.isArray(s.enabledEvolveIdx))enabledEvolveIdx=new Set(s.enabledEvolveIdx);if(s.layers)PAD_LAYERS.forEach(l=>{if(s.layers[l.id]!=null)layerState[l.id].volume=s.layers[l.id].volume??0})}catch(e){}}
 let _saveT=null;function queueSave(){clearTimeout(_saveT);_saveT=setTimeout(saveSettings,500)}
 
 // ─── START ───
@@ -661,9 +761,9 @@ async function initAndStart(){
   // Start pads at saved (or default 0) volumes
   PAD_LAYERS.forEach(l=>{
     if(l.type==="granular"){if(layerState[l.id].volume>0)startGranular(layerState[l.id].volume);return}
-    if(l.type==="shimmer"){if(layerState[l.id].volume>0)startShimmer(layerState[l.id].volume);return}
     startPad(l,layerState[l.id].volume,homeRoot,currentEvolve);
   });
+  if(shimmerVol>0)startShimmer(shimmerVol);
   // Resume AudioContext when returning from background
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&ctx&&ctx.state==='suspended'&&!audioPaused)ctx.resume()});
   window.addEventListener('focus',()=>{if(ctx&&ctx.state==='suspended'&&!audioPaused)ctx.resume()});
