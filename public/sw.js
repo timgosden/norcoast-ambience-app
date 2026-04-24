@@ -1,10 +1,5 @@
-const CACHE = 'norcoast-v1';
-const PRECACHE = [
-  '/',
-  '/manifest.json',
-  '/icons/icon.svg',
-  '/icons/icon-maskable.svg',
-];
+const CACHE = 'norcoast-v10';
+const PRECACHE = ['./', './manifest.json', './icons/icon.svg', './icons/icon-maskable.svg'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(PRECACHE)));
@@ -21,7 +16,6 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-  // Only handle same-origin GETs
   if (e.request.method !== 'GET' || !e.request.url.startsWith(self.location.origin)) return;
   e.respondWith(
     caches.match(e.request).then(cached => cached || fetch(e.request).then(res => {
