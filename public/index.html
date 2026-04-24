@@ -94,7 +94,10 @@
   .preset-export-btn{width:100%;margin-top:12px;padding:9px 0;border-radius:8px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.03);color:rgba(255,255,255,0.3);font-size:11px;letter-spacing:1px;cursor:pointer;transition:all 0.2s}
   .preset-export-btn:hover{background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.6)}
   .preset-row{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,0.04);cursor:grab;transition:background 0.15s}
-  .preset-drag{font-size:16px;color:rgba(255,255,255,0.2);cursor:grab;padding:0 2px;user-select:none;flex-shrink:0}
+  .preset-order-btns{display:flex;flex-direction:column;gap:2px;flex-shrink:0}
+  .preset-ord-btn{background:none;border:none;color:rgba(255,255,255,0.25);font-size:9px;padding:1px 4px;cursor:pointer;line-height:1;transition:color 0.15s}
+  .preset-ord-btn:not([disabled]):hover{color:rgba(196,145,94,0.8)}
+  .preset-ord-btn[disabled]{opacity:0.15;cursor:default}
   .fx-section-header{font-size:10px;font-weight:700;letter-spacing:1.5px;color:rgba(255,255,255,0.55);text-transform:uppercase;padding:8px 12px;margin:10px -16px 6px;}
   .preset-drag{font-size:16px;color:rgba(255,255,255,0.2);cursor:grab;padding:0 2px;user-select:none;flex-shrink:0}
   .preset-info{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}
@@ -115,20 +118,25 @@
 </head>
 <body>
 <!-- Tap-to-start -->
-<div id="audioPrompt" onclick="initAndStart()" style="position:fixed;top:0;left:0;right:0;bottom:0;z-index:100;display:flex;align-items:center;justify-content:center;background:rgba(6,8,16,0.97);cursor:pointer;transition:opacity 0.6s">
-  <div style="text-align:center">
-    <svg width="52" height="52" viewBox="0 0 100 100" fill="none">
-      <circle cx="50" cy="50" r="46" stroke="rgba(196,145,94,0.3)" stroke-width="1.5"/>
-      <path d="M 20 50 Q 30 35, 40 50 Q 50 65, 60 50 Q 70 35, 80 50" stroke="rgba(196,145,94,0.7)" stroke-width="2" stroke-linecap="round" fill="none"/>
-      <path d="M 20 50 Q 30 40, 40 50 Q 50 60, 60 50 Q 70 40, 80 50" stroke="rgba(94,184,138,0.5)" stroke-width="1.5" stroke-linecap="round" fill="none"/>
-      <path d="M 25 50 Q 35 44, 45 50 Q 55 56, 65 50 Q 75 44, 85 50" stroke="rgba(212,107,138,0.4)" stroke-width="1" stroke-linecap="round" fill="none"/>
-      <text x="50" y="30" text-anchor="middle" fill="rgba(196,145,94,0.5)" font-family="'Open Sans',sans-serif" font-size="11" font-weight="600" letter-spacing="1">N</text>
-      <circle cx="50" cy="50" r="38" stroke="rgba(255,255,255,0.04)" stroke-width="0.5"/>
-    </svg>
-    <div style="font-size:11px;letter-spacing:3px;color:rgba(255,255,255,0.2);text-transform:uppercase;font-weight:300;margin-top:16px">Tap to start</div>
-    <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:8px"></div>
-  </div>
+<div id="audioPrompt" onclick="initAndStart()" style="position:fixed;top:0;left:0;right:0;bottom:0;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#080b14;cursor:pointer;transition:opacity 0.8s;padding:40px">
+  <svg width="84" height="84" viewBox="0 0 100 100" fill="none" style="margin-bottom:28px">
+    <circle cx="50" cy="50" r="46" stroke="rgba(196,145,94,0.15)" stroke-width="1"/>
+    <circle cx="50" cy="50" r="46" stroke="rgba(196,145,94,0.55)" stroke-width="1.5" stroke-dasharray="289" stroke-dashoffset="289" style="animation:splashRing 2s cubic-bezier(0.4,0,0.2,1) 0.2s forwards;transform-origin:50px 50px;transform:rotate(-90deg)"/>
+    <path d="M 18 50 Q 29 30, 40 50 Q 51 70, 62 50 Q 73 30, 84 50" stroke="rgba(196,145,94,0.9)" stroke-width="2.5" stroke-linecap="round" fill="none" style="animation:splashPath 1s ease-out 0.6s both;stroke-dasharray:120;stroke-dashoffset:120"/>
+    <path d="M 18 50 Q 29 38, 40 50 Q 51 62, 62 50 Q 73 38, 84 50" stroke="rgba(94,184,138,0.55)" stroke-width="1.5" stroke-linecap="round" fill="none" style="animation:splashPath 1s ease-out 0.85s both;stroke-dasharray:110;stroke-dashoffset:110"/>
+    <path d="M 22 50 Q 33 42, 44 50 Q 55 58, 66 50 Q 77 42, 88 50" stroke="rgba(212,107,138,0.35)" stroke-width="1" stroke-linecap="round" fill="none" style="animation:splashPath 1s ease-out 1.05s both;stroke-dasharray:105;stroke-dashoffset:105"/>
+  </svg>
+  <div style="font-size:10px;letter-spacing:5px;color:rgba(196,145,94,0.5);text-transform:uppercase;font-family:'Open Sans',sans-serif;margin-bottom:8px;animation:splashFade 0.8s ease-out 1.2s both">Norcoast Audio</div>
+  <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
+  <div style="font-size:10px;letter-spacing:3px;color:rgba(255,255,255,0.22);text-transform:uppercase;font-family:'Open Sans',sans-serif;animation:splashPulse 2.5s ease-in-out 2s infinite">tap to begin</div>
+  <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
 </div>
+<style>
+@keyframes splashRing{to{stroke-dashoffset:0}}
+@keyframes splashPath{to{stroke-dashoffset:0;opacity:1}}
+@keyframes splashFade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+@keyframes splashPulse{0%,100%{opacity:0.22}50%{opacity:0.65}}
+</style>
 <!-- Performance mode -->
 <div id="perf">
   <div class="perf-top">
@@ -471,39 +479,49 @@ function fadeOut(nodes,time){
 function getStaticFreqs(root,def){const r=noteFreq(root,ROOT_OCT);return def.rootOnly?[r]:[r,semiFreq(r,7)]}
 function getEvolveFreq(root,ei){const r=noteFreq(root,ROOT_OCT);return CHORD_TYPES[ei].semis.map(s=>semiFreq(r,s))}
 
+// Shimmer: sustained octave-up oscillator bank — 6 voices, root+5th, 1+2 octaves up
+let shimmerOscs=[];
+function _shimmerFreqs(){
+  const r=noteFreq(homeRoot,ROOT_OCT);
+  // root+1oct, root+2oct, 5th+1oct, 5th+2oct (all above the pads)
+  return[r*2, r*2, r*4, semiFreq(r,7)*2, semiFreq(r,7)*2, semiFreq(r,7)*4];
+}
+function updateShimmerPitch(){
+  const freqs=_shimmerFreqs();
+  shimmerOscs.forEach((o,i)=>{ if(o)o.frequency.linearRampToValueAtTime(freqs[i],ctx.currentTime+3);});
+}
 function startShimmer(vol){
   shimmerActive=true;
-  if(shimmerGainNode){shimmerGainNode.gain.linearRampToValueAtTime(vol,ctx.currentTime+0.5);return}
-  shimmerGainNode=ctx.createGain();shimmerGainNode.gain.setValueAtTime(0,ctx.currentTime);
-  shimmerGainNode.gain.linearRampToValueAtTime(vol,ctx.currentTime+ATTACK);
-  shimmerGainNode.connect(master);
-  function grain(){
-    if(!shimmerActive||!shimmerGainNode)return;
-    const root=noteFreq(homeRoot,ROOT_OCT);
-    const octMult=[4,5,6,8][Math.random()*4|0];
-    const base=root*octMult;
-    const shimSemis=CHORD_TYPES[currentEvolve].semis;
-    const shimSemi=shimSemis[Math.floor(Math.random()*shimSemis.length)];
-    const f=Math.random()<0.45?base*Math.pow(2,shimSemi/12):base;
-    const w=Math.random()<0.6?'glass':'lush';
-    const osc=ctx.createOscillator();osc.setPeriodicWave(waves[w]);
-    osc.frequency.value=Math.min(f,ctx.sampleRate*0.45);
-    osc.detune.value=(Math.random()-0.5)*25;
-    const env=ctx.createGain();const now=ctx.currentTime;
-    const atk=0.15+Math.random()*0.35,peak=0.035+Math.random()*0.045,rel=1.2+Math.random()*2;
-    env.gain.setValueAtTime(0,now);env.gain.linearRampToValueAtTime(peak,now+atk);
-    env.gain.exponentialRampToValueAtTime(0.001,now+atk+rel);
-    osc.connect(env);env.connect(shimmerGainNode);osc.start(now);osc.stop(now+atk+rel+0.1);
-    shimmerTimer=setTimeout(grain,(0.18+Math.random()*0.42)*1000);
-  }
-  grain();
+  if(shimmerGainNode){shimmerGainNode.gain.linearRampToValueAtTime(vol*0.7,ctx.currentTime+0.5);return;}
+  // Master shimmer gain → HPF (keep it airy) → reverb + tiny dry
+  shimmerGainNode=ctx.createGain();
+  shimmerGainNode.gain.setValueAtTime(0,ctx.currentTime);
+  shimmerGainNode.gain.linearRampToValueAtTime(vol*0.7,ctx.currentTime+ATTACK*2);
+  const shimHPF=ctx.createBiquadFilter();shimHPF.type='highpass';shimHPF.frequency.value=600;shimHPF.Q.value=0.5;
+  shimmerGainNode.connect(shimHPF);
+  shimHPF.connect(reverb.input);  // feed into reverb for bloom
+  shimHPF.connect(master);        // tiny direct (reverb covers the rest)
+  const freqs=_shimmerFreqs();
+  const pans=[-0.7,-0.3,0.7,0.4,-0.5,0.6];
+  const detunes=[-8,8,-6,6,-10,10];
+  shimmerOscs=freqs.map((f,i)=>{
+    const o=ctx.createOscillator();o.type='sine';
+    o.frequency.value=f;o.detune.value=detunes[i];
+    const lfo=ctx.createOscillator();lfo.type='sine';lfo.frequency.value=0.04+i*0.013;
+    const lg=ctx.createGain();lg.gain.value=2+i*0.5;
+    lfo.connect(lg);lg.connect(o.detune);lfo.start();
+    const vg=ctx.createGain();vg.gain.value=i>=4?0.03:0.055;  // 2oct voices quieter
+    const pn=ctx.createStereoPanner();pn.pan.value=pans[i];
+    o.connect(vg);vg.connect(pn);pn.connect(shimmerGainNode);
+    o.start();return o;
+  });
 }
 function stopShimmer(){
   shimmerActive=false;
-  if(shimmerTimer){clearTimeout(shimmerTimer);shimmerTimer=null}
+  shimmerOscs.forEach(o=>{try{o.stop();}catch(e){}});shimmerOscs=[];
   if(shimmerGainNode){
     const n=shimmerGainNode;n.gain.linearRampToValueAtTime(0,ctx.currentTime+RELEASE);
-    setTimeout(()=>{try{n.disconnect()}catch(e){}},RELEASE*1000+500);shimmerGainNode=null;
+    setTimeout(()=>{try{n.disconnect();}catch(e){}},RELEASE*1000+500);shimmerGainNode=null;
   }
 }
 
@@ -529,6 +547,7 @@ function evolveVoice(ei){
       evolveNodes[l.id]=buildGroup(l,ef,layerState[l.id].volume,XFADE);
     }
   });
+  if(shimmerActive)updateShimmerPitch();
 }
 
 // ─── EVOLUTION ───
@@ -623,6 +642,7 @@ function buildKeys(){
         if(!layerState[l.id].active||layerState[l.id].volume<=0)return;
         startPad(l,layerState[l.id].volume,homeRoot,currentEvolve);
       });
+      if(shimmerActive)updateShimmerPitch();
       buildKeys();saveSettings();
     };
     row.appendChild(btn);
@@ -763,11 +783,12 @@ function buildEditSheet(){
   h+='<div class="preset-save-row"><input class="preset-input" id="presetNameInput" placeholder="Name this sound…" /><button class="preset-save-btn" onclick="savePreset(document.getElementById(\'presetNameInput\').value)">Save</button></div>';
   if(presetNames.length===0){h+='<div class="preset-empty">No saved sounds yet</div>'}
   else{
-    presetNames.forEach(n=>{
+    presetNames.forEach((n,idx)=>{
       const pd=presets[n];const ns=n.replace(/'/g,"\\'");
       const cn=pd.enabledEvolveIdx&&pd.enabledEvolveIdx.length>0?CHORD_TYPES[pd.enabledEvolveIdx[0]]?.name:'';
       const meta=[pd.homeRoot||'',cn,pd.clickBPM?pd.clickBPM+' bpm':''].filter(Boolean).join(' · ');
-      h+='<div class="preset-row" draggable="true" data-pn="'+n+'" ondragstart="pDragStart(event,this)" ondragover="pDragOver(event)" ondrop="pDrop(event,this)" ondragleave="pDragLeave(event)" ondragend="pDragEnd()"><div class="preset-drag">⠿</div><div class="preset-info"><span class="preset-name">'+n+'</span>'+(meta?'<span class="preset-meta">'+meta+'</span>':'')+' </div><button class="preset-load-btn" onclick="loadPreset(\''+ns+'\')">Load</button><button class="preset-del-btn" onclick="deletePreset(\''+ns+'\')">✕</button></div>';
+      const isFirst=idx===0,isLast=idx===presetNames.length-1;
+      h+='<div class="preset-row" data-pn="'+n+'"><div class="preset-order-btns"><button class="preset-ord-btn" '+(isFirst?'disabled':'')+' onclick="movePreset(\''+ns+'\',-1)">▲</button><button class="preset-ord-btn" '+(isLast?'disabled':'')+' onclick="movePreset(\''+ns+'\',1)">▼</button></div><div class="preset-info"><span class="preset-name">'+n+'</span>'+(meta?'<span class="preset-meta">'+meta+'</span>':'')+'</div><button class="preset-load-btn" onclick="loadPreset(\''+ns+'\')">Load</button><button class="preset-del-btn" onclick="deletePreset(\''+ns+'\')">✕</button></div>';
     });
   }
   h+='</div><div class="edit-bottom-pad"></div>';
@@ -1027,8 +1048,16 @@ function tapTempo(){
 }
 
 
-// ─── SETLIST DRAG REORDER ───
-let _dragName=null;
+// ─── SETLIST REORDER ───
+function movePreset(name,dir){
+  const ps=getPresets();const keys=Object.keys(ps);
+  const i=keys.indexOf(name);if(i<0)return;
+  const j=i+dir;if(j<0||j>=keys.length)return;
+  [keys[i],keys[j]]=[keys[j],keys[i]];
+  const newPs={};keys.forEach(k=>{newPs[k]=ps[k]});
+  localStorage.setItem('norcoast_presets',JSON.stringify(newPs));
+  buildEditSheet();updatePerfSetlist();
+}
 
 function updatePerfSetlist(){
   const el=document.getElementById('perfSetlist');if(!el)return;
@@ -1038,21 +1067,6 @@ function updatePerfSetlist(){
     const pd=ps[n];const active=(pd.homeRoot===homeRoot&&JSON.stringify([...enabledEvolveIdx])===JSON.stringify(pd.enabledEvolveIdx||[]));
     return '<button class="setlist-chip'+(active?' active':'')+'" onclick="loadPreset(\''+n.replace(/'/g,"\\'")+'');updatePerfSetlist()">'+n+'</button>';
   }).join('');
-}
-function pDragStart(e,el){_dragName=el.dataset.pn;el.style.opacity='0.45';e.dataTransfer.effectAllowed='move';}
-function pDragOver(e){e.preventDefault();e.dataTransfer.dropEffect='move';e.currentTarget.style.background='rgba(196,145,94,0.12)';}
-function pDragLeave(e){e.currentTarget.style.background='';}
-function pDragEnd(){_dragName=null;document.querySelectorAll('.preset-row').forEach(r=>{r.style.opacity='';r.style.background='';})}
-function pDrop(e,el){
-  e.preventDefault();el.style.background='';
-  const dropName=el.dataset.pn;if(!_dragName||_dragName===dropName)return;
-  const ps=getPresets();const keys=Object.keys(ps);
-  const di=keys.indexOf(_dragName),ti=keys.indexOf(dropName);
-  if(di<0||ti<0)return;
-  keys.splice(di,1);keys.splice(ti,0,_dragName);
-  const newPs={};keys.forEach(k=>{newPs[k]=ps[k]});
-  localStorage.setItem('norcoast_presets',JSON.stringify(newPs));
-  buildEditSheet();
 }
 // ─── MIDI ───
 let midiReady=false;
