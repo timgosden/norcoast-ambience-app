@@ -89,6 +89,7 @@
   .slope-label{font-size:11px;color:rgba(255,255,255,0.35);letter-spacing:0.5px;flex:1}
   .slope-btn{padding:6px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:rgba(255,255,255,0.35);font-size:11px;cursor:pointer;transition:all 0.2s;letter-spacing:0.5px}
   .slope-btn.active{background:rgba(255,255,255,0.1);border-color:rgba(255,255,255,0.25);color:rgba(255,255,255,0.85)}
+  .oct-btn.active{background:rgba(196,145,94,0.18);border-color:rgba(196,145,94,0.5);color:#c4915e;box-shadow:0 0 12px rgba(196,145,94,0.15)}
   .preset-save-row{display:flex;gap:8px;margin:12px 0 4px}
   .preset-input{flex:1;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:10px 12px;color:rgba(255,255,255,0.85);font-size:13px;outline:none;font-family:'Open Sans',sans-serif}
   .preset-input::placeholder{color:rgba(255,255,255,0.2)}
@@ -200,11 +201,13 @@ const CHORD_TYPES=[
   {name:"5th",    semis:[7],        weight:5},
   {name:"Oct",    semis:[12],       weight:5},
   {name:"4th",    semis:[5],        weight:4},
-  {name:"9th",    semis:[14],       weight:3},
-  {name:"4+Oct",  semis:[5,12],     weight:2},
-  {name:"5+Oct",  semis:[7,12],     weight:2},
-  {name:"Sus",    semis:[5,7],      weight:2},
-  {name:"11th",   semis:[17],       weight:1},
+  {name:"Sus2",   semis:[2,7],      weight:4},
+  {name:"Sus4",   semis:[5,7],      weight:3},
+  {name:"5+Oct",  semis:[7,12],     weight:3},
+  {name:"Maj7",   semis:[11],       weight:3},
+  {name:"Add9",   semis:[7,14],     weight:3},
+  {name:"6th",    semis:[9],        weight:2},
+  {name:"M7+5",   semis:[7,11],     weight:2},
 ];
 // Alias for legacy references
 const EVOLVE_INTERVALS=CHORD_TYPES;
@@ -249,7 +252,7 @@ let shimmerActive=false,shimmerGainNode=null,shimmerTimer=null,shimmerVol=0;
 let granularTimers=[],granularGain=null,reversedBuf=null;
 let evolveTimer=null,animFrame=null;
 let audioPaused=false;
-let enabledEvolveIdx=new Set([0,1,2,3,4,5,6,7]);
+let enabledEvolveIdx=new Set([0,1,2,3,4,5,6,7,8,9]);
 
 const DEFAULT_VOLUMES={foundation:0.55,pads:0.45,texture:0.3};
 PAD_LAYERS.forEach(l=>{layerState[l.id]={active:true,volume:DEFAULT_VOLUMES[l.id]??0}});
@@ -772,7 +775,7 @@ function buildEditSheet(){
     h+='<input type="range" min="0" max="1" step="0.003" value="'+fPos+'" data-lid="'+l.id+'" style="background:linear-gradient(to right,'+l.color+'55 '+fPos*100+'%,rgba(255,255,255,0.06) '+fPos*100+'%);accent-color:'+l.color+'">';
     h+='</div>';
   });
-  h+='<div class="slope-row" style="margin:6px 0 2px"><span class="slope-label">Texture Oct</span><button class="slope-btn'+(textureOctUp?' active':'')+'" onclick="toggleTextureOct()">+1 Oct</button></div>';
+  h+='<div class="slope-row" style="margin:6px 0 2px"><span class="slope-label">Texture Oct</span><button class="slope-btn oct-btn'+(textureOctUp?' active':'')+'" onclick="toggleTextureOct()">+1 Oct</button></div>';
   h+='</div><div class="edit-divider"></div>';
   // ── Effects ──
   const shF=volToFader(shimmerVol);
