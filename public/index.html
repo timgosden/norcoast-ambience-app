@@ -415,10 +415,16 @@ function updateGranularPitch(){
 }
 
 // ─── AUDIO INIT ───
-function initAudio(){
+let _pitchShifterNode=null; // AudioWorkletNode created once worklet loads
+async function initAudio(){
   ctx=new(window.AudioContext||window.webkitAudioContext)();
   const sb=ctx.createBuffer(1,1,ctx.sampleRate);
   const s=ctx.createBufferSource();s.buffer=sb;s.connect(ctx.destination);s.start(0);
+  // Load pitch-shifter worklet (fail gracefully — shimmer still works without it)
+  try{
+    await ctx.audioWorklet.addModule('./pitch-shifter-worklet.js');
+    _pitchShifterNode=new AudioWorkletNode(ctx,'pitch-shifter');
+  }catch(e){console.warn('Pitch-shifter worklet unavailable:',e);}
   initWaves();
   master=ctx.createGain();master.gain.value=masterVol;
   globalLPF=ctx.createBiquadFilter();globalLPF.type="lowpass";globalLPF.frequency.value=lpfFaderToHz(lpfValue);globalLPF.Q.value=lpfQ;
@@ -472,7 +478,8 @@ function buildGroup(def,freqs,vol,atk){
   const aG=ctx.createGain();aG.gain.value=def.aMod*vol;
   aL.connect(aG);aG.connect(gG.gain);aL.start();
   const oscs=[],lfos=[fL,aL];
-  freqs.forEach((bf,ni)=>{def.octaves.forEach(oo=>{const f=bf*Math.pow(2,oo);def.timbres.forEach(tb=>{const w=waves[tb.wave];for(let vi=0;vi<tb.count;vi++){const t=tb.count>1?(vi/(tb.count-1))*2-1:0;const o=ctx.createOscillator();o.setPeriodicWave(w);o.frequency.value=f;o.detune.value=t*tb.ds*(0.4+densityValue*1.2);const vg=ctx.createGain();vg.gain.value=tb.gain;const pn=ctx.createStereoPanner();pn.pan.value=t*tb.pan*(ni%2===0?1:-1);const lfo=ctx.createOscillator();lfo.type="sine";lfo.frequency.value=0.01+Math.random()*0.05;const lg=ctx.createGain();lg.gain.value=1+Math.random()*3;lfo.connect(lg);lg.connect(o.detune);lfo.start();lfos.push(lfo);const h=ctx.createDelay(0.01);h.delayTime.value=Math.random()*0.004;o.connect(vg);vg.connect(pn);pn.connect(h);h.connect(flt);o.start();oscs.push(o)}})})});
+  const spread=densityValue;// 0=pure unison, 1=wide chorus
+  freqs.forEach((bf,ni)=>{def.octaves.forEach(oo=>{const f=bf*Math.pow(2,oo);def.timbres.forEach(tb=>{const w=waves[tb.wave];for(let vi=0;vi<tb.count;vi++){const t=tb.count>1?(vi/(tb.count-1))*2-1:0;const o=ctx.createOscillator();o.setPeriodicWave(w);o.frequency.value=f;o.detune.value=t*tb.ds*spread*2.5;const vg=ctx.createGain();vg.gain.value=tb.gain;const pn=ctx.createStereoPanner();pn.pan.value=t*tb.pan*(ni%2===0?1:-1)*(0.3+spread*0.7);const lfo=ctx.createOscillator();lfo.type="sine";lfo.frequency.value=0.01+Math.random()*0.05;const lg=ctx.createGain();lg.gain.value=(0.2+Math.random()*1.5)*(0.1+spread*0.9);lfo.connect(lg);lg.connect(o.detune);lfo.start();lfos.push(lfo);const h=ctx.createDelay(0.01);h.delayTime.value=Math.random()*0.004*spread;o.connect(vg);vg.connect(pn);pn.connect(h);h.connect(flt);o.start();oscs.push(o)}})})});
   flt.connect(gG);gG.connect(master);
   return{oscs,lfos,gain:gG,filter:flt,filterLG:fG};
 }
@@ -487,33 +494,43 @@ function fadeOut(nodes,time){
 function getStaticFreqs(root,def){const r=noteFreq(root,ROOT_OCT);return def.rootOnly?[r]:[r,semiFreq(r,7)]}
 function getEvolveFreq(root,ei){const r=noteFreq(root,ROOT_OCT);return CHORD_TYPES[ei].semis.map(s=>semiFreq(r,s))}
 
-// Shimmer: feedback reverb that processes actual audio input
-// Allpass diffuser → modulated delay chain → HP-filtered feedback → output
-let shimmerNode=null; // {input, output(GainNode), lfo1, lfo2}
+// Shimmer reverb: allpass diffuser + pitch-shifted feedback loop
+// Each feedback pass is raised an octave by the AudioWorklet pitch shifter,
+// producing a genuinely ascending shimmer tail.
+let shimmerNode=null;
 function createShimmerReverb(){
   const inputG=ctx.createGain();
   const outputG=ctx.createGain();outputG.gain.value=0;
-  // 6-stage allpass diffuser
-  const aps=[230,520,970,1800,3200,5800].map(f=>{const ap=ctx.createBiquadFilter();ap.type='allpass';ap.frequency.value=f;ap.Q.value=8;return ap;});
-  // Two modulated delays in the feedback path
-  const fd1=ctx.createDelay(3.0);fd1.delayTime.value=0.27;
-  const fd2=ctx.createDelay(3.0);fd2.delayTime.value=0.19;
-  // HP filter in feedback — bleeds bass each loop, creates ascending shimmer feel
-  const hp=ctx.createBiquadFilter();hp.type='highpass';hp.frequency.value=420;hp.Q.value=0.5;
-  const fbG=ctx.createGain();fbG.gain.value=0.74;
-  // Slow LFOs modulate delay times → pitch warble = shimmer character
-  const lfo1=ctx.createOscillator();lfo1.type='sine';lfo1.frequency.value=0.09;
-  const lg1=ctx.createGain();lg1.gain.value=0.022;lfo1.connect(lg1);lg1.connect(fd1.delayTime);lfo1.start();
-  const lfo2=ctx.createOscillator();lfo2.type='sine';lfo2.frequency.value=0.137;
-  const lg2=ctx.createGain();lg2.gain.value=0.015;lfo2.connect(lg2);lg2.connect(fd2.delayTime);lfo2.start();
-  // Chain: input → ap[0..5] → fd1 → hp → fd2 → fbG → [back to ap[0]] + [outputG]
-  inputG.connect(aps[0]);
-  aps.forEach((ap,i)=>{if(i<aps.length-1)ap.connect(aps[i+1]);});
-  aps[aps.length-1].connect(fd1);
-  fd1.connect(hp);hp.connect(fd2);fd2.connect(fbG);
-  fbG.connect(aps[0]); // feedback loop
-  fbG.connect(outputG); // tap output
-  return{input:inputG,output:outputG,lfo1,lfo2};
+  // 4-stage allpass diffuser (pre-pitch-shift)
+  const ap1=[230,520,970,1800].map(f=>{const n=ctx.createBiquadFilter();n.type='allpass';n.frequency.value=f;n.Q.value=8;return n;});
+  // Pre-delay before feedback loop
+  const preDel=ctx.createDelay(2.0);preDel.delayTime.value=0.18;
+  // Slow modulation on pre-delay (chorus character)
+  const lfo=ctx.createOscillator();lfo.type='sine';lfo.frequency.value=0.09;
+  const lg=ctx.createGain();lg.gain.value=0.012;lfo.connect(lg);lg.connect(preDel.delayTime);lfo.start();
+  // HP in feedback: bleeds bass each pass → high end sustained longer = shimmer feel
+  const hp=ctx.createBiquadFilter();hp.type='highpass';hp.frequency.value=380;hp.Q.value=0.5;
+  // LP to prevent aliasing from repeated octave-up pitching
+  const lp=ctx.createBiquadFilter();lp.type='lowpass';lp.frequency.value=7000;lp.Q.value=0.5;
+  // 2-stage allpass for post-pitch-shift diffusion
+  const ap2=[3200,6800].map(f=>{const n=ctx.createBiquadFilter();n.type='allpass';n.frequency.value=f;n.Q.value=7;return n;});
+  const fbG=ctx.createGain();fbG.gain.value=0.62;
+  // Routing:
+  // inputG → ap1 chain → preDel → hp → [pitchShifter if available] → lp → ap2 chain → fbG
+  // fbG → ap1[0]  (feedback)
+  // fbG → outputG (tap to output)
+  inputG.connect(ap1[0]);
+  ap1.forEach((n,i)=>{if(i<ap1.length-1)n.connect(ap1[i+1]);});
+  ap1[ap1.length-1].connect(preDel);
+  preDel.connect(hp);
+  // Pitch shifter in feedback — octave up each pass
+  if(_pitchShifterNode){hp.connect(_pitchShifterNode);_pitchShifterNode.connect(lp);}
+  else{hp.connect(lp);}  // graceful fallback: shimmer without pitch shift
+  lp.connect(ap2[0]);ap2[0].connect(ap2[1]);
+  ap2[1].connect(fbG);
+  fbG.connect(ap1[0]); // feedback
+  fbG.connect(outputG); // output tap
+  return{input:inputG,output:outputG};
 }
 function startShimmer(vol){
   shimmerActive=true;
@@ -731,7 +748,7 @@ function buildEditSheet(){
     h+='</div>';
   });
   h+='<div class="slope-row" style="margin:6px 0 2px"><span class="slope-label">Texture Oct</span><button class="slope-btn'+(textureOctUp?' active':'')+'" onclick="toggleTextureOct()">+1 Oct</button></div>';
-  h+=sliderRowHTML('den','Density','#7ab8d8',densityValue,Math.round(densityValue*100)+'%');
+  h+=sliderRowHTML('den','Spread','#7ab8d8',densityValue,Math.round(densityValue*100)+'%');
   h+='</div><div class="edit-divider"></div>';
   // ── Effects ──
   const shF=volToFader(shimmerVol);
@@ -774,7 +791,7 @@ function buildEditSheet(){
   // ── MIDI map ──
   h+='<div class="edit-section"><div class="edit-title">MIDI Map</div>';
   h+='<div class="midi-map-grid">';
-  [['CC 1','Reverb Mix'],['CC 7 / 11','Master Vol'],['CC 21','Low Pass'],['CC 22','High Pass'],['CC 23','Delay Mix'],['CC 24','Shimmer'],['CC 25','Density'],['CC 26','Chorus'],['CC 27','Reverb Size'],['CC 28','Delay Feedback'],['Note On','Root Key']].forEach(([cc,lbl])=>{h+='<div class="midi-cc">'+cc+'</div><div class="midi-lbl">'+lbl+'</div>';});
+  [['CC 1','Reverb Mix'],['CC 7 / 11','Master Vol'],['CC 21','Low Pass'],['CC 22','High Pass'],['CC 23','Delay Mix'],['CC 24','Shimmer'],['CC 25','Spread'],['CC 26','Chorus'],['CC 27','Reverb Size'],['CC 28','Delay Feedback'],['Note On','Root Key']].forEach(([cc,lbl])=>{h+='<div class="midi-cc">'+cc+'</div><div class="midi-lbl">'+lbl+'</div>';});
   h+='</div></div><div class="edit-divider"></div>';
   // ── Evolution ──
   h+='<div class="edit-section"><div class="edit-title">Evolution</div>';
@@ -1178,7 +1195,7 @@ async function initAndStart(){
   prompt.onclick=null; // prevent double-tap
   const ls=document.getElementById('loadStatus');if(ls)ls.textContent='Loading…';
   try{
-    initAudio();
+    await initAudio();
     await ctx.resume();
     await decodeSample();
     PAD_LAYERS.forEach(l=>{
