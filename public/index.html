@@ -149,6 +149,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.12);letter-spacing:0.5px;pointer-events:none">v0.21</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -186,7 +187,7 @@
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
     </div>
     <button id="midiBtn" class="evolve-pill off" onclick="initMIDI()" title="Enable MIDI">MIDI</button>
-    <div class="app-version">v0.20</div>
+    <div class="app-version">v0.21</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -583,6 +584,8 @@ function evolveVoice(ei){
 // ─── EVOLUTION ───
 function scheduleEvolve(){
   if(evolveTimer)clearTimeout(evolveTimer);
+  // When click+beat-sync is on, fireClick handles evolution deterministically — skip random timer
+  if(evolveOnBeat&&clickActive){evolveTimer=null;return;}
   const cur=currentEvolve;
   const base=10000+Math.random()*14000;const time=base*(1.5-evolveSpeed*0.8);
   evolveTimer=setTimeout(()=>{
@@ -592,15 +595,8 @@ function scheduleEvolve(){
     const wts=cands.map(i=>CHORD_TYPES[i].weight);const tot=wts.reduce((a,b)=>a+b,0);
     let r=Math.random()*tot,next=cands[0];
     for(let i=0;i<cands.length;i++){r-=wts[i];if(r<=0){next=cands[i];break}}
-    if(evolveOnBeat&&clickActive){
-      // Queue for next bar downbeat — show preview with arrow
-      pendingEvolve=next;
-      document.getElementById('stateEvolve').textContent='→ '+CHORD_TYPES[next].name;
-      // Don't call scheduleEvolve here — fireClick will call it after applying
-    } else {
-      currentEvolve=next;const _se=document.getElementById('stateEvolve');if(_se){_se.textContent=CHORD_TYPES[next].name;_se.classList.add('evo-flash');setTimeout(()=>_se.classList.remove('evo-flash'),700);}
-      evolveVoice(next);scheduleEvolve();
-    }
+    currentEvolve=next;const _se=document.getElementById('stateEvolve');if(_se){_se.textContent=CHORD_TYPES[next].name;_se.classList.add('evo-flash');setTimeout(()=>_se.classList.remove('evo-flash'),700);}
+    evolveVoice(next);scheduleEvolve();
   },time);
 }
 
@@ -801,7 +797,7 @@ function buildEditSheet(){
   // ── Tone / Filters ──
   h+='<div class="edit-section"><div class="edit-title">Tone</div>';
   h+=sliderRowHTML('lpf','Low Pass','#d46b8a',lpfValue,formatHz(lpfFaderToHz(lpfValue)));
-  h+='<div class="slope-row" style="margin:-4px 0 6px"><span class="slope-label" style="font-size:10px;color:rgba(255,255,255,0.25)">LP Slope</span><button class="slope-btn'+(lpfSlope===12?' active':'')+'" onclick="toggleSlope('lpf')" style="padding:4px 12px;font-size:10px">12 dB</button><button class="slope-btn'+(lpfSlope===24?' active':'')+'" onclick="toggleSlope('lpf')" style="padding:4px 12px;font-size:10px">24 dB</button></div>';
+  h+='<div class="slope-row" style="margin:-4px 0 6px"><span class="slope-label" style="font-size:10px;color:rgba(255,255,255,0.25)">LP Slope</span><button class="slope-btn'+(lpfSlope===12?' active':'')+'" onclick="toggleSlope(\'lpf\')" style="padding:4px 12px;font-size:10px">12 dB</button><button class="slope-btn'+(lpfSlope===24?' active':'')+'" onclick="toggleSlope(\'lpf\')" style="padding:4px 12px;font-size:10px">24 dB</button></div>';
   h+=sliderRowHTML('hpf','High Pass','#b07acc',hpfValue,formatHz(hpfFaderToHz(hpfValue)));
   // EQ expandable panel
   h+='<button class="eq-toggle" onclick="toggleEQPanel(this)">EQ ▾</button>';
@@ -984,6 +980,13 @@ function startVis(){
 
 function toggleEvolving(){evolving=!evolving;const btn=document.getElementById('evolveBtn');btn.className='evolve-pill '+(evolving?'on':'off');btn.textContent=evolving?'Evolving':'Static';saveSettings();if(evolving)scheduleEvolve()}
 function toggleTextureOct(){textureOctUp=!textureOctUp;saveSettings();buildEditSheet()}
+function toggleFoundationSub(){
+  foundationSubOct=!foundationSubOct;
+  const fd=PAD_LAYERS.find(l=>l.id==='foundation');
+  if(fd)fd.octaves=foundationSubOct?[-2,-1]:[-1];
+  if(ctx&&layerState.foundation.volume>0)startPad(fd,layerState.foundation.volume,homeRoot,currentEvolve);
+  saveSettings();buildEditSheet();
+}
 function toggleEvolveOnBeat(){evolveOnBeat=!evolveOnBeat;if(!evolveOnBeat&&pendingEvolve>=0){currentEvolve=pendingEvolve;document.getElementById('stateEvolve').textContent=CHORD_TYPES[currentEvolve].name;evolveVoice(currentEvolve);pendingEvolve=-1;scheduleEvolve()}saveSettings();buildEditSheet()}
 function setEvolveBars(b){evolveBars=b;saveSettings();buildEditSheet()}
 
@@ -1076,21 +1079,34 @@ function scheduleClicks(){
 }
 function fireClick(t){
   const beat=clickBeat++;
-  // Downbeat indicator — slightly louder on beat 1 of each bar
   const isDown=(beat%(evolveBars*4))===0;
   const osc=ctx.createOscillator();const env=ctx.createGain();
   osc.type='sine';osc.frequency.value=1200;
   env.gain.setValueAtTime(0.32,t);env.gain.exponentialRampToValueAtTime(0.001,t+0.018);
   osc.connect(env);env.connect(ctx.destination);osc.start(t);osc.stop(t+0.025);
-  // Apply queued chord evolution on bar downbeat
-  if(evolveOnBeat&&pendingEvolve>=0&&isDown){
-    const ne=pendingEvolve;pendingEvolve=-1;
-    const delay=Math.max(0,(t-ctx.currentTime)*1000);
-    setTimeout(()=>{
-      currentEvolve=ne;
-      document.getElementById('stateEvolve').textContent=CHORD_TYPES[ne].name;
-      evolveVoice(ne);scheduleEvolve();
-    },delay);
+  if(evolveOnBeat&&isDown&&evolving){
+    // Apply pending chord at the bar downbeat
+    if(pendingEvolve>=0){
+      const ne=pendingEvolve;pendingEvolve=-1;
+      const delay=Math.max(0,(t-ctx.currentTime)*1000);
+      setTimeout(()=>{
+        currentEvolve=ne;
+        const se=document.getElementById('stateEvolve');if(se){se.textContent=CHORD_TYPES[ne].name;se.classList.add('evo-flash');setTimeout(()=>se.classList.remove('evo-flash'),700);}
+        evolveVoice(ne);if(!clickActive)scheduleEvolve();
+      },delay);
+    }
+    // When click is on, deterministically queue the next chord for the next downbeat
+    if(pendingEvolve<0){
+      const cur=currentEvolve;
+      const cands=CHORD_TYPES.map((_,i)=>i).filter(i=>i!==cur&&enabledEvolveIdx.has(i));
+      if(cands.length){
+        const wts=cands.map(i=>CHORD_TYPES[i].weight);const tot=wts.reduce((a,b)=>a+b,0);
+        let r=Math.random()*tot,next=cands[0];
+        for(let i=0;i<cands.length;i++){r-=wts[i];if(r<=0){next=cands[i];break}}
+        pendingEvolve=next;
+        const se=document.getElementById('stateEvolve');if(se)se.textContent='→ '+CHORD_TYPES[next].name;
+      }
+    }
   }
 }
 function toggleClick(){
@@ -1099,6 +1115,8 @@ function toggleClick(){
   const btn=document.getElementById('clickBtn');if(btn){btn.className='evolve-pill '+(clickActive?'on':'off');btn.textContent=clickActive?'Click: On':'Click: Off'}
   // Re-draw BPM control if edit sheet open
   const bpmInp=document.getElementById('bpmInput');if(bpmInp)bpmInp.value=clickBPM;
+  // Switch between deterministic (click on) and random (click off) evolution
+  scheduleEvolve();
 }
 function setBPM(v){clickBPM=Math.max(50,Math.min(200,parseInt(v)||120));const d=document.getElementById('bpmDisplay');if(d)d.textContent=clickBPM;if(clickActive){stopClick();startClick()}applyDelaySync();}
 function getDelayTime(){const beat=60/clickBPM;const divs={'1/2':beat*2,'q.':beat*1.5,'q':beat,'1/8.':beat*0.75,'1/8':beat*0.5};return Math.min(divs[delaySyncDiv]||beat*1.5,1.9)}
