@@ -195,7 +195,7 @@ let chorusGainNode=null,chorusMix=0;
 let dulcimerBuf=null; // decoded audio buffer
 let homeRoot="C",evolving=true,evolveSpeed=0.5,currentEvolve=0;
 let lpfValue=0.7,hpfValue=0,densityValue=0.5;
-let reverbMix=0.6,delayMixVal=0.1,masterVol=0.65;
+let reverbMix=0.6,reverbSize=0.78,reverbDamp=2600,delayMixVal=0.1,delayFeedback=0.4,masterVol=0.65;
 let textureOctUp=true;
 let staticNodes={},evolveNodes={},layerState={};
 let shimmerActive=false,shimmerGainNode=null,shimmerTimer=null,shimmerVol=0;
@@ -242,7 +242,7 @@ function initReverb(){
   lns.forEach(l=>{dO.connect(l.delay);l.delay.connect(l.filter);l.filter.connect(l.gain);l.gain.connect(lM);l.gain.connect(d1)});
   d1.connect(d2);d2.connect(hs);hs.connect(fbG);fbG.connect(aps[0].delay);
   dO.connect(out);lM.connect(out);
-  return{input:inp,output:out};
+  return{input:inp,output:out,fbGain:fbG,damp:d1,damp2:d2};
 }
 
 // ─── DECODE EMBEDDED SAMPLE ───
@@ -395,12 +395,12 @@ function initAudio(){
   const lgR=ctx.createGain();lgR.gain.value=0.003;lR.connect(lgR);lgR.connect(dR.delayTime);lR.start();
   const pL=ctx.createStereoPanner();pL.pan.value=-0.65;
   const pR=ctx.createStereoPanner();pR.pan.value=0.65;
-  reverb=initReverb();
+  reverb=initReverb();reverb.fbGain.gain.value=reverbSize;reverb.damp.frequency.value=reverbDamp;reverb.damp2.frequency.value=reverbDamp*1.25;
   reverbGain=ctx.createGain();reverbGain.gain.value=reverbMix;
   dryGain=ctx.createGain();dryGain.gain.value=0.55;
   delayNode=ctx.createDelay(2);delayNode.delayTime.value=DELAY_Q;
   delayGainN=ctx.createGain();delayGainN.gain.value=delayMixVal;
-  delayFB=ctx.createGain();delayFB.gain.value=0.4;
+  delayFB=ctx.createGain();delayFB.gain.value=delayFeedback;
   const dLP=ctx.createBiquadFilter();dLP.type="lowpass";dLP.frequency.value=1800;
   analyser=ctx.createAnalyser();analyser.fftSize=1024;analyser.smoothingTimeConstant=0.7;
   master.connect(globalHPF);globalHPF.connect(globalHPF2);globalHPF2.connect(globalLPF);globalLPF.connect(globalLPF2);
@@ -516,6 +516,8 @@ function scheduleEvolve(){
 }
 
 // ─── FILTER MATH ───
+function dampFaderToHz(v){return Math.exp(Math.log(800)+v*(Math.log(8000)-Math.log(800)))}
+function reverbSizeToFB(v){return 0.62+v*0.28}
 function lpfFaderToHz(v){return Math.exp(Math.log(100)+v*v*(Math.log(20000)-Math.log(100)))}
 function hpfFaderToHz(v){if(v<0.01)return 20;return Math.exp(Math.log(20)+v*(Math.log(500)-Math.log(20)))}
 function formatHz(hz){return hz>=1000?(hz/1000).toFixed(1)+'kHz':Math.round(hz)+'Hz'}
@@ -659,8 +661,12 @@ function buildEditSheet(){
   // ── Effects ──
   const shF=volToFader(shimmerVol);
   h+='<div class="edit-section"><div class="edit-title">Effects</div>';
+  const rvSz=(reverbSize-0.62)/0.28,rvDp=(Math.log(reverbDamp)-Math.log(800))/(Math.log(8000)-Math.log(800));
   h+=sliderRowHTML('rev','Reverb','#6a9fd8',volToFader(reverbMix),Math.round(reverbMix*100)+'%');
+  h+=sliderRowHTML('rvSz','  Size','#6a9fd8',rvSz,(rvSz*100|0)+'%');
+  h+=sliderRowHTML('rvDp','  Damp','#6a9fd8',rvDp,formatHz(reverbDamp));
   h+=sliderRowHTML('dly','Delay','#5eb88a',volToFader(delayMixVal),Math.round(delayMixVal*100)+'%');
+  h+=sliderRowHTML('dlyFB','  Feedback','#5eb88a',delayFeedback/0.85,Math.round(delayFeedback/0.85*100)+'%');
   h+='<div class="slope-row"><span class="slope-label">Delay BPM</span><button class="slope-btn'+(delaySync?' active':'')+'" onclick="toggleDelaySync()">'+(delaySync?'Sync On':'Sync Off')+'</button>';
   if(delaySync){['q.','q','1/8.','1/8'].forEach(d=>{h+='<button class="slope-btn'+(delaySyncDiv===d?' active':'')+'" onclick="setDelaySyncDiv(\''+d+'\')" style="padding:6px 8px">'+d+'</button>'})}
   h+='</div>';
@@ -732,7 +738,10 @@ function buildEditSheet(){
   });
   // Wire Effects sliders
   wireSR(c,'rev',r=>{reverbMix=faderToVol(r);reverbGain.gain.value=reverbMix;dryGain.gain.value=1-reverbMix*0.35;return Math.round(reverbMix*100)+'%'});
+  wireSR(c,'rvSz',r=>{reverbSize=reverbSizeToFB(r);if(reverb&&reverb.fbGain)reverb.fbGain.gain.linearRampToValueAtTime(reverbSize,ctx.currentTime+0.1);return(r*100|0)+'%'});
+  wireSR(c,'rvDp',r=>{reverbDamp=dampFaderToHz(r);if(reverb&&reverb.damp){reverb.damp.frequency.linearRampToValueAtTime(reverbDamp,ctx.currentTime+0.1);reverb.damp2.frequency.linearRampToValueAtTime(reverbDamp*1.25,ctx.currentTime+0.1)}return formatHz(reverbDamp)});
   wireSR(c,'dly',r=>{delayMixVal=faderToVol(r);delayGainN.gain.value=delayMixVal;return Math.round(delayMixVal*100)+'%'});
+  wireSR(c,'dlyFB',r=>{delayFeedback=r*0.85;if(delayFB)delayFB.gain.linearRampToValueAtTime(delayFeedback,ctx.currentTime+0.1);return Math.round(r*100)+'%'});
   wireSR(c,'shm',r=>{const vol=faderToVol(r),was=shimmerVol;shimmerVol=vol;if(vol>0&&was===0)startShimmer(vol);else if(vol<=0)stopShimmer();else if(shimmerGainNode)shimmerGainNode.gain.linearRampToValueAtTime(vol,ctx.currentTime+0.1);return Math.round(vol*100)+'%'});
   wireSR(c,'chr',r=>{chorusMix=faderToVol(r);if(chorusGainNode)chorusGainNode.gain.linearRampToValueAtTime(chorusMix*0.8,ctx.currentTime+0.1);return Math.round(chorusMix*100)+'%'});
   // Wire Tone sliders
@@ -851,14 +860,14 @@ function toggleSlope(type){
   // Update slope buttons
   document.querySelectorAll('.slope-btn[data-slope="'+type+'"]').forEach(b=>{b.classList.toggle('active',parseInt(b.dataset.val)===(type==='lpf'?lpfSlope:hpfSlope))});
 }
-function saveSettings(){try{const s={homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,lpfQ,hpfQ,lpfSlope,hpfSlope,densityValue,eqLowGain,eqLoMidGain,eqHiMidGain,eqHighGain,chorusMix,reverbMix,delayMixVal,delaySync,delaySyncDiv,shimmerVol,masterVol,textureOctUp,clickBPM,enabledEvolveIdx:[...enabledEvolveIdx],layers:{}};PAD_LAYERS.forEach(l=>{s.layers[l.id]={volume:layerState[l.id].volume}});localStorage.setItem('norcoast_v1',JSON.stringify(s))}catch(e){}}
-function loadSettings(){try{const raw=localStorage.getItem('norcoast_v1');if(!raw)return;const s=JSON.parse(raw);if(s.homeRoot)homeRoot=s.homeRoot;if(s.evolving!=null)evolving=s.evolving;if(s.evolveSpeed!=null)evolveSpeed=s.evolveSpeed;if(s.lpfValue!=null)lpfValue=s.lpfValue;if(s.hpfValue!=null)hpfValue=s.hpfValue;if(s.lpfQ!=null)lpfQ=s.lpfQ;if(s.hpfQ!=null)hpfQ=s.hpfQ;if(s.lpfSlope!=null)lpfSlope=s.lpfSlope;if(s.hpfSlope!=null)hpfSlope=s.hpfSlope;if(s.densityValue!=null)densityValue=s.densityValue;if(s.eqLowGain!=null)eqLowGain=s.eqLowGain;if(s.eqLoMidGain!=null)eqLoMidGain=s.eqLoMidGain;if(s.eqHiMidGain!=null)eqHiMidGain=s.eqHiMidGain;if(s.eqHighGain!=null)eqHighGain=s.eqHighGain;if(s.chorusMix!=null)chorusMix=s.chorusMix;if(s.shimmerVol!=null)shimmerVol=s.shimmerVol;if(s.reverbMix!=null)reverbMix=s.reverbMix;if(s.delayMixVal!=null)delayMixVal=s.delayMixVal;if(s.delaySync!=null)delaySync=s.delaySync;if(s.delaySyncDiv)delaySyncDiv=s.delaySyncDiv;if(s.masterVol!=null)masterVol=s.masterVol;if(s.textureOctUp!=null)textureOctUp=s.textureOctUp;if(s.clickBPM!=null)clickBPM=s.clickBPM;if(Array.isArray(s.enabledEvolveIdx))enabledEvolveIdx=new Set(s.enabledEvolveIdx);if(s.layers)PAD_LAYERS.forEach(l=>{if(s.layers[l.id]!=null)layerState[l.id].volume=s.layers[l.id].volume??0})}catch(e){}}
+function saveSettings(){try{const s={homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,lpfQ,hpfQ,lpfSlope,hpfSlope,densityValue,eqLowGain,eqLoMidGain,eqHiMidGain,eqHighGain,chorusMix,reverbMix,reverbSize,reverbDamp,delayMixVal,delayFeedback,delaySync,delaySyncDiv,shimmerVol,masterVol,textureOctUp,clickBPM,enabledEvolveIdx:[...enabledEvolveIdx],layers:{}};PAD_LAYERS.forEach(l=>{s.layers[l.id]={volume:layerState[l.id].volume}});localStorage.setItem('norcoast_v1',JSON.stringify(s))}catch(e){}}
+function loadSettings(){try{const raw=localStorage.getItem('norcoast_v1');if(!raw)return;const s=JSON.parse(raw);if(s.homeRoot)homeRoot=s.homeRoot;if(s.evolving!=null)evolving=s.evolving;if(s.evolveSpeed!=null)evolveSpeed=s.evolveSpeed;if(s.lpfValue!=null)lpfValue=s.lpfValue;if(s.hpfValue!=null)hpfValue=s.hpfValue;if(s.lpfQ!=null)lpfQ=s.lpfQ;if(s.hpfQ!=null)hpfQ=s.hpfQ;if(s.lpfSlope!=null)lpfSlope=s.lpfSlope;if(s.hpfSlope!=null)hpfSlope=s.hpfSlope;if(s.densityValue!=null)densityValue=s.densityValue;if(s.eqLowGain!=null)eqLowGain=s.eqLowGain;if(s.eqLoMidGain!=null)eqLoMidGain=s.eqLoMidGain;if(s.eqHiMidGain!=null)eqHiMidGain=s.eqHiMidGain;if(s.eqHighGain!=null)eqHighGain=s.eqHighGain;if(s.chorusMix!=null)chorusMix=s.chorusMix;if(s.shimmerVol!=null)shimmerVol=s.shimmerVol;if(s.reverbMix!=null)reverbMix=s.reverbMix;if(s.reverbSize!=null)reverbSize=s.reverbSize;if(s.reverbDamp!=null)reverbDamp=s.reverbDamp;if(s.delayMixVal!=null)delayMixVal=s.delayMixVal;if(s.delayFeedback!=null)delayFeedback=s.delayFeedback;if(s.delaySync!=null)delaySync=s.delaySync;if(s.delaySyncDiv)delaySyncDiv=s.delaySyncDiv;if(s.masterVol!=null)masterVol=s.masterVol;if(s.textureOctUp!=null)textureOctUp=s.textureOctUp;if(s.clickBPM!=null)clickBPM=s.clickBPM;if(Array.isArray(s.enabledEvolveIdx))enabledEvolveIdx=new Set(s.enabledEvolveIdx);if(s.layers)PAD_LAYERS.forEach(l=>{if(s.layers[l.id]!=null)layerState[l.id].volume=s.layers[l.id].volume??0})}catch(e){}}
 let _saveT=null;function queueSave(){clearTimeout(_saveT);_saveT=setTimeout(saveSettings,500)}
 
 // ─── PRESETS ───
 function getPresets(){try{return JSON.parse(localStorage.getItem('norcoast_presets')||'{}')}catch(e){return{}}}
 function captureState(){
-  const s={homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,lpfQ,hpfQ,lpfSlope,hpfSlope,densityValue,eqLowGain,eqLoMidGain,eqHiMidGain,eqHighGain,chorusMix,reverbMix,delayMixVal,delaySync,delaySyncDiv,shimmerVol,masterVol,textureOctUp,clickBPM,enabledEvolveIdx:[...enabledEvolveIdx],layers:{}};
+  const s={homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,lpfQ,hpfQ,lpfSlope,hpfSlope,densityValue,eqLowGain,eqLoMidGain,eqHiMidGain,eqHighGain,chorusMix,reverbMix,reverbSize,reverbDamp,delayMixVal,delayFeedback,delaySync,delaySyncDiv,shimmerVol,masterVol,textureOctUp,clickBPM,enabledEvolveIdx:[...enabledEvolveIdx],layers:{}};
   PAD_LAYERS.forEach(l=>{s.layers[l.id]={volume:layerState[l.id].volume}});return s;
 }
 function savePreset(name){
@@ -870,7 +879,8 @@ function loadPreset(name){
   if(s.homeRoot)homeRoot=s.homeRoot;if(s.evolving!=null)evolving=s.evolving;if(s.evolveSpeed!=null)evolveSpeed=s.evolveSpeed;
   if(s.lpfValue!=null)lpfValue=s.lpfValue;if(s.hpfValue!=null)hpfValue=s.hpfValue;if(s.lpfQ!=null)lpfQ=s.lpfQ;if(s.hpfQ!=null)hpfQ=s.hpfQ;
   if(s.densityValue!=null)densityValue=s.densityValue;if(s.eqLowGain!=null)eqLowGain=s.eqLowGain;if(s.eqLoMidGain!=null)eqLoMidGain=s.eqLoMidGain;if(s.eqHiMidGain!=null)eqHiMidGain=s.eqHiMidGain;if(s.eqHighGain!=null)eqHighGain=s.eqHighGain;if(s.chorusMix!=null)chorusMix=s.chorusMix;
-  if(s.reverbMix!=null)reverbMix=s.reverbMix;if(s.delayMixVal!=null)delayMixVal=s.delayMixVal;if(s.shimmerVol!=null)shimmerVol=s.shimmerVol;
+  if(s.reverbMix!=null)reverbMix=s.reverbMix;if(s.reverbSize!=null)reverbSize=s.reverbSize;if(s.reverbDamp!=null)reverbDamp=s.reverbDamp;
+  if(s.delayMixVal!=null)delayMixVal=s.delayMixVal;if(s.delayFeedback!=null)delayFeedback=s.delayFeedback;if(s.shimmerVol!=null)shimmerVol=s.shimmerVol;
   if(s.delaySync!=null)delaySync=s.delaySync;if(s.delaySyncDiv)delaySyncDiv=s.delaySyncDiv;
   if(s.masterVol!=null)masterVol=s.masterVol;if(s.textureOctUp!=null)textureOctUp=s.textureOctUp;
   if(s.clickBPM!=null){clickBPM=s.clickBPM;if(clickActive){stopClick();startClick()}}
@@ -881,7 +891,9 @@ function loadPreset(name){
   if(globalHPF){globalHPF.frequency.value=hpfFaderToHz(hpfValue);globalHPF.Q.value=hpfQ}
   if(eqLowNode)eqLowNode.gain.value=eqLowGain;if(eqLoMidNode)eqLoMidNode.gain.value=eqLoMidGain;if(eqHiMidNode)eqHiMidNode.gain.value=eqHiMidGain;if(eqHighNode)eqHighNode.gain.value=eqHighGain;if(chorusGainNode)chorusGainNode.gain.value=chorusMix*0.8;
   if(reverbGain){reverbGain.gain.value=reverbMix;dryGain.gain.value=1-reverbMix*0.35}
-  if(delayGainN)delayGainN.gain.value=delayMixVal;applyDelaySync();if(master)master.gain.value=masterVol;
+  if(reverb&&reverb.fbGain)reverb.fbGain.gain.value=reverbSize;
+  if(reverb&&reverb.damp){reverb.damp.frequency.value=reverbDamp;reverb.damp2.frequency.value=reverbDamp*1.25}
+  if(delayGainN)delayGainN.gain.value=delayMixVal;if(delayFB)delayFB.gain.value=delayFeedback;applyDelaySync();if(master)master.gain.value=masterVol;
   // Restart layers
   PAD_LAYERS.forEach(l=>{if(l.type!=="granular")startPad(l,layerState[l.id].volume,homeRoot,currentEvolve)});
   if(layerState.texture&&layerState.texture.volume>0)startGranular(layerState.texture.volume);else stopGranular();
