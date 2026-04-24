@@ -147,9 +147,7 @@ const PAD_LAYERS=[
     timbres:[{wave:"lush",count:6,ds:10,gain:0.032,pan:0.6},{wave:"warm",count:4,ds:7,gain:0.025,pan:0.4},{wave:"choir",count:3,ds:14,gain:0.015,pan:0.75}],
     fBase:1200,fMod:400,fRate:0.055,aMod:0.1,aRate:0.08,octaves:[0,1]},
   {id:"texture",name:"Texture",color:"#a08060",type:"granular"},
-  {id:"shimmer",name:"Shimmer",color:"#d46b8a",type:"synth",
-    timbres:[{wave:"glass",count:6,ds:8,gain:0.018,pan:0.9},{wave:"choir",count:4,ds:12,gain:0.012,pan:0.85},{wave:"lush",count:2,ds:15,gain:0.006,pan:0.7}],
-    fBase:4000,fMod:1500,fRate:0.025,aMod:0.2,aRate:0.04,octaves:[1,2]},
+  {id:"shimmer",name:"Shimmer",color:"#d46b8a",type:"shimmer"},
 ];
 
 const ATTACK=4,RELEASE=5,XFADE=3,ROOT_OCT=3,DELAY_Q=60/70;
@@ -159,16 +157,18 @@ let ctx,waves,master,reverb,reverbGain,dryGain,delayNode,delayGainN,delayFB,anal
 let globalLPF,globalHPF;
 let dulcimerBuf=null; // decoded audio buffer
 let homeRoot="C",evolving=true,evolveSpeed=0.5,currentEvolve=0;
-let lpfValue=0.7,hpfValue=0;
+let lpfValue=0.7,hpfValue=0,densityValue=0.5;
 let reverbMix=0.6,delayMixVal=0.1,masterVol=0.65;
 let textureOctUp=true;
 let staticNodes={},evolveNodes={},layerState={};
+let shimmerActive=false,shimmerGainNode=null,shimmerTimer=null;
 let granularTimers=[],granularGain=null,reversedBuf=null;
 let evolveTimer=null,animFrame=null;
 let audioPaused=false;
 let enabledEvolveIdx=new Set([0,1,2,3]);
 
-PAD_LAYERS.forEach(l=>{layerState[l.id]={active:true,volume:0}});
+const DEFAULT_VOLUMES={foundation:0.55,pads:0.45,texture:0.3,shimmer:0};
+PAD_LAYERS.forEach(l=>{layerState[l.id]={active:true,volume:DEFAULT_VOLUMES[l.id]??0}});
 loadSettings();
 
 // ─── WAVETABLES ───
@@ -367,7 +367,7 @@ function buildGroup(def,freqs,vol,atk){
   const aG=ctx.createGain();aG.gain.value=def.aMod*vol;
   aL.connect(aG);aG.connect(gG.gain);aL.start();
   const oscs=[],lfos=[fL,aL];
-  freqs.forEach((bf,ni)=>{def.octaves.forEach(oo=>{const f=bf*Math.pow(2,oo);def.timbres.forEach(tb=>{const w=waves[tb.wave];for(let vi=0;vi<tb.count;vi++){const t=tb.count>1?(vi/(tb.count-1))*2-1:0;const o=ctx.createOscillator();o.setPeriodicWave(w);o.frequency.value=f;o.detune.value=t*tb.ds;const vg=ctx.createGain();vg.gain.value=tb.gain;const pn=ctx.createStereoPanner();pn.pan.value=t*tb.pan*(ni%2===0?1:-1);const lfo=ctx.createOscillator();lfo.type="sine";lfo.frequency.value=0.01+Math.random()*0.05;const lg=ctx.createGain();lg.gain.value=1+Math.random()*3;lfo.connect(lg);lg.connect(o.detune);lfo.start();lfos.push(lfo);const h=ctx.createDelay(0.01);h.delayTime.value=Math.random()*0.004;o.connect(vg);vg.connect(pn);pn.connect(h);h.connect(flt);o.start();oscs.push(o)}})})});
+  freqs.forEach((bf,ni)=>{def.octaves.forEach(oo=>{const f=bf*Math.pow(2,oo);def.timbres.forEach(tb=>{const w=waves[tb.wave];for(let vi=0;vi<tb.count;vi++){const t=tb.count>1?(vi/(tb.count-1))*2-1:0;const o=ctx.createOscillator();o.setPeriodicWave(w);o.frequency.value=f;o.detune.value=t*tb.ds*(0.4+densityValue*1.2);const vg=ctx.createGain();vg.gain.value=tb.gain;const pn=ctx.createStereoPanner();pn.pan.value=t*tb.pan*(ni%2===0?1:-1);const lfo=ctx.createOscillator();lfo.type="sine";lfo.frequency.value=0.01+Math.random()*0.05;const lg=ctx.createGain();lg.gain.value=1+Math.random()*3;lfo.connect(lg);lg.connect(o.detune);lfo.start();lfos.push(lfo);const h=ctx.createDelay(0.01);h.delayTime.value=Math.random()*0.004;o.connect(vg);vg.connect(pn);pn.connect(h);h.connect(flt);o.start();oscs.push(o)}})})});
   flt.connect(gG);gG.connect(master);
   return{oscs,lfos,gain:gG,filter:flt,filterLG:fG};
 }
@@ -382,8 +382,43 @@ function fadeOut(nodes,time){
 function getStaticFreqs(root,def){const r=noteFreq(root,ROOT_OCT);return def.rootOnly?[r]:[r,semiFreq(r,7)]}
 function getEvolveFreq(root,ei){return[semiFreq(noteFreq(root,ROOT_OCT),EVOLVE_INTERVALS[ei].semi)]}
 
+function startShimmer(vol){
+  shimmerActive=true;
+  if(shimmerGainNode){shimmerGainNode.gain.linearRampToValueAtTime(vol,ctx.currentTime+0.5);return}
+  shimmerGainNode=ctx.createGain();shimmerGainNode.gain.setValueAtTime(0,ctx.currentTime);
+  shimmerGainNode.gain.linearRampToValueAtTime(vol,ctx.currentTime+ATTACK);
+  shimmerGainNode.connect(master);
+  function grain(){
+    if(!shimmerActive||!shimmerGainNode)return;
+    const root=noteFreq(homeRoot,ROOT_OCT);
+    const octMult=[4,5,6,8][Math.random()*4|0];
+    const base=root*octMult;
+    const f=Math.random()<0.45?base*Math.pow(2,EVOLVE_INTERVALS[currentEvolve].semi/12):base;
+    const w=Math.random()<0.6?'glass':'lush';
+    const osc=ctx.createOscillator();osc.setPeriodicWave(waves[w]);
+    osc.frequency.value=Math.min(f,ctx.sampleRate*0.45);
+    osc.detune.value=(Math.random()-0.5)*25;
+    const env=ctx.createGain();const now=ctx.currentTime;
+    const atk=0.15+Math.random()*0.35,peak=0.035+Math.random()*0.045,rel=1.2+Math.random()*2;
+    env.gain.setValueAtTime(0,now);env.gain.linearRampToValueAtTime(peak,now+atk);
+    env.gain.exponentialRampToValueAtTime(0.001,now+atk+rel);
+    osc.connect(env);env.connect(shimmerGainNode);osc.start(now);osc.stop(now+atk+rel+0.1);
+    shimmerTimer=setTimeout(grain,(0.18+Math.random()*0.42)*1000);
+  }
+  grain();
+}
+function stopShimmer(){
+  shimmerActive=false;
+  if(shimmerTimer){clearTimeout(shimmerTimer);shimmerTimer=null}
+  if(shimmerGainNode){
+    const n=shimmerGainNode;n.gain.linearRampToValueAtTime(0,ctx.currentTime+RELEASE);
+    setTimeout(()=>{try{n.disconnect()}catch(e){}},RELEASE*1000+500);shimmerGainNode=null;
+  }
+}
+
 function startPad(def,vol,root,ei){
   if(def.type==="granular"){startGranular(vol);return}
+  if(def.type==="shimmer"){startShimmer(vol);return}
   fadeOut(staticNodes[def.id],XFADE);fadeOut(evolveNodes[def.id],XFADE);
   staticNodes[def.id]=buildGroup(def,getStaticFreqs(root,def),vol,ATTACK);
   if(!def.rootOnly)evolveNodes[def.id]=buildGroup(def,getEvolveFreq(root,ei),vol,ATTACK);
@@ -391,6 +426,7 @@ function startPad(def,vol,root,ei){
 function stopPad(id){
   const def=PAD_LAYERS.find(l=>l.id===id);
   if(def&&def.type==="granular"){stopGranular();return}
+  if(def&&def.type==="shimmer"){stopShimmer();return}
   fadeOut(staticNodes[id],RELEASE);fadeOut(evolveNodes[id],RELEASE);
   delete staticNodes[id];delete evolveNodes[id];
 }
@@ -399,6 +435,7 @@ function evolveVoice(ei){
   const ef=getEvolveFreq(homeRoot,ei);
   PAD_LAYERS.forEach(l=>{
     if(l.type==="granular"){updateGranularPitch();return}
+    if(l.type==="shimmer")return;
     if(layerState[l.id].active&&layerState[l.id].volume>0&&!l.rootOnly){
       fadeOut(evolveNodes[l.id],XFADE);
       evolveNodes[l.id]=buildGroup(l,ef,layerState[l.id].volume,XFADE);
@@ -462,7 +499,11 @@ function buildKeys(){
       }
       homeRoot=n;document.getElementById('stateRoot').textContent=n;
       row.querySelectorAll('.key-btn').forEach(b=>b.classList.remove('active','paused'));btn.classList.add('active');
-      PAD_LAYERS.forEach(l=>{if(layerState[l.id].active&&layerState[l.id].volume>0)startPad(l,layerState[l.id].volume,homeRoot,currentEvolve)});
+      PAD_LAYERS.forEach(l=>{
+        if(!layerState[l.id].active||layerState[l.id].volume<=0)return;
+        if(l.type==="shimmer")return; // shimmer follows currentEvolve globally
+        startPad(l,layerState[l.id].volume,homeRoot,currentEvolve);
+      });
       saveSettings();
     };
     row.appendChild(btn);
@@ -483,10 +524,12 @@ function toggleLayer(id){
   if(st.volume>0){
     st._prevVol=st.volume;st.volume=0;
     if(l.type==="granular"){stopGranular();if(granularGain)granularGain.gain.linearRampToValueAtTime(0,ctx.currentTime+0.5)}
+    else if(l.type==="shimmer"){stopShimmer()}
     else{const t=ctx.currentTime+0.15;if(staticNodes[id])staticNodes[id].gain.gain.linearRampToValueAtTime(0,t);if(evolveNodes[id])evolveNodes[id].gain.gain.linearRampToValueAtTime(0,t)}
   }else{
     st.volume=st._prevVol||0.5;
     if(l.type==="granular")startGranular(st.volume);
+    else if(l.type==="shimmer")startShimmer(st.volume);
     else if(!staticNodes[id])startPad(l,st.volume,homeRoot,currentEvolve);
     else{const t=ctx.currentTime+0.5;if(staticNodes[id])staticNodes[id].gain.gain.linearRampToValueAtTime(st.volume,t);if(evolveNodes[id])evolveNodes[id].gain.gain.linearRampToValueAtTime(st.volume,t)}
   }
@@ -535,6 +578,7 @@ function buildEditSheet(){
     h+='<input type="range" min="0" max="1" step="0.003" value="'+fPos+'" data-lid="'+l.id+'" style="background:linear-gradient(to right,'+l.color+'55 '+fPos*100+'%,rgba(255,255,255,0.06) '+fPos*100+'%);accent-color:'+l.color+'">';
     h+='</div>';
   });
+  h+=sliderRowHTML('den','Density','#7ab8d8',densityValue,Math.round(densityValue*100)+'%');
   h+='</div><div class="edit-divider"></div>';
   // ── FX ──
   h+='<div class="edit-section"><div class="edit-title">Effects</div>';
@@ -560,6 +604,7 @@ function buildEditSheet(){
       layerState[l.id].volume=vol;queueSave();
       inp.style.background='linear-gradient(to right,'+l.color+'55 '+raw*100+'%,rgba(255,255,255,0.06) '+raw*100+'%)';
       if(l.type==="granular"){if(vol>0&&wasZero)startGranular(vol);else if(vol<=0)stopGranular();else if(granularGain)granularGain.gain.linearRampToValueAtTime(vol*0.8,ctx.currentTime+0.1)}
+      else if(l.type==="shimmer"){if(vol>0&&wasZero)startShimmer(vol);else if(vol<=0)stopShimmer();else if(shimmerGainNode)shimmerGainNode.gain.linearRampToValueAtTime(vol,ctx.currentTime+0.1)}
       else{if(vol>0&&wasZero&&!staticNodes[l.id])startPad(l,vol,homeRoot,currentEvolve);else{const t=ctx.currentTime+0.08;if(staticNodes[l.id])staticNodes[l.id].gain.gain.linearRampToValueAtTime(vol,t);if(evolveNodes[l.id])evolveNodes[l.id].gain.gain.linearRampToValueAtTime(vol,t)}}
       const row=inp.closest('.edit-layer'),on=vol>0;
       const db=row.querySelector('.layer-dot-btn');db.style.borderColor=on?l.color+'55':'rgba(255,255,255,0.1)';db.style.background=on?l.color+'15':'transparent';
@@ -572,6 +617,7 @@ function buildEditSheet(){
   wireSR(c,'dly',r=>{delayMixVal=faderToVol(r);delayGainN.gain.value=delayMixVal;return Math.round(delayMixVal*100)+'%'});
   wireSR(c,'lpf',r=>{lpfValue=r;const hz=lpfFaderToHz(r);globalLPF.frequency.linearRampToValueAtTime(hz,ctx.currentTime+0.1);return formatHz(hz)});
   wireSR(c,'hpf',r=>{hpfValue=r;const hz=hpfFaderToHz(r);globalHPF.frequency.linearRampToValueAtTime(hz,ctx.currentTime+0.1);return formatHz(hz)});
+  wireSR(c,'den',r=>{densityValue=r;queueSave();PAD_LAYERS.forEach(l=>{if(l.type==="synth"&&layerState[l.id].volume>0)startPad(l,layerState[l.id].volume,homeRoot,currentEvolve)});return Math.round(r*100)+'%'});
   wireSR(c,'spd',r=>{evolveSpeed=faderToVol(r);return Math.round(evolveSpeed*100)+'%'});
   wireSR(c,'mst',r=>{masterVol=faderToVol(r);master.gain.linearRampToValueAtTime(masterVol,ctx.currentTime+0.1);return Math.round(masterVol*100)+'%'});
 }
@@ -599,8 +645,8 @@ function startVis(){
 
 function toggleEvolving(){evolving=!evolving;const btn=document.getElementById('evolveBtn');btn.className='evolve-pill '+(evolving?'on':'off');btn.textContent=evolving?'Evolving':'Static';saveSettings();if(evolving)scheduleEvolve()}
 
-function saveSettings(){try{const s={homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,reverbMix,delayMixVal,masterVol,textureOctUp,enabledEvolveIdx:[...enabledEvolveIdx],layers:{}};PAD_LAYERS.forEach(l=>{s.layers[l.id]={volume:layerState[l.id].volume}});localStorage.setItem('norcoast_v1',JSON.stringify(s))}catch(e){}}
-function loadSettings(){try{const raw=localStorage.getItem('norcoast_v1');if(!raw)return;const s=JSON.parse(raw);if(s.homeRoot)homeRoot=s.homeRoot;if(s.evolving!=null)evolving=s.evolving;if(s.evolveSpeed!=null)evolveSpeed=s.evolveSpeed;if(s.lpfValue!=null)lpfValue=s.lpfValue;if(s.hpfValue!=null)hpfValue=s.hpfValue;if(s.reverbMix!=null)reverbMix=s.reverbMix;if(s.delayMixVal!=null)delayMixVal=s.delayMixVal;if(s.masterVol!=null)masterVol=s.masterVol;if(s.textureOctUp!=null)textureOctUp=s.textureOctUp;if(Array.isArray(s.enabledEvolveIdx))enabledEvolveIdx=new Set(s.enabledEvolveIdx);if(s.layers)PAD_LAYERS.forEach(l=>{if(s.layers[l.id]!=null)layerState[l.id].volume=s.layers[l.id].volume??0})}catch(e){}}
+function saveSettings(){try{const s={homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,densityValue,reverbMix,delayMixVal,masterVol,textureOctUp,enabledEvolveIdx:[...enabledEvolveIdx],layers:{}};PAD_LAYERS.forEach(l=>{s.layers[l.id]={volume:layerState[l.id].volume}});localStorage.setItem('norcoast_v1',JSON.stringify(s))}catch(e){}}
+function loadSettings(){try{const raw=localStorage.getItem('norcoast_v1');if(!raw)return;const s=JSON.parse(raw);if(s.homeRoot)homeRoot=s.homeRoot;if(s.evolving!=null)evolving=s.evolving;if(s.evolveSpeed!=null)evolveSpeed=s.evolveSpeed;if(s.lpfValue!=null)lpfValue=s.lpfValue;if(s.hpfValue!=null)hpfValue=s.hpfValue;if(s.densityValue!=null)densityValue=s.densityValue;if(s.reverbMix!=null)reverbMix=s.reverbMix;if(s.delayMixVal!=null)delayMixVal=s.delayMixVal;if(s.masterVol!=null)masterVol=s.masterVol;if(s.textureOctUp!=null)textureOctUp=s.textureOctUp;if(Array.isArray(s.enabledEvolveIdx))enabledEvolveIdx=new Set(s.enabledEvolveIdx);if(s.layers)PAD_LAYERS.forEach(l=>{if(s.layers[l.id]!=null)layerState[l.id].volume=s.layers[l.id].volume??0})}catch(e){}}
 let _saveT=null;function queueSave(){clearTimeout(_saveT);_saveT=setTimeout(saveSettings,500)}
 
 // ─── START ───
@@ -613,8 +659,11 @@ async function initAndStart(){
   await decodeSample();
 
   // Start pads at saved (or default 0) volumes
-  PAD_LAYERS.forEach(l=>{if(l.type!=="granular")startPad(l,layerState[l.id].volume,homeRoot,currentEvolve)});
-  if(layerState.texture.volume>0)startGranular(layerState.texture.volume);
+  PAD_LAYERS.forEach(l=>{
+    if(l.type==="granular"){if(layerState[l.id].volume>0)startGranular(layerState[l.id].volume);return}
+    if(l.type==="shimmer"){if(layerState[l.id].volume>0)startShimmer(layerState[l.id].volume);return}
+    startPad(l,layerState[l.id].volume,homeRoot,currentEvolve);
+  });
   // Resume AudioContext when returning from background
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&ctx&&ctx.state==='suspended'&&!audioPaused)ctx.resume()});
   window.addEventListener('focus',()=>{if(ctx&&ctx.state==='suspended'&&!audioPaused)ctx.resume()});
