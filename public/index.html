@@ -16,7 +16,7 @@
   html,body{height:100%;overflow:hidden;background:#060810}
   body{font-family:'Open Sans',sans-serif;color:#fff;-webkit-tap-highlight-color:transparent;-webkit-font-smoothing:antialiased;user-select:none;-webkit-user-select:none}
   /* ── Performance layout ── */
-  #perf{position:fixed;inset:0;display:flex;flex-direction:column;background:linear-gradient(160deg,#0b0e18,#111624 40%,#0d1016);padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}  .bpm-tap-main{display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(196,145,94,0.1);border:1px solid rgba(196,145,94,0.3);border-radius:10px;padding:5px 12px;cursor:pointer;color:rgba(196,145,94,0.9);transition:background 0.1s,border-color 0.1s;gap:0;min-width:56px}
+  #perf{position:fixed;inset:0;display:flex;flex-direction:column;background:linear-gradient(160deg,#0b0e18,#111624 40%,#0d1016);padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}  .bpm-tap-main{display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(196,145,94,0.1);border:1px solid rgba(196,145,94,0.3);border-radius:10px;padding:5px 12px;cursor:pointer;color:rgba(196,145,94,0.9);transition:background 0.1s,border-color 0.1s;gap:0;min-width:56px;touch-action:manipulation;-webkit-user-select:none;user-select:none}
   .bpm-tap-main:active{background:rgba(196,145,94,0.22);border-color:rgba(196,145,94,0.6)}
   .bpm-tap-main #bpmDisplay{font-size:18px;font-weight:700;font-family:'Open Sans',sans-serif;line-height:1}
   .bpm-tap-label{font-size:9px;letter-spacing:1px;opacity:0.7;margin-top:1px}
@@ -132,7 +132,7 @@
   .bpm-label{font-size:12px;color:rgba(255,255,255,0.4);min-width:36px}
   .bpm-input{width:64px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:8px 10px;color:rgba(255,255,255,0.85);font-size:15px;font-family:'Open Sans',sans-serif;text-align:center;outline:none}
   .bpm-nudge{padding:8px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.5);font-size:14px;cursor:pointer}
-  .bpm-tap{flex:1;padding:8px 0;border-radius:8px;border:1px solid rgba(196,145,94,0.25);background:rgba(196,145,94,0.06);color:rgba(196,145,94,0.65);font-size:11px;letter-spacing:1.5px;cursor:pointer;transition:background 0.1s}
+  .bpm-tap{flex:1;padding:8px 0;border-radius:8px;border:1px solid rgba(196,145,94,0.25);background:rgba(196,145,94,0.06);color:rgba(196,145,94,0.65);font-size:11px;letter-spacing:1.5px;cursor:pointer;transition:background 0.1s;touch-action:manipulation}
   .bpm-tap:active{background:rgba(196,145,94,0.2)}
 </style>
 </head>
@@ -150,7 +150,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v0.35</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v0.36</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -187,7 +187,7 @@
       <button class="bpm-tap-main" id="bpmTapMain" onclick="tapTempo()" title="Tap for BPM"><span id="bpmDisplay">70</span><span class="bpm-tap-label">BPM</span></button>
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
     </div>
-    <div class="app-version">v0.35</div>
+    <div class="app-version">v0.36</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -564,9 +564,9 @@ async function initAudio(){
   clickOutBus=ctx.createGain();clickOutBus.gain.value=1;
   analyser.connect(limiter);limiter.connect(ctx.destination);
   clickOutBus.connect(ctx.destination);
-  // Dedicated arp reverb send — bypasses global dry/wet so arp is always drenched
-  arpRevSend=ctx.createGain();arpRevSend.gain.value=0.65;
-  arpRevSend.connect(reverb.input);
+  // Arp reverb send — enters filter chain so HPF/LPF affect it correctly
+  arpRevSend=ctx.createGain();arpRevSend.gain.value=0.42;
+  arpRevSend.connect(globalHPF);
 }
 
 // ─── SYNTH VOICE BUILDER ───
@@ -629,7 +629,7 @@ function startShimmer(vol){
   shimmerGainNode=shimmerNode.output;
   shimmerGainNode.gain.cancelScheduledValues(ctx.currentTime);
   shimmerGainNode.gain.setValueAtTime(shimmerGainNode.gain.value,ctx.currentTime);
-  shimmerGainNode.gain.linearRampToValueAtTime(vol*0.7,ctx.currentTime+ATTACK*2);
+  shimmerGainNode.gain.linearRampToValueAtTime(vol*0.28,ctx.currentTime+ATTACK*2);
 }
 function stopShimmer(){
   shimmerActive=false;
@@ -700,7 +700,7 @@ function clearPendingChord(){
 }
 
 // ─── ARPEGGIATOR ───
-function _arpBarSec(){return clickActive?(60/clickBPM*4):4.2;}
+function _arpBarSec(){return 60/clickBPM*4;}
 function fireArpNote(){
   if(!ctx||!waves||arpVol<=0)return;
   const semis=CHORD_TYPES[currentEvolve].semis;
@@ -1057,7 +1057,7 @@ function buildEditSheet(){
   wireSR(c,'dlyFB',r=>{delayFeedback=r*0.85;if(delayFB)delayFB.gain.linearRampToValueAtTime(delayFeedback,ctx.currentTime+0.1);return Math.round(r*100)+'%'});
   wireSR(c,'dlyT',r=>{delayTimeVal=0.05*Math.pow(2.0/0.05,r);if(delayNode&&!delaySync)delayNode.delayTime.linearRampToValueAtTime(delayTimeVal,ctx.currentTime+0.1);return Math.round(delayTimeVal*1000)+'ms'});
   wireSR(c,'dlyTone',r=>{delayTone=r;if(dToneNode)dToneNode.gain.linearRampToValueAtTime((r-0.5)*24,ctx.currentTime+0.05);return r<0.42?'Dark':r>0.58?'Bright':'Neutral'});
-  wireSR(c,'shm',r=>{const was=shimmerVol;shimmerVol=r;if(r>0&&was===0)startShimmer(r);else if(r<=0)stopShimmer();else if(shimmerNode){shimmerNode.output.gain.cancelScheduledValues(ctx.currentTime);shimmerNode.output.gain.setValueAtTime(shimmerNode.output.gain.value,ctx.currentTime);shimmerNode.output.gain.linearRampToValueAtTime(r,ctx.currentTime+0.15);}return Math.round(r*100)+'%'});
+  wireSR(c,'shm',r=>{const was=shimmerVol;shimmerVol=r;if(r>0&&was===0)startShimmer(r);else if(r<=0)stopShimmer();else if(shimmerNode){shimmerNode.output.gain.cancelScheduledValues(ctx.currentTime);shimmerNode.output.gain.setValueAtTime(shimmerNode.output.gain.value,ctx.currentTime);shimmerNode.output.gain.linearRampToValueAtTime(r*0.28,ctx.currentTime+0.15);}return Math.round(r*100)+'%'});
   wireSR(c,'wid',r=>{widthMod=r;if(widthLFOGain)widthLFOGain.gain.linearRampToValueAtTime(r*0.5,ctx.currentTime+0.1);return Math.round(r*100)+'%'});
   wireSR(c,'chr',r=>{chorusMix=r;if(chorusGainNode)chorusGainNode.gain.linearRampToValueAtTime(r*0.5,ctx.currentTime+0.1);return Math.round(r*100)+'%'});
   // Wire Tone sliders
@@ -1303,7 +1303,7 @@ function startClick(){
   if(clickActive)return;clickActive=true;clickBeat=0;
   clickNextTime=ctx.currentTime+0.05;scheduleClicks();
 }
-function stopClick(){clickActive=false;if(clickSchedId){clearTimeout(clickSchedId);clickSchedId=null}}
+function stopClick(){clickActive=false;if(clickSchedId){clearTimeout(clickSchedId);clickSchedId=null}if(arpVol>0)scheduleArp();}
 function scheduleClicks(){
   if(!clickActive)return;const now=ctx.currentTime;
   while(clickNextTime<now+0.12){fireClick(clickNextTime);clickNextTime+=60/clickBPM}
@@ -1481,7 +1481,7 @@ function applyMidiParam(id,val){
     case'dlyT':delayTimeVal=0.05*Math.pow(2.0/0.05,val);if(delayNode&&!delaySync)delayNode.delayTime.linearRampToValueAtTime(delayTimeVal,ctx.currentTime+0.1);break;
     case'dlyTone':delayTone=val;if(dToneNode)dToneNode.gain.linearRampToValueAtTime((val-0.5)*24,ctx.currentTime+0.05);break;
     case'chr':chorusMix=val;if(chorusGainNode)chorusGainNode.gain.linearRampToValueAtTime(val*0.5,ctx.currentTime+0.1);break;
-    case'shm':{const sv=faderToVol(val),wasS=shimmerVol;shimmerVol=sv;if(sv>0&&wasS===0)startShimmer(sv);else if(sv<=0)stopShimmer();else if(shimmerNode)shimmerNode.output.gain.linearRampToValueAtTime(sv*0.7,ctx.currentTime+0.1);break}
+    case'shm':{const sv=faderToVol(val),wasS=shimmerVol;shimmerVol=sv;if(sv>0&&wasS===0)startShimmer(sv);else if(sv<=0)stopShimmer();else if(shimmerNode)shimmerNode.output.gain.linearRampToValueAtTime(sv*0.28,ctx.currentTime+0.1);break}
     case'lpf':lpfValue=val;{const hz=lpfFaderToHz(val);if(globalLPF){globalLPF.frequency.linearRampToValueAtTime(hz,ctx.currentTime+0.1);if(globalLPF2&&lpfSlope===24)globalLPF2.frequency.linearRampToValueAtTime(hz,ctx.currentTime+0.1)}}break;
     case'hpf':hpfValue=val;{const hz=hpfFaderToHz(val);if(globalHPF){globalHPF.frequency.linearRampToValueAtTime(hz,ctx.currentTime+0.1);if(globalHPF2&&hpfSlope===24)globalHPF2.frequency.linearRampToValueAtTime(hz,ctx.currentTime+0.1)}}break;
     case'spd':evolveSpeed=faderToVol(val);break;
@@ -1511,7 +1511,7 @@ function handleMIDI(msg){
       21:r=>{lpfValue=r;if(globalLPF){globalLPF.frequency.linearRampToValueAtTime(lpfFaderToHz(r),ctx.currentTime+0.05);if(globalLPF2&&lpfSlope===24)globalLPF2.frequency.linearRampToValueAtTime(lpfFaderToHz(r),ctx.currentTime+0.05)}},
       22:r=>{hpfValue=r;if(globalHPF){globalHPF.frequency.linearRampToValueAtTime(hpfFaderToHz(r),ctx.currentTime+0.05);if(globalHPF2&&hpfSlope===24)globalHPF2.frequency.linearRampToValueAtTime(hpfFaderToHz(r),ctx.currentTime+0.05)}},
       23:r=>{delayMixVal=r;if(delayGainN)delayGainN.gain.value=r*0.7},
-      24:r=>{const was=shimmerVol;shimmerVol=r;if(r>0&&was===0)startShimmer(r);else if(r<=0)stopShimmer();else if(shimmerNode){shimmerNode.output.gain.cancelScheduledValues(ctx.currentTime);shimmerNode.output.gain.setValueAtTime(shimmerNode.output.gain.value,ctx.currentTime);shimmerNode.output.gain.linearRampToValueAtTime(r,ctx.currentTime+0.15)}},
+      24:r=>{const was=shimmerVol;shimmerVol=r;if(r>0&&was===0)startShimmer(r);else if(r<=0)stopShimmer();else if(shimmerNode){shimmerNode.output.gain.cancelScheduledValues(ctx.currentTime);shimmerNode.output.gain.setValueAtTime(shimmerNode.output.gain.value,ctx.currentTime);shimmerNode.output.gain.linearRampToValueAtTime(r*0.28,ctx.currentTime+0.15)}},
       25:r=>{densityValue=r},
       26:r=>{chorusMix=faderToVol(r);if(chorusGainNode)chorusGainNode.gain.linearRampToValueAtTime(chorusMix*0.5,ctx.currentTime+0.05)},
       27:r=>{reverbSize=reverbSizeToFB(r);if(reverb&&reverb.fbGain)reverb.fbGain.gain.linearRampToValueAtTime(reverbSize,ctx.currentTime+0.1)},
