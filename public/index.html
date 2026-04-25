@@ -150,7 +150,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v0.25</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v0.28</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -187,7 +187,7 @@
       <button class="bpm-tap-main" id="bpmTapMain" onclick="tapTempo()" title="Tap for BPM"><span id="bpmDisplay">70</span><span class="bpm-tap-label">BPM</span></button>
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
     </div>
-    <div class="app-version">v0.27</div>
+    <div class="app-version">v0.28</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -1138,7 +1138,7 @@ function fireClick(t){
       },delay);
     }
     // When click is on, deterministically queue the next chord for the next downbeat
-    if(pendingEvolve<0){
+    else if(pendingEvolve<0){
       const cur=currentEvolve;
       const cands=CHORD_TYPES.map((_,i)=>i).filter(i=>i!==cur&&enabledEvolveIdx.has(i));
       if(cands.length){
