@@ -150,7 +150,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v0.24</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v0.25</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -188,7 +188,7 @@
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
     </div>
     <button id="midiBtn" class="evolve-pill off" onclick="initMIDI()" title="Enable MIDI">MIDI</button>
-    <div class="app-version">v0.24</div>
+    <div class="app-version">v0.25</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -1237,15 +1237,23 @@ function initPresetDrag(container){
 
 function updatePerfSetlist(){
   const el=document.getElementById('perfSetlist');if(!el)return;
+  el.innerHTML='';
   const ps=getPresets();const keys=Object.keys(ps);
-  if(keys.length===0){el.innerHTML='';return;}
-  el.innerHTML=keys.map(n=>{
-    const pd=ps[n];const ns=n.replace(/'/g,"\\'");
+  if(!keys.length){
+    el.innerHTML='<div class="setlist-empty">Save sounds in the menu ↗ to build your setlist</div>';
+    return;
+  }
+  keys.forEach(n=>{
+    const pd=ps[n];
     const active=(pd.homeRoot===homeRoot&&JSON.stringify([...enabledEvolveIdx])===JSON.stringify(pd.enabledEvolveIdx||[]));
     const cn=pd.enabledEvolveIdx&&pd.enabledEvolveIdx.length>0?CHORD_TYPES[pd.enabledEvolveIdx[0]]?.name:'';
     const meta=[pd.homeRoot||'',cn,pd.clickBPM?pd.clickBPM+' bpm':''].filter(Boolean).join(' · ');
-    return '<button class="setlist-item'+(active?' active':'')+'" onclick="loadPreset(\''+ns+'\');updatePerfSetlist()"><div class="setlist-item-name">'+n+'</div>'+(meta?'<div class="setlist-item-meta">'+meta+'</div>':'')+'</button>';
-  }).join('');
+    const btn=document.createElement('button');
+    btn.className='setlist-item'+(active?' active':'');
+    btn.innerHTML='<div class="setlist-item-name">'+n+'</div>'+(meta?'<div class="setlist-item-meta">'+meta+'</div>':'');
+    btn.addEventListener('click',()=>{loadPreset(n);updatePerfSetlist();});
+    el.appendChild(btn);
+  });
 }
 // ─── MIDI ───
 let midiReady=false,midiLearnMode=false,midiLearnPending=null,midiMappings={};
