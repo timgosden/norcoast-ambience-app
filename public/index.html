@@ -150,7 +150,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v0.31</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v0.32</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -187,7 +187,7 @@
       <button class="bpm-tap-main" id="bpmTapMain" onclick="tapTempo()" title="Tap for BPM"><span id="bpmDisplay">70</span><span class="bpm-tap-label">BPM</span></button>
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
     </div>
-    <div class="app-version">v0.31</div>
+    <div class="app-version">v0.32</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -260,6 +260,8 @@ let reverbMix=0.6,reverbSize=0.78,reverbMod=0.5,delayMixVal=0.1,delayFeedback=0.
 let textureOctUp=true,foundationSubOct=false;
 let widthMod=0;
 let arpVol=0,arpRate=2,arpStep=0,arpTimer=null;
+let limiter=null,clickOutBus=null;
+let multiOutActive=false,_multiOutMerger=null,_multiOutSplitter=null;
 let staticNodes={},evolveNodes={},layerState={};
 let shimmerActive=false,shimmerGainNode=null,shimmerTimer=null,shimmerVol=0;
 let granularTimers={},granularGain=null,reversedBuf=null;
@@ -516,10 +518,12 @@ async function initAudio(){
   // EQ at the very end
   _sumBus.connect(eqLowNode);eqLowNode.connect(eqLoMidNode);eqLoMidNode.connect(eqHiMidNode);eqHiMidNode.connect(eqHighNode);eqHighNode.connect(analyser);
   applyDelaySync();
-  const limiter=ctx.createDynamicsCompressor();
+  limiter=ctx.createDynamicsCompressor();
   limiter.threshold.value=-3;limiter.knee.value=3;limiter.ratio.value=20;
   limiter.attack.value=0.001;limiter.release.value=0.12;
+  clickOutBus=ctx.createGain();clickOutBus.gain.value=1;
   analyser.connect(limiter);limiter.connect(ctx.destination);
+  clickOutBus.connect(ctx.destination);
 }
 
 // ─── SYNTH VOICE BUILDER ───
@@ -931,6 +935,27 @@ function buildEditSheet(){
   // ── Master ──
   h+='<div class="edit-section"><div class="edit-title">Master</div>';
   h+=sliderRowHTML('mst','Volume','#c4915e',volToFader(masterVol),Math.round(masterVol*100)+'%');
+  // Multi-output routing
+  const _maxCh=ctx?ctx.destination.maxChannelCount:2;
+  h+='<div class="slope-row" style="flex-wrap:wrap;gap:6px 8px"><span class="slope-label">Multi-Out</span>';
+  if(_maxCh>=3){
+    if(multiOutActive){
+      h+='<button class="slope-btn active" onclick="disableMultiOut()">On</button>';
+      h+='<span style="font-size:10px;color:rgba(94,184,138,0.7);letter-spacing:0.3px">Pads → 1/2 &nbsp;·&nbsp; Click → 3</span>';
+    }else{
+      h+='<button class="slope-btn" onclick="enableMultiOut()">Off</button>';
+      h+='<span style="font-size:10px;color:rgba(255,255,255,0.3)">'+_maxCh+' ch available</span>';
+    }
+  }else{
+    h+='<span style="font-size:10px;color:rgba(255,255,255,0.22)">Need ≥3 outputs on interface</span>';
+  }
+  h+='</div>';
+  // Device picker — Chrome setSinkId only
+  if(ctx&&ctx.setSinkId){
+    h+='<div class="slope-row" style="gap:8px"><span class="slope-label">Device</span>';
+    h+='<select id="audioOutSel" onchange="setOutputDevice(this.value)" style="flex:1;background:#1e2340;color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:5px 8px;font-size:12px"><option>Loading…</option></select>';
+    h+='</div>';
+  }
   h+='</div><div class="edit-divider"></div>';
   // ── Setlist ──
   const presets=getPresets();const presetNames=Object.keys(presets);
@@ -990,6 +1015,7 @@ function buildEditSheet(){
   wireSR(c,'arp',r=>{const wasOff=arpVol<=0;arpVol=r;if(r>0&&wasOff)startArp();else if(r<=0)stopArp();return Math.round(r*100)+'%'});
   wireSR(c,'spd',r=>{evolveSpeed=faderToVol(r);return Math.round(evolveSpeed*100)+'%'});
   wireSR(c,'mst',r=>{masterVol=faderToVol(r);master.gain.linearRampToValueAtTime(masterVol,ctx.currentTime+0.1);return Math.round(masterVol*100)+'%'});
+  if(ctx&&ctx.setSinkId)populateOutputDevices();
   initPresetDrag(c);
 }
 
@@ -1163,6 +1189,47 @@ function exportPresets(btn){
   navigator.clipboard.writeText(json).then(()=>{btn.textContent='Copied!';setTimeout(()=>btn.textContent='Export All',2000)}).catch(()=>{btn.textContent='Copy failed';setTimeout(()=>btn.textContent='Export All',2000)});
 }
 
+// ─── MULTI-OUTPUT ROUTING ───
+function enableMultiOut(){
+  if(!ctx||!limiter||!clickOutBus)return;
+  const max=ctx.destination.maxChannelCount;
+  if(max<3){buildEditSheet();return;}
+  ctx.destination.channelCount=Math.min(4,max);
+  ctx.destination.channelCountMode='explicit';
+  ctx.destination.channelInterpretation='discrete';
+  _multiOutMerger=ctx.createChannelMerger(Math.min(4,max));
+  _multiOutMerger.connect(ctx.destination);
+  _multiOutSplitter=ctx.createChannelSplitter(2);
+  try{limiter.disconnect(ctx.destination)}catch(e){}
+  limiter.connect(_multiOutSplitter);
+  _multiOutSplitter.connect(_multiOutMerger,0,0); // pads L → ch 0
+  _multiOutSplitter.connect(_multiOutMerger,1,1); // pads R → ch 1
+  try{clickOutBus.disconnect(ctx.destination)}catch(e){}
+  clickOutBus.connect(_multiOutMerger,0,2); // click mono → ch 2
+  multiOutActive=true;buildEditSheet();
+}
+function disableMultiOut(){
+  if(!multiOutActive)return;
+  try{limiter.disconnect(_multiOutSplitter);_multiOutSplitter.disconnect(_multiOutMerger);clickOutBus.disconnect(_multiOutMerger);_multiOutMerger.disconnect(ctx.destination);}catch(e){}
+  ctx.destination.channelCount=2;ctx.destination.channelCountMode='max';ctx.destination.channelInterpretation='speakers';
+  limiter.connect(ctx.destination);clickOutBus.connect(ctx.destination);
+  multiOutActive=false;_multiOutMerger=null;_multiOutSplitter=null;buildEditSheet();
+}
+async function populateOutputDevices(){
+  const sel=document.getElementById('audioOutSel');if(!sel)return;
+  try{
+    await navigator.mediaDevices.getUserMedia({audio:true});
+    const devs=await navigator.mediaDevices.enumerateDevices();
+    const outs=devs.filter(d=>d.kind==='audiooutput');
+    sel.innerHTML='';
+    outs.forEach(d=>{const o=document.createElement('option');o.value=d.deviceId;o.textContent=d.label||'Output '+d.deviceId.slice(0,6);sel.appendChild(o);});
+  }catch(e){sel.innerHTML='<option>Permission denied</option>';}
+}
+async function setOutputDevice(deviceId){
+  if(!ctx||!ctx.setSinkId)return;
+  try{await ctx.setSinkId(deviceId);if(multiOutActive){disableMultiOut();enableMultiOut();}}catch(e){console.warn('setSinkId:',e);}
+}
+
 // ─── CLICK TRACK ───
 let clickBPM=70,clickActive=false,clickNextTime=0,clickSchedId=null,clickBeat=0;
 let delaySync=true,delaySyncDiv='q';
@@ -1185,7 +1252,7 @@ function fireClick(t){
   const osc=ctx.createOscillator();const env=ctx.createGain();
   osc.type='sine';osc.frequency.value=1200;
   env.gain.setValueAtTime(0.32,t);env.gain.exponentialRampToValueAtTime(0.001,t+0.018);
-  osc.connect(env);env.connect(ctx.destination);osc.start(t);osc.stop(t+0.025);osc.onended=()=>{try{osc.disconnect();env.disconnect()}catch(e){}};
+  osc.connect(env);env.connect(clickOutBus||ctx.destination);osc.start(t);osc.stop(t+0.025);osc.onended=()=>{try{osc.disconnect();env.disconnect()}catch(e){}};
   if(evolveOnBeat&&isDown&&evolving){
     // Apply pending chord at the bar downbeat
     if(pendingEvolve>=0){
