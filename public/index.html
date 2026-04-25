@@ -187,7 +187,7 @@
       <button class="bpm-tap-main" id="bpmTapMain" onclick="tapTempo()" title="Tap for BPM"><span id="bpmDisplay">70</span><span class="bpm-tap-label">BPM</span></button>
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
     </div>
-    <div class="app-version">v0.26</div>
+    <div class="app-version">v0.27</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -1049,7 +1049,7 @@ let _saveT=null;function queueSave(){clearTimeout(_saveT);_saveT=setTimeout(save
 // ─── PRESETS ───
 function getPresets(){try{return JSON.parse(localStorage.getItem('norcoast_presets')||'{}')}catch(e){return{}}}
 function captureState(){
-  const s={homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,lpfQ,hpfQ,lpfSlope,hpfSlope,densityValue,eqLowGain,eqLoMidGain,eqHiMidGain,eqHighGain,chorusMix,widthMod,reverbMix,reverbSize,reverbMod,delayMixVal,delayFeedback,delayTone,delaySync,delaySyncDiv,delayTimeVal,shimmerVol,masterVol,textureOctUp,clickBPM,currentMode,evolveOnBeat,evolveBars,grainSize,grainSpread,enabledEvolveIdx:[...enabledEvolveIdx],layers:{}};
+  const s={homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,lpfQ,hpfQ,lpfSlope,hpfSlope,densityValue,eqLowGain,eqLoMidGain,eqHiMidGain,eqHighGain,chorusMix,widthMod,reverbMix,reverbSize,reverbMod,delayMixVal,delayFeedback,delayTone,delaySync,delaySyncDiv,delayTimeVal,shimmerVol,textureOctUp,clickBPM,currentMode,evolveOnBeat,evolveBars,grainSize,grainSpread,enabledEvolveIdx:[...enabledEvolveIdx],layers:{}};
   PAD_LAYERS.forEach(l=>{s.layers[l.id]={volume:layerState[l.id].volume}});return s;
 }
 function savePreset(name){
@@ -1064,7 +1064,7 @@ function loadPreset(name){try{
   if(s.reverbMix!=null)reverbMix=s.reverbMix;if(s.reverbSize!=null)reverbSize=s.reverbSize;if(s.reverbMod!=null)reverbMod=s.reverbMod;
   if(s.delayMixVal!=null)delayMixVal=s.delayMixVal;if(s.delayFeedback!=null)delayFeedback=s.delayFeedback;if(s.delayTone!=null)delayTone=s.delayTone;if(s.shimmerVol!=null)shimmerVol=s.shimmerVol;
   if(s.delaySync!=null)delaySync=s.delaySync;if(s.delaySyncDiv)delaySyncDiv=s.delaySyncDiv;if(s.delayTimeVal!=null)delayTimeVal=s.delayTimeVal;
-  if(s.masterVol!=null)masterVol=s.masterVol;if(s.textureOctUp!=null)textureOctUp=s.textureOctUp;
+  if(s.textureOctUp!=null)textureOctUp=s.textureOctUp;
   if(s.clickBPM!=null){clickBPM=s.clickBPM;if(clickActive){stopClick();startClick()}}
   if(s.currentMode!=null)currentMode=s.currentMode;
   if(Array.isArray(s.enabledEvolveIdx))enabledEvolveIdx=new Set(s.enabledEvolveIdx);
@@ -1080,7 +1080,7 @@ function loadPreset(name){try{
   if(reverbGain){reverbGain.gain.value=reverbMix;dryGain.gain.value=1-reverbMix*0.35}
   if(reverb&&reverb.fbGain)reverb.fbGain.gain.value=reverbSize;
 
-  if(delayGainN)delayGainN.gain.value=delayMixVal;if(delayFB)delayFB.gain.value=delayFeedback;if(dToneNode)dToneNode.gain.value=(delayTone-0.5)*24;if(delayNode&&!delaySync)delayNode.delayTime.value=delayTimeVal;applyDelaySync();if(master)master.gain.value=masterVol;
+  if(delayGainN)delayGainN.gain.value=delayMixVal;if(delayFB)delayFB.gain.value=delayFeedback;if(dToneNode)dToneNode.gain.value=(delayTone-0.5)*24;if(delayNode&&!delaySync)delayNode.delayTime.value=delayTimeVal;applyDelaySync();
   // Restart layers
   PAD_LAYERS.forEach(l=>{if(l.type!=="granular")startPad(l,layerState[l.id].volume,homeRoot,currentEvolve)});
   if(layerState.texture&&layerState.texture.volume>0)startGranular(layerState.texture.volume);else stopGranular();
