@@ -478,9 +478,19 @@ async function initAudio(){
   widthLFOGain=ctx.createGain();widthLFOGain.gain.value=widthMod;
   _widthLFO.connect(widthLFOGain);widthLFOGain.connect(widthPanner.pan);_widthLFO.start();
   master.connect(widthPanner);widthPanner.connect(globalHPF);globalHPF.connect(globalHPF2);globalHPF2.connect(globalLPF);globalLPF.connect(globalLPF2);
-  globalLPF2.connect(eqLowNode);eqLowNode.connect(eqLoMidNode);eqLoMidNode.connect(eqHiMidNode);eqHiMidNode.connect(eqHighNode);
-  eqHighNode.connect(dryGain);eqHighNode.connect(reverb.input);reverb.output.connect(reverbGain);
-  // Post-reverb chorus — makes the reverb mod clearly audible
+  // ── Signal path: filters → chorus insert → shimmer → reverb/delay → EQ ──
+  // Chorus serial insert: filters dry + chorus wet merge into _chorBus
+  const _chorBus=ctx.createGain();_chorBus.gain.value=1;
+  globalLPF2.connect(_chorBus);
+  globalLPF2.connect(chorusGainNode);chorusGainNode.connect(dL);chorusGainNode.connect(dR);dL.connect(pL);dR.connect(pR);pL.connect(_chorBus);pR.connect(_chorBus);
+  // Shimmer taps from chorused bus
+  shimmerNode=createShimmerReverb();_chorBus.connect(shimmerNode.input);
+  // All FX returns collect at _sumBus before EQ
+  const _sumBus=ctx.createGain();_sumBus.gain.value=1;
+  shimmerNode.stereoL.connect(_sumBus);shimmerNode.stereoR.connect(_sumBus);
+  // Reverb from chorused signal
+  _chorBus.connect(reverb.input);reverb.output.connect(reverbGain);reverbGain.connect(_sumBus);
+  // Post-reverb chorus (LFO modulation on reverb tail)
   const rvModL=ctx.createDelay(0.05),rvModR=ctx.createDelay(0.05);
   rvModL.delayTime.value=0.008;rvModR.delayTime.value=0.011;
   const rvModLFOL=ctx.createOscillator();rvModLFOL.type='sine';rvModLFOL.frequency.value=0.7;
@@ -495,12 +505,13 @@ async function initAudio(){
   reverbModWet=ctx.createGain();reverbModWet.gain.value=reverbMod*0.5;
   reverb.output.connect(rvModL);reverb.output.connect(rvModR);
   rvModL.connect(rvModPanL);rvModR.connect(rvModPanR);
-  rvModPanL.connect(reverbModWet);rvModPanR.connect(reverbModWet);
-  reverbModWet.connect(analyser);
-  eqHighNode.connect(delayNode);
-  eqHighNode.connect(chorusGainNode);chorusGainNode.connect(dL);chorusGainNode.connect(dR);dL.connect(pL);dR.connect(pR);pL.connect(analyser);pR.connect(analyser);delayNode.connect(dLP);dLP.connect(delayFB);delayFB.connect(delayNode);dLP.connect(delayGainN);
-  dryGain.connect(analyser);reverbGain.connect(analyser);delayGainN.connect(dToneNode);dToneNode.connect(analyser);
-  shimmerNode=createShimmerReverb();eqHighNode.connect(shimmerNode.input);shimmerNode.stereoL.connect(analyser);shimmerNode.stereoR.connect(analyser);
+  rvModPanL.connect(reverbModWet);rvModPanR.connect(reverbModWet);reverbModWet.connect(_sumBus);
+  // Delay from chorused signal
+  _chorBus.connect(delayNode);delayNode.connect(dLP);dLP.connect(delayFB);delayFB.connect(delayNode);dLP.connect(delayGainN);delayGainN.connect(dToneNode);dToneNode.connect(_sumBus);
+  // Dry path
+  _chorBus.connect(dryGain);dryGain.connect(_sumBus);
+  // EQ at the very end
+  _sumBus.connect(eqLowNode);eqLowNode.connect(eqLoMidNode);eqLoMidNode.connect(eqHiMidNode);eqHiMidNode.connect(eqHighNode);eqHighNode.connect(analyser);
   applyDelaySync();
   const limiter=ctx.createDynamicsCompressor();
   limiter.threshold.value=-3;limiter.knee.value=3;limiter.ratio.value=20;
