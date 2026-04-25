@@ -150,7 +150,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v0.28</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v0.29</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -187,7 +187,7 @@
       <button class="bpm-tap-main" id="bpmTapMain" onclick="tapTempo()" title="Tap for BPM"><span id="bpmDisplay">70</span><span class="bpm-tap-label">BPM</span></button>
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
     </div>
-    <div class="app-version">v0.28</div>
+    <div class="app-version">v0.29</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -835,11 +835,9 @@ function buildEditSheet(){
   h+='<div class="fx-section-header" style="background:rgba(94,184,138,0.08);border-left:3px solid #5eb88a">Delay</div>';
   h+=sliderRowHTML('dly','Mix','#5eb88a',delayMixVal,Math.round(delayMixVal*100)+'%');
   h+=sliderRowHTML('dlyFB','Feedback','#5eb88a',delayFeedback/0.85,Math.round(delayFeedback/0.85*100)+'%');
-  h+='<div class="fx-section-header" style="background:rgba(94,184,138,0.06);border-left:3px solid #5eb88a">Filter</div>';
   const toneLabel=delayTone<0.42?'Dark':delayTone>0.58?'Bright':'Neutral';
-  h+=sliderRowHTML('dlyTone','Tone','#5eb88a',delayTone,toneLabel);
-  h+='<div class="fx-section-header" style="background:rgba(94,184,138,0.04);border-left:3px solid rgba(94,184,138,0.4)">BPM Sync</div>';
-  h+='<div class="slope-row"><span class="slope-label">Sync</span><button class="slope-btn'+(delaySync?' active':'')+'" onclick="toggleDelaySync()">'+(delaySync?'On':'Off')+'</button>';
+  h+=sliderRowHTML('dlyTone','Filter','#5eb88a',delayTone,toneLabel);
+  h+='<div class="slope-row"><span class="slope-label">BPM Sync</span><button class="slope-btn'+(delaySync?' active':'')+'" onclick="toggleDelaySync()">'+(delaySync?'On':'Off')+'</button>';
   if(delaySync){[['1/2','1/2'],['1/4d','q.'],['1/4','q'],['1/8d','1/8.'],['1/8','1/8']].forEach(([lbl,dv])=>{h+='<button class="slope-btn'+(delaySyncDiv===dv?' active':'')+'" onclick="setDelaySyncDiv(\''+dv+'\')" style="padding:6px 10px">'+lbl+'</button>'})}
   h+='</div>';
   if(!delaySync){const dtR=Math.log(delayTimeVal/0.05)/Math.log(2.0/0.05);h+=sliderRowHTML('dlyT','Time','#5eb88a',dtR,Math.round(delayTimeVal*1000)+'ms')}
