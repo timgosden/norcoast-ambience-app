@@ -150,7 +150,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v0.34</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v0.35</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -187,7 +187,7 @@
       <button class="bpm-tap-main" id="bpmTapMain" onclick="tapTempo()" title="Tap for BPM"><span id="bpmDisplay">70</span><span class="bpm-tap-label">BPM</span></button>
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
     </div>
-    <div class="app-version">v0.34</div>
+    <div class="app-version">v0.35</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -259,7 +259,7 @@ let lpfValue=0.7,hpfValue=0,densityValue=0.5;
 let reverbMix=0.6,reverbSize=0.78,reverbMod=0.5,delayMixVal=0.1,delayFeedback=0.4,delayTone=0.5,masterVol=0.5;
 let textureOctUp=true,foundationSubOct=false;
 let widthMod=0;
-let arpVol=0,arpRate=0.5,arpStep=0,arpTimer=null;
+let arpVol=0,arpRate=0.5,arpOct=0,arpStep=0,arpTimer=null;
 let limiter=null,clickOutBus=null,arpRevSend=null;
 let multiOutActive=false,_multiOutMerger=null,_multiOutSplitter=null;
 let staticNodes={},evolveNodes={},layerState={};
@@ -603,21 +603,16 @@ let shimmerNode=null;
 function createShimmerReverb(){
   const inputG=ctx.createGain();
   const outputG=ctx.createGain();outputG.gain.value=0;
-  // Bright FDN with shorter pre-delay for transparent, airy character
-  const shimRev=initReverb({bright:true,preDelay:0.012});
-  shimRev.fbGain.gain.value=0.85;
-  // Dry signal into reverb
-  inputG.connect(shimRev.input);
-  // Pitch-shifted feedback loop: reverb tail → octave up → back into reverb
-  // Each recirculation rises in pitch — this is what creates genuinely ascending shimmer
+  // Bright FDN — very short pre-delay, high fbGain for long luminous tail
+  const shimRev=initReverb({bright:true,preDelay:0.006});
+  shimRev.fbGain.gain.value=0.88;
+  // Input is pitch-shifted +1 octave before entering the reverb.
+  // The long bright reverb then sustains this harmonic as a shimmering halo.
+  // Pre-reverb approach avoids feedback-loop grain artifacts from the worklet.
   let pitchNode=null;
   try{pitchNode=new AudioWorkletNode(ctx,'pitch-shifter');}catch(e){}
-  if(pitchNode){
-    const shimFBGain=ctx.createGain();shimFBGain.gain.value=0.22;
-    shimRev.output.connect(pitchNode);
-    pitchNode.connect(shimFBGain);
-    shimFBGain.connect(shimRev.input);
-  }
+  if(pitchNode){inputG.connect(pitchNode);pitchNode.connect(shimRev.input);}
+  else{inputG.connect(shimRev.input);}
   shimRev.output.connect(outputG);
   // Haas stereo spread
   const dL=ctx.createDelay(0.05);dL.delayTime.value=0.011;
@@ -711,7 +706,7 @@ function fireArpNote(){
   const semis=CHORD_TYPES[currentEvolve].semis;
   const semitone=semis[arpStep%semis.length];
   const octShift=Math.floor(arpStep/semis.length)%2;
-  const freq=semiFreq(noteFreq(homeRoot,ROOT_OCT+1+octShift),semitone);
+  const freq=semiFreq(noteFreq(homeRoot,ROOT_OCT+1+octShift+arpOct),semitone);
   const noteDur=arpRate*_arpBarSec();
   const atk=0.003; // near-instant attack — hard pluck
   const dec=Math.min(noteDur*0.35,0.9);
@@ -758,6 +753,7 @@ function startArp(){if(arpTimer)clearTimeout(arpTimer);arpStep=0;scheduleArp();}
 function stopArp(){if(arpTimer)clearTimeout(arpTimer);arpTimer=null;}
 function toggleArp(){if(arpVol>0){arpVol=0;stopArp();}else{arpVol=0.5;startArp();}buildEditSheet();}
 function setArpRate(b){arpRate=b;if(arpVol>0&&!clickActive){if(arpTimer)clearTimeout(arpTimer);scheduleArp();}saveSettings();buildEditSheet();}
+function setArpOct(o){arpOct=o;arpStep=0;saveSettings();buildEditSheet();}
 
 // ─── FILTER MATH ───
 function dampFaderToHz(v){return Math.exp(Math.log(800)+v*(Math.log(8000)-Math.log(800)))}
@@ -944,6 +940,9 @@ function buildEditSheet(){
   h+='<span class="slider-val" id="sr_arp">'+Math.round(arpVol*100)+'%</span></div>';
   h+='<div class="slope-row" style="padding:2px 12px 10px"><span class="slope-label">Rate</span>';
   [[0.125,'1/8'],[0.25,'1/4'],[0.5,'1/2'],[1,'1 bar']].forEach(([r,l])=>{h+='<button class="slope-btn'+(arpRate===r?' active':'')+'" onclick="setArpRate('+r+')" style="padding:6px 10px">'+l+'</button>';});
+  h+='<button class="slope-btn'+(arpOct===-1?' active':'')+'" onclick="setArpOct(-1)" style="padding:6px 10px;margin-left:6px">−8ve</button>';
+  h+='<button class="slope-btn'+(arpOct===0?' active':'')+'" onclick="setArpOct(0)" style="padding:6px 10px">Mid</button>';
+  h+='<button class="slope-btn'+(arpOct===1?' active':'')+'" onclick="setArpOct(1)" style="padding:6px 10px">+8ve</button>';
   h+='</div>';
   h+='</div><div class="edit-divider"></div>';
   // ── Effects ──
@@ -1185,14 +1184,14 @@ function toggleSlope(type){
   }
   drawEQCurve();saveSettings();buildEditSheet();
 }
-function saveSettings(){try{const s={homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,lpfQ,hpfQ,lpfSlope,hpfSlope,densityValue,eqLowGain,eqLoMidGain,eqHiMidGain,eqHighGain,chorusMix,widthMod,reverbMix,reverbSize,reverbMod,delayMixVal,delayFeedback,delayTone,delaySync,delaySyncDiv,delayTimeVal,shimmerVol,masterVol,textureOctUp,foundationSubOct,arpVol,arpRate,clickBPM,currentMode,evolveOnBeat,evolveBars,grainSize,grainSpread,enabledEvolveIdx:[...enabledEvolveIdx],layers:{}};PAD_LAYERS.forEach(l=>{s.layers[l.id]={volume:layerState[l.id].volume}});localStorage.setItem('norcoast_v1',JSON.stringify(s))}catch(e){}}
-function loadSettings(){try{const raw=localStorage.getItem('norcoast_v1');if(!raw)return;const s=JSON.parse(raw);if(s.homeRoot)homeRoot=s.homeRoot;if(s.evolving!=null)evolving=s.evolving;if(s.evolveSpeed!=null)evolveSpeed=s.evolveSpeed;if(s.lpfValue!=null)lpfValue=s.lpfValue;if(s.hpfValue!=null)hpfValue=s.hpfValue;if(s.lpfQ!=null)lpfQ=s.lpfQ;if(s.hpfQ!=null)hpfQ=s.hpfQ;if(s.lpfSlope!=null)lpfSlope=s.lpfSlope;if(s.hpfSlope!=null)hpfSlope=s.hpfSlope;if(s.densityValue!=null)densityValue=s.densityValue;if(s.eqLowGain!=null)eqLowGain=s.eqLowGain;if(s.eqLoMidGain!=null)eqLoMidGain=s.eqLoMidGain;if(s.eqHiMidGain!=null)eqHiMidGain=s.eqHiMidGain;if(s.eqHighGain!=null)eqHighGain=s.eqHighGain;if(s.chorusMix!=null)chorusMix=s.chorusMix;if(s.widthMod!=null)widthMod=s.widthMod;if(s.shimmerVol!=null)shimmerVol=s.shimmerVol;if(s.reverbMix!=null)reverbMix=s.reverbMix;if(s.reverbSize!=null)reverbSize=s.reverbSize;if(s.reverbMod!=null)reverbMod=s.reverbMod;if(s.delayMixVal!=null)delayMixVal=s.delayMixVal;if(s.delayFeedback!=null)delayFeedback=s.delayFeedback;if(s.delayTone!=null)delayTone=s.delayTone;if(s.delaySync!=null)delaySync=s.delaySync;if(s.delaySyncDiv)delaySyncDiv=s.delaySyncDiv;if(s.delayTimeVal!=null)delayTimeVal=s.delayTimeVal;if(s.masterVol!=null)masterVol=s.masterVol;if(s.textureOctUp!=null)textureOctUp=s.textureOctUp;if(s.foundationSubOct!=null)foundationSubOct=s.foundationSubOct;if(s.foundationSubOct!=null)foundationSubOct=s.foundationSubOct;if(s.clickBPM!=null)clickBPM=s.clickBPM;if(s.currentMode!=null)currentMode=s.currentMode;if(s.evolveOnBeat!=null)evolveOnBeat=s.evolveOnBeat;if(s.evolveBars!=null)evolveBars=s.evolveBars;if(s.grainSize!=null)grainSize=s.grainSize;if(s.grainSpread!=null)grainSpread=s.grainSpread;if(s.arpVol!=null)arpVol=s.arpVol;if(s.arpRate!=null)arpRate=s.arpRate;if(Array.isArray(s.enabledEvolveIdx))enabledEvolveIdx=new Set(s.enabledEvolveIdx);if(s.layers)PAD_LAYERS.forEach(l=>{if(s.layers[l.id]!=null)layerState[l.id].volume=s.layers[l.id].volume??0})}catch(e){}}
+function saveSettings(){try{const s={homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,lpfQ,hpfQ,lpfSlope,hpfSlope,densityValue,eqLowGain,eqLoMidGain,eqHiMidGain,eqHighGain,chorusMix,widthMod,reverbMix,reverbSize,reverbMod,delayMixVal,delayFeedback,delayTone,delaySync,delaySyncDiv,delayTimeVal,shimmerVol,masterVol,textureOctUp,foundationSubOct,arpVol,arpRate,arpOct,clickBPM,currentMode,evolveOnBeat,evolveBars,grainSize,grainSpread,enabledEvolveIdx:[...enabledEvolveIdx],layers:{}};PAD_LAYERS.forEach(l=>{s.layers[l.id]={volume:layerState[l.id].volume}});localStorage.setItem('norcoast_v1',JSON.stringify(s))}catch(e){}}
+function loadSettings(){try{const raw=localStorage.getItem('norcoast_v1');if(!raw)return;const s=JSON.parse(raw);if(s.homeRoot)homeRoot=s.homeRoot;if(s.evolving!=null)evolving=s.evolving;if(s.evolveSpeed!=null)evolveSpeed=s.evolveSpeed;if(s.lpfValue!=null)lpfValue=s.lpfValue;if(s.hpfValue!=null)hpfValue=s.hpfValue;if(s.lpfQ!=null)lpfQ=s.lpfQ;if(s.hpfQ!=null)hpfQ=s.hpfQ;if(s.lpfSlope!=null)lpfSlope=s.lpfSlope;if(s.hpfSlope!=null)hpfSlope=s.hpfSlope;if(s.densityValue!=null)densityValue=s.densityValue;if(s.eqLowGain!=null)eqLowGain=s.eqLowGain;if(s.eqLoMidGain!=null)eqLoMidGain=s.eqLoMidGain;if(s.eqHiMidGain!=null)eqHiMidGain=s.eqHiMidGain;if(s.eqHighGain!=null)eqHighGain=s.eqHighGain;if(s.chorusMix!=null)chorusMix=s.chorusMix;if(s.widthMod!=null)widthMod=s.widthMod;if(s.shimmerVol!=null)shimmerVol=s.shimmerVol;if(s.reverbMix!=null)reverbMix=s.reverbMix;if(s.reverbSize!=null)reverbSize=s.reverbSize;if(s.reverbMod!=null)reverbMod=s.reverbMod;if(s.delayMixVal!=null)delayMixVal=s.delayMixVal;if(s.delayFeedback!=null)delayFeedback=s.delayFeedback;if(s.delayTone!=null)delayTone=s.delayTone;if(s.delaySync!=null)delaySync=s.delaySync;if(s.delaySyncDiv)delaySyncDiv=s.delaySyncDiv;if(s.delayTimeVal!=null)delayTimeVal=s.delayTimeVal;if(s.masterVol!=null)masterVol=s.masterVol;if(s.textureOctUp!=null)textureOctUp=s.textureOctUp;if(s.foundationSubOct!=null)foundationSubOct=s.foundationSubOct;if(s.foundationSubOct!=null)foundationSubOct=s.foundationSubOct;if(s.clickBPM!=null)clickBPM=s.clickBPM;if(s.currentMode!=null)currentMode=s.currentMode;if(s.evolveOnBeat!=null)evolveOnBeat=s.evolveOnBeat;if(s.evolveBars!=null)evolveBars=s.evolveBars;if(s.grainSize!=null)grainSize=s.grainSize;if(s.grainSpread!=null)grainSpread=s.grainSpread;if(s.arpVol!=null)arpVol=s.arpVol;if(s.arpRate!=null)arpRate=s.arpRate;if(s.arpOct!=null)arpOct=s.arpOct;if(Array.isArray(s.enabledEvolveIdx))enabledEvolveIdx=new Set(s.enabledEvolveIdx);if(s.layers)PAD_LAYERS.forEach(l=>{if(s.layers[l.id]!=null)layerState[l.id].volume=s.layers[l.id].volume??0})}catch(e){}}
 let _saveT=null;function queueSave(){clearTimeout(_saveT);_saveT=setTimeout(saveSettings,500)}
 
 // ─── PRESETS ───
 function getPresets(){try{return JSON.parse(localStorage.getItem('norcoast_presets')||'{}')}catch(e){return{}}}
 function captureState(){
-  const s={homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,lpfQ,hpfQ,lpfSlope,hpfSlope,densityValue,eqLowGain,eqLoMidGain,eqHiMidGain,eqHighGain,chorusMix,widthMod,reverbMix,reverbSize,reverbMod,delayMixVal,delayFeedback,delayTone,delaySync,delaySyncDiv,delayTimeVal,shimmerVol,textureOctUp,foundationSubOct,arpVol,arpRate,clickBPM,currentMode,evolveOnBeat,evolveBars,grainSize,grainSpread,enabledEvolveIdx:[...enabledEvolveIdx],layers:{}};
+  const s={homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,lpfQ,hpfQ,lpfSlope,hpfSlope,densityValue,eqLowGain,eqLoMidGain,eqHiMidGain,eqHighGain,chorusMix,widthMod,reverbMix,reverbSize,reverbMod,delayMixVal,delayFeedback,delayTone,delaySync,delaySyncDiv,delayTimeVal,shimmerVol,textureOctUp,foundationSubOct,arpVol,arpRate,arpOct,clickBPM,currentMode,evolveOnBeat,evolveBars,grainSize,grainSpread,enabledEvolveIdx:[...enabledEvolveIdx],layers:{}};
   PAD_LAYERS.forEach(l=>{s.layers[l.id]={volume:layerState[l.id].volume}});return s;
 }
 function savePreset(name){
@@ -1214,6 +1213,7 @@ function loadPreset(name){try{
   if(s.grainSize!=null)grainSize=s.grainSize;
   if(s.grainSpread!=null)grainSpread=s.grainSpread;
   if(s.arpRate!=null)arpRate=s.arpRate;
+  if(s.arpOct!=null)arpOct=s.arpOct;
   if(s.arpVol!=null){arpVol=s.arpVol;arpStep=0;if(arpVol>0)startArp();else stopArp();}
   if(s.clickBPM!=null){clickBPM=s.clickBPM;if(clickActive){stopClick();startClick()}}
   if(s.currentMode!=null)currentMode=s.currentMode;
