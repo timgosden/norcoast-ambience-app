@@ -150,7 +150,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v0.33</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v0.34</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -187,7 +187,7 @@
       <button class="bpm-tap-main" id="bpmTapMain" onclick="tapTempo()" title="Tap for BPM"><span id="bpmDisplay">70</span><span class="bpm-tap-label">BPM</span></button>
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
     </div>
-    <div class="app-version">v0.33</div>
+    <div class="app-version">v0.34</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -260,7 +260,7 @@ let reverbMix=0.6,reverbSize=0.78,reverbMod=0.5,delayMixVal=0.1,delayFeedback=0.
 let textureOctUp=true,foundationSubOct=false;
 let widthMod=0;
 let arpVol=0,arpRate=0.5,arpStep=0,arpTimer=null;
-let limiter=null,clickOutBus=null;
+let limiter=null,clickOutBus=null,arpRevSend=null;
 let multiOutActive=false,_multiOutMerger=null,_multiOutSplitter=null;
 let staticNodes={},evolveNodes={},layerState={};
 let shimmerActive=false,shimmerGainNode=null,shimmerTimer=null,shimmerVol=0;
@@ -564,6 +564,9 @@ async function initAudio(){
   clickOutBus=ctx.createGain();clickOutBus.gain.value=1;
   analyser.connect(limiter);limiter.connect(ctx.destination);
   clickOutBus.connect(ctx.destination);
+  // Dedicated arp reverb send — bypasses global dry/wet so arp is always drenched
+  arpRevSend=ctx.createGain();arpRevSend.gain.value=0.65;
+  arpRevSend.connect(reverb.input);
 }
 
 // ─── SYNTH VOICE BUILDER ───
@@ -710,7 +713,7 @@ function fireArpNote(){
   const octShift=Math.floor(arpStep/semis.length)%2;
   const freq=semiFreq(noteFreq(homeRoot,ROOT_OCT+1+octShift),semitone);
   const noteDur=arpRate*_arpBarSec();
-  const atk=0.012; // fast attack — Juno DCO pluck
+  const atk=0.003; // near-instant attack — hard pluck
   const dec=Math.min(noteDur*0.35,0.9);
   const rel=Math.min(noteDur*0.55,1.8);
   // Three-voice unison: left-detuned, center, right-detuned — classic Juno spread
@@ -735,7 +738,9 @@ function fireArpNote(){
     if(noteDur>atk+rel){env.gain.setValueAtTime(pk*0.45,ctx.currentTime+dec);}
     env.gain.linearRampToValueAtTime(0,ctx.currentTime+noteDur);
     pan.pan.value=panV;
-    osc.connect(filt);filt.connect(env);env.connect(pan);pan.connect(master);
+    osc.connect(filt);filt.connect(env);env.connect(pan);
+    pan.connect(master);
+    if(arpRevSend)pan.connect(arpRevSend); // extra reverb send — makes arp swim in verb
     osc.start();osc.stop(ctx.currentTime+noteDur+0.5);
     osc.onended=()=>{try{osc.disconnect();filt.disconnect();env.disconnect();pan.disconnect()}catch(e){}};
   });
