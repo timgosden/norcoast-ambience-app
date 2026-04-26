@@ -1653,13 +1653,21 @@ async function initAndStart(){
     if(shimmerVol>0)startShimmer(shimmerVol);
     startClick();
     if(arpVol>0)startArp();
-    document.addEventListener('visibilitychange',()=>{
-      if(!ctx)return;
-      if(document.visibilityState==='visible'){if(ctx.state==='suspended'&&!audioPaused)ctx.resume();}
-      else ctx.suspend();
-    });
-    window.addEventListener('focus',()=>{if(ctx&&ctx.state==='suspended'&&!audioPaused)ctx.resume()});
-    window.addEventListener('pagehide',()=>{if(ctx)ctx.close();});
+    if(window.__NATIVE_APP__){
+      // Native wrapper: AVAudioSession manages backgrounding — don't suspend the
+      // AudioContext ourselves or every notification banner causes a glitch.
+      document.addEventListener('visibilitychange',()=>{
+        if(ctx&&ctx.state==='suspended'&&!audioPaused&&document.visibilityState==='visible')ctx.resume();
+      });
+    } else {
+      document.addEventListener('visibilitychange',()=>{
+        if(!ctx)return;
+        if(document.visibilityState==='visible'){if(ctx.state==='suspended'&&!audioPaused)ctx.resume();}
+        else ctx.suspend();
+      });
+      window.addEventListener('focus',()=>{if(ctx&&ctx.state==='suspended'&&!audioPaused)ctx.resume()});
+      window.addEventListener('pagehide',()=>{if(ctx)ctx.close();});
+    }
     loadMidiMappings();buildKeys();startVis();scheduleEvolve();initMIDI();updatePerfSetlist();
     // Swipe down to close edit sheet
     {const sheet=document.getElementById('editSheet');let _sy=0,_sw=false;
