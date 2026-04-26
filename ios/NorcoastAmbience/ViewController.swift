@@ -15,6 +15,7 @@ final class ViewController: UIViewController {
         setupNowPlaying()
         setupRemoteControls()
         loadApp()
+        setupiCloudSync()
     }
 
     // MARK: - WebView
@@ -66,6 +67,36 @@ final class ViewController: UIViewController {
         webView.loadFileURL(indexURL, allowingReadAccessTo: webRoot)
     }
 
+    // MARK: - iCloud KV Sync
+
+    func setupiCloudSync() {
+        let kv = NSUbiquitousKeyValueStore.default
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(iCloudDidChange),
+            name: NSUbiquitousKeyValueStore.didChangeExternallyNotification,
+            object: kv
+        )
+        kv.synchronize()
+        injectCloudPresets()
+    }
+
+    @objc private func iCloudDidChange(_ notification: Notification) {
+        injectCloudPresets()
+    }
+
+    private func injectCloudPresets() {
+        guard let json = NSUbiquitousKeyValueStore.default.string(forKey: "norcoast_presets") else { return }
+        let escaped = json.replacingOccurrences(of: "\\", with: "\\\\")
+                          .replacingOccurrences(of: "'", with: "\\'")
+        webView.evaluateJavaScript("norcoast_setCloudPresets('\(escaped)')", completionHandler: nil)
+    }
+
+    func savePresetsToiCloud(_ json: String) {
+        NSUbiquitousKeyValueStore.default.set(json, forKey: "norcoast_presets")
+        NSUbiquitousKeyValueStore.default.synchronize()
+    }
+
     // MARK: - Lock Screen / Now Playing
 
     private func setupNowPlaying() {
@@ -114,6 +145,12 @@ final class ViewController: UIViewController {
         webView.evaluateJavaScript(js, completionHandler: nil)
     }
 
+    /// Called by SceneDelegate when a phone call or Siri begins.
+    func pauseForInterruption() {
+        sendToWebApp("norcoast_pause()")
+        MPNowPlayingInfoCenter.default().playbackState = .paused
+    }
+
     /// Called by SceneDelegate after a phone-call / Siri interruption ends.
     func resumeAfterInterruption() {
         sendToWebApp("norcoast_resume()")
@@ -153,11 +190,17 @@ extension ViewController: WKScriptMessageHandler {
         didReceive message: WKScriptMessage
     ) {
         guard message.name == "bridge", let body = message.body as? String else { return }
+        if body.hasPrefix("presets:") {
+            savePresetsToiCloud(String(body.dropFirst("presets:".count)))
+            return
+        }
         switch body {
         case "playing":
             MPNowPlayingInfoCenter.default().playbackState = .playing
         case "paused":
             MPNowPlayingInfoCenter.default().playbackState = .paused
+        case "haptic":
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         default:
             break
         }

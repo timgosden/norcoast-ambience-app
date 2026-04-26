@@ -1,5 +1,6 @@
 import UIKit
 import AVFoundation
+import Sentry
 
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
@@ -12,12 +13,25 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     ) {
         guard let windowScene = scene as? UIWindowScene else { return }
 
+        configureSentry()
         configureAudioSession()
 
         let window = UIWindow(windowScene: windowScene)
         window.rootViewController = ViewController()
         window.makeKeyAndVisible()
         self.window = window
+    }
+
+    // MARK: - Crash Reporting
+
+    private func configureSentry() {
+        // Replace YOUR_SENTRY_DSN with the DSN from sentry.io → Project Settings → Client Keys.
+        let dsn = "YOUR_SENTRY_DSN"
+        guard dsn != "YOUR_SENTRY_DSN" else { return }
+        SentrySDK.start { options in
+            options.dsn = dsn
+            options.tracesSampleRate = 0.2
+        }
     }
 
     // MARK: - Audio Session
@@ -48,15 +62,25 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
             let type = AVAudioSession.InterruptionType(rawValue: typeValue)
         else { return }
 
-        if type == .ended {
+        switch type {
+        case .began:
+            if let vc = window?.rootViewController as? ViewController {
+                vc.pauseForInterruption()
+            }
+        case .ended:
+            try? AVAudioSession.sharedInstance().setActive(true)
             let optionsValue = info[AVAudioSessionInterruptionOptionKey] as? UInt ?? 0
             let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue)
             if options.contains(.shouldResume) {
-                try? AVAudioSession.sharedInstance().setActive(true)
-                if let vc = window?.rootViewController as? ViewController {
-                    vc.resumeAfterInterruption()
+                // Short delay lets the audio system stabilise before we resume.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    if let vc = self.window?.rootViewController as? ViewController {
+                        vc.resumeAfterInterruption()
+                    }
                 }
             }
+        @unknown default:
+            break
         }
     }
 }

@@ -23,6 +23,11 @@ settings:
     Release:
       SWIFT_OPTIMIZATION_LEVEL: "-O"
 
+packages:
+  Sentry:
+    url: https://github.com/getsentry/sentry-cocoa.git
+    from: "8.0.0"
+
 targets:
   NorcoastAmbience:
     type: application
@@ -34,6 +39,9 @@ targets:
       - path: ../public
         type: folder
         name: public
+    dependencies:
+      - package: Sentry
+        product: Sentry
     resources:
       - NorcoastAmbience/Resources
     settings:
@@ -41,3 +49,4 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.norcoast.ambience
         INFOPLIST_FILE: NorcoastAmbience/Info.plist
         GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_ENTITLEMENTS: NorcoastAmbience/NorcoastAmbience.entitlements
