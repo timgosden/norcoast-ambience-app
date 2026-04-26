@@ -38,3 +38,4 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.norcoast.ambience
         INFOPLIST_FILE: NorcoastAmbience/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
