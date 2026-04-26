@@ -153,7 +153,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v0.45</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v0.46</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -191,7 +191,7 @@
       <button class="bpm-tap-main" id="bpmTapMain" onclick="tapTempo()" title="Tap for BPM"><span id="bpmDisplay">70</span><span class="bpm-tap-label">BPM</span></button>
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
     </div>
-    <div class="app-version">v0.45</div>
+    <div class="app-version">v0.46</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -300,8 +300,8 @@ function initReverb(opts){
   // Delay times chosen to be mutually prime → no flutter echo, dense response
   const cTimes=[0.0297,0.0371,0.0411,0.0437,0.0539,0.0593,0.0671,0.0737];
   // Per-comb HF damping — simulates air/material absorption; later combs darker
-  const baseDamp=opts.bright?8000:4800;
-  const cDampHz=cTimes.map((_,i)=>baseDamp-i*(opts.bright?300:238));
+  const baseDamp=opts.bright?8000:4000;
+  const cDampHz=cTimes.map((_,i)=>baseDamp-i*(opts.bright?300:200));
   // Slight per-comb feedback variation — prevents parallel "pinging" at resonances
   const cFBScale=[1.000,0.995,0.990,0.985,0.980,0.975,0.970,0.965];
 
@@ -328,8 +328,8 @@ function initReverb(opts){
   cSum.connect(tailHP);
   // 4 allpass diffusers — smooth comb resonances, thicken the tail; Q=1.5 avoids tonal coloration
   let prev=tailHP;
-  [150,500,1800,5500].forEach(f=>{
-    const ap=ctx.createBiquadFilter();ap.type='allpass';ap.frequency.value=f;ap.Q.value=1.5;
+  [120,380,900,2100,4800,9000].forEach(f=>{
+    const ap=ctx.createBiquadFilter();ap.type='allpass';ap.frequency.value=f;ap.Q.value=1.1;
     prev.connect(ap);prev=ap;
   });
   // Gentle air shelf compensates for HF damping in comb tails — keeps the top end alive
@@ -694,9 +694,9 @@ function clearPendingChord(){
 function _arpBarSec(){return 60/clickBPM*4;}
 function fireArpNote(){
   if(!ctx||!waves||arpVol<=0)return;
-  const semis=CHORD_TYPES[currentEvolve].semis;
-  const semitone=semis[arpStep%semis.length];
-  const octShift=Math.floor(arpStep/semis.length)%2;
+  const ARP_PAT=[0,7,12,7]; // 1-5-8-5
+  const semitone=ARP_PAT[arpStep%4];
+  const octShift=Math.floor(arpStep/4)%2;
   const freq=semiFreq(noteFreq(homeRoot,ROOT_OCT+1+octShift+arpOct),semitone);
   const noteDur=arpRate*_arpBarSec();
   const atk=0.003; // near-instant attack — hard pluck
@@ -748,7 +748,7 @@ function setArpOct(o){arpOct=o;arpStep=0;saveSettings();buildEditSheet();}
 
 // ─── FILTER MATH ───
 function dampFaderToHz(v){return Math.exp(Math.log(800)+v*(Math.log(8000)-Math.log(800)))}
-function reverbSizeToFB(v){return 0.62+v*0.28}
+function reverbSizeToFB(v){return 0.62+v*0.24}
 function lpfFaderToHz(v){return Math.exp(Math.log(100)+v*v*(Math.log(20000)-Math.log(100)))}
 function hpfFaderToHz(v){if(v<0.01)return 20;return Math.exp(Math.log(20)+v*(Math.log(500)-Math.log(20)))}
 function formatHz(hz){return hz>=1000?(hz/1000).toFixed(1)+'kHz':Math.round(hz)+'Hz'}
@@ -1115,8 +1115,6 @@ function triggerFade(){
   master.gain.cancelScheduledValues(ctx.currentTime);
   master.gain.setValueAtTime(master.gain.value,ctx.currentTime);
   master.gain.linearRampToValueAtTime(0,ctx.currentTime+DUR);
-  if(clickActive)stopClick();
-  stopArp();
   const btn=document.getElementById('fadeBtn');
   let remaining=DUR;
   function tick(){btn.textContent=remaining+'s';remaining--;if(remaining>0)_fadeCountT=setTimeout(tick,1000);}
@@ -1133,7 +1131,6 @@ function cancelFade(){
     master.gain.setValueAtTime(master.gain.value,ctx.currentTime);
     master.gain.linearRampToValueAtTime(masterVol,ctx.currentTime+0.5);
   }
-  if(arpVol>0&&!clickActive)startArp();
   const btn=document.getElementById('fadeBtn');if(btn){btn.classList.remove('fading');btn.textContent='Fade';}
 }
 function toggleEvolving(){evolving=!evolving;const btn=document.getElementById('evolveBtn');btn.className='evolve-pill '+(evolving?'on':'off');btn.textContent=evolving?'Evolving':'Static';saveSettings();if(evolving)scheduleEvolve()}
@@ -1270,15 +1267,16 @@ async function setOutputDevice(deviceId){
 }
 
 // ─── CLICK TRACK ───
-let clickBPM=70,clickActive=false,clickNextTime=0,clickSchedId=null,clickBeat=0;
+let clickBPM=70,clickActive=false,clickMuted=true,clickNextTime=0,clickSchedId=null,clickBeat=0;
 let delaySync=true,delaySyncDiv='q';
 let evolveOnBeat=true,evolveBars=4,pendingEvolve=-1;
 
 function startClick(){
   if(clickActive)return;clickActive=true;clickBeat=0;
   clickNextTime=ctx.currentTime+0.05;scheduleClicks();
+  const btn=document.getElementById('clickBtn');if(btn){btn.className='evolve-pill '+(clickMuted?'off':'on');}
 }
-function stopClick(){clickActive=false;if(clickSchedId){clearTimeout(clickSchedId);clickSchedId=null}if(arpVol>0)scheduleArp();}
+function stopClick(){clickActive=false;if(clickSchedId){clearTimeout(clickSchedId);clickSchedId=null}}
 function scheduleClicks(){
   if(!clickActive)return;const now=ctx.currentTime;
   while(clickNextTime<now+0.12){fireClick(clickNextTime);clickNextTime+=60/clickBPM}
@@ -1287,11 +1285,13 @@ function scheduleClicks(){
 function fireClick(t){
   const beat=clickBeat++;
   const isDown=(beat%(evolveBars*4))===0;
-  const osc=ctx.createOscillator();const env=ctx.createGain();
-  osc.type='sine';osc.frequency.value=1200;
-  env.gain.setValueAtTime(0.32,t);env.gain.exponentialRampToValueAtTime(0.001,t+0.018);
-  osc.connect(env);env.connect(clickOutBus||ctx.destination);osc.start(t);osc.stop(t+0.025);osc.onended=()=>{try{osc.disconnect();env.disconnect()}catch(e){}};
-  if(evolveOnBeat&&isDown&&evolving){
+  if(!clickMuted&&!_fadeActive){
+    const osc=ctx.createOscillator();const env=ctx.createGain();
+    osc.type='sine';osc.frequency.value=1200;
+    env.gain.setValueAtTime(0.32,t);env.gain.exponentialRampToValueAtTime(0.001,t+0.018);
+    osc.connect(env);env.connect(clickOutBus||ctx.destination);osc.start(t);osc.stop(t+0.025);osc.onended=()=>{try{osc.disconnect();env.disconnect()}catch(e){}};
+  }
+  if(evolveOnBeat&&isDown&&evolving&&!_fadeActive){
     // Apply pending chord at the bar downbeat
     if(pendingEvolve>=0){
       const ne=pendingEvolve;pendingEvolve=-1;
@@ -1317,7 +1317,7 @@ function fireClick(t){
     }
   }
   // Arp: rates are fractions of a bar (0.125=1/8, 0.25=1/4, 0.5=1/2, 1=1 bar)
-  if(arpVol>0){
+  if(arpVol>0&&!_fadeActive){
     const bpn=arpRate*4; // beats per arp note
     if(bpn<=1||beat%bpn===0){
       const delay=Math.max(0,(t-ctx.currentTime)*1000);
@@ -1331,16 +1331,12 @@ function fireClick(t){
 }
 function toggleClick(){
   if(!ctx)return;
-  if(clickActive)stopClick();else startClick();
-  const btn=document.getElementById('clickBtn');if(btn){btn.className='evolve-pill '+(clickActive?'on':'off');btn.textContent=clickActive?'Click: On':'Click: Off'}
-  // Re-draw BPM control if edit sheet open
-  const bpmInp=document.getElementById('bpmInput');if(bpmInp)bpmInp.value=clickBPM;
-  // Switch between deterministic (click on) and random (click off) evolution
-  scheduleEvolve();
+  clickMuted=!clickMuted;
+  const btn=document.getElementById('clickBtn');if(btn){btn.className='evolve-pill '+(clickMuted?'off':'on');}
 }
 function setBPM(v){clickBPM=Math.max(50,Math.min(200,parseInt(v)||120));const d=document.getElementById('bpmDisplay');if(d)d.textContent=clickBPM;if(clickActive){stopClick();startClick()}applyDelaySync();}
 function getDelayTime(){const beat=60/clickBPM;const divs={'1/2':beat*2,'q.':beat*1.5,'q':beat,'1/8.':beat*0.75,'1/8':beat*0.5};return Math.min(divs[delaySyncDiv]||beat*1.5,1.9)}
-function applyDelaySync(){if(!delaySync||!delayNode)return;const _dt=getDelayTime();delayNode.delayTime.cancelScheduledValues(ctx.currentTime);delayNode.delayTime.setValueAtTime(delayNode.delayTime.value,ctx.currentTime);delayNode.delayTime.linearRampToValueAtTime(_dt,ctx.currentTime+0.06);}
+function applyDelaySync(){if(!delaySync||!delayNode)return;const _dt=getDelayTime();delayNode.delayTime.cancelScheduledValues(ctx.currentTime);delayNode.delayTime.setValueAtTime(delayNode.delayTime.value,ctx.currentTime);delayNode.delayTime.linearRampToValueAtTime(_dt,ctx.currentTime+1.2);}
 function toggleDelaySync(){delaySync=!delaySync;applyDelaySync();saveSettings();buildEditSheet()}
 function setDelaySyncDiv(d){delaySyncDiv=d;applyDelaySync();saveSettings();buildEditSheet()}
 
@@ -1533,6 +1529,7 @@ async function initAndStart(){
       startPad(l,layerState[l.id].volume,homeRoot,currentEvolve);
     });
     if(shimmerVol>0)startShimmer(shimmerVol);
+    startClick();
     if(arpVol>0)startArp();
     document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&ctx&&ctx.state==='suspended'&&!audioPaused)ctx.resume()});
     window.addEventListener('focus',()=>{if(ctx&&ctx.state==='suspended'&&!audioPaused)ctx.resume()});
