@@ -153,7 +153,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v0.47</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v0.48</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -191,7 +191,7 @@
       <button class="bpm-tap-main" id="bpmTapMain" onclick="tapTempo()" title="Tap for BPM"><span id="bpmDisplay">70</span><span class="bpm-tap-label">BPM</span></button>
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
     </div>
-    <div class="app-version">v0.47</div>
+    <div class="app-version">v0.48</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -839,8 +839,8 @@ function buildKeys(){
     btn.onclick=()=>{
       if(n===homeRoot){
         audioPaused=!audioPaused;
-        if(audioPaused){master.gain.linearRampToValueAtTime(0,ctx.currentTime+0.4);btn.classList.add('paused')}
-        else{ctx.resume();master.gain.linearRampToValueAtTime(masterVol,ctx.currentTime+0.4);btn.classList.remove('paused')}
+        if(audioPaused){master.gain.linearRampToValueAtTime(0,ctx.currentTime+0.4);btn.classList.add('paused');if('mediaSession' in navigator)navigator.mediaSession.playbackState='paused';}
+        else{ctx.resume();master.gain.linearRampToValueAtTime(masterVol,ctx.currentTime+0.4);btn.classList.remove('paused');if('mediaSession' in navigator)navigator.mediaSession.playbackState='playing';}
         return;
       }
       homeRoot=n;currentPresetName=null;document.getElementById('stateRoot').textContent=n;
@@ -1545,6 +1545,24 @@ async function initAndStart(){
   try{
     await initAudio();
     await ctx.resume();
+    // Force iOS audio session to 'playback' category so silent switch is ignored.
+    // Web Audio defaults to 'ambient' (muted by silent switch); routing through a
+    // <audio playsinline> element is the only web API that overrides this.
+    try{
+      const _msd=ctx.createMediaStreamDestination();
+      const _sb=ctx.createBuffer(1,1,ctx.sampleRate);
+      const _ss=ctx.createBufferSource();_ss.buffer=_sb;_ss.loop=true;
+      _ss.connect(_msd);_ss.start();
+      const _ae=document.createElement('audio');
+      _ae.setAttribute('playsinline','');_ae.setAttribute('x-webkit-airplay','deny');
+      _ae.srcObject=_msd.stream;_ae.volume=0.001;
+      document.body.appendChild(_ae);
+      await _ae.play();
+    }catch(_){}
+    if('mediaSession' in navigator){
+      navigator.mediaSession.playbackState='playing';
+      try{navigator.mediaSession.metadata=new MediaMetadata({title:'NorCoast Ambience'})}catch(_){}
+    }
     await decodeSample();
     PAD_LAYERS.forEach(l=>{
       if(l.type==="granular"){if(layerState[l.id].volume>0)startGranular(layerState[l.id].volume);return}
