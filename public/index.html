@@ -756,8 +756,8 @@ function fireArpNote(){
       osc.type='triangle';
       osc.frequency.value=freq;
       osc.detune.value=det;
-      filt.type='lowpass';filt.frequency.value=Math.min(1400+freq*0.5,3500);filt.Q.value=0.8;
-      const pk=arpVol*0.22*velScale;
+      filt.type='lowpass';filt.frequency.value=Math.min(900+freq*0.25,2000);filt.Q.value=0.7;
+      const pk=arpVol*0.14*velScale;
       env.gain.setValueAtTime(0,ctx.currentTime);
       env.gain.linearRampToValueAtTime(pk,ctx.currentTime+atk);
       env.gain.setValueAtTime(pk*0.65,ctx.currentTime+Math.min(noteDur*0.4,0.6));
@@ -782,12 +782,12 @@ function fireArpNote(){
       osc.type='sawtooth';
       osc.frequency.value=freq;
       osc.detune.value=det;
-      filt.type='lowpass';filt.Q.value=1.8;
-      const brightHz=Math.min(5500+freq*2.2,18000);
-      const darkHz=Math.max(550+freq*0.38,180);
+      filt.type='lowpass';filt.Q.value=1.4;
+      const brightHz=Math.min(4000+freq*1.5,10000);
+      const darkHz=Math.max(320+freq*0.15,110);
       filt.frequency.setValueAtTime(brightHz,ctx.currentTime);
       filt.frequency.exponentialRampToValueAtTime(darkHz,ctx.currentTime+dec);
-      const pk=arpVol*0.19*velScale;
+      const pk=arpVol*0.13*velScale;
       env.gain.setValueAtTime(0,ctx.currentTime);
       env.gain.linearRampToValueAtTime(pk,ctx.currentTime+atk);
       if(noteDur>atk+rel){env.gain.setValueAtTime(pk*0.45,ctx.currentTime+dec);}
