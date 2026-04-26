@@ -60,10 +60,12 @@ final class ViewController: UIViewController {
 
     private func loadApp() {
         // public/ is bundled as a folder reference named "public" inside the app bundle.
+        // The marketing site lives at public/index.html; the synth itself lives at public/app/.
         guard let resourceURL = Bundle.main.resourceURL else { return }
-        let webRoot = resourceURL.appendingPathComponent("public")
-        let indexURL = webRoot.appendingPathComponent("index.html")
-        webView.loadFileURL(indexURL, allowingReadAccessTo: webRoot)
+        let publicRoot = resourceURL.appendingPathComponent("public")
+        let appRoot = publicRoot.appendingPathComponent("app")
+        let indexURL = appRoot.appendingPathComponent("index.html")
+        webView.loadFileURL(indexURL, allowingReadAccessTo: publicRoot)
     }
 
     // MARK: - Lock Screen / Now Playing

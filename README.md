@@ -8,13 +8,23 @@ Live at [norcoastaudio.com](https://norcoastaudio.com) (linked from the main sit
 
 ```
 public/
-  index.html        ← Ambience synth (self-contained, ~2MB)
-  manifest.json     ← PWA manifest (install to home screen)
-  sw.js             ← Service worker (offline support)
+  index.html        ← Marketing landing page (App Store funnel)
+  sw.js             ← Cleanup worker (unregisters legacy root SW)
   icons/
-    icon.svg
-    icon-maskable.svg
+    icon.svg        ← Favicon for the marketing site
+  app/
+    index.html      ← Ambience synth (self-contained, ~2MB)
+    manifest.json   ← PWA manifest (install to home screen)
+    sw.js           ← Service worker (offline support)
+    pitch-shifter-worklet.js
+    icons/
+      icon.svg
+      icon-maskable.svg
 ```
+
+The marketing site lives at `/`; the synth itself runs at `/app`. Replace
+the `href="#"` on the App Store buttons in `public/index.html` with the
+real App Store URL once the app is live.
 
 ## Local dev
 
@@ -35,9 +45,9 @@ The `start` script uses `serve` to host the `public/` directory. Railway provide
 
 ## Install on phone
 
-**Android:** Open in Chrome → three-dot menu → Add to Home Screen
+**Android:** Open `/app` in Chrome → three-dot menu → Add to Home Screen
 
-**iPhone:** Open in Safari → Share → Add to Home Screen
+**iPhone:** Open `/app` in Safari → Share → Add to Home Screen
 
 The app caches fully after first load and works offline.
 
