@@ -1,8 +1,10 @@
-# Norcoast Ambience
+# Norcoast Ambience — marketing site
 
-Standalone generative ambient synthesizer — web app + iOS wrapper.
+Marketing landing page for [Norcoast Ambience](https://timgosden.github.io/norcoast-ambience-app/) — a single-page funnel into the App Store.
 
-Live at [norcoastaudio.com](https://norcoastaudio.com) (linked from the main site).
+Live at [norcoastaudio.com](https://norcoastaudio.com).
+
+The synth itself is developed in a separate repo and hosted on GitHub Pages.
 
 ## Structure
 
@@ -11,20 +13,12 @@ public/
   index.html        ← Marketing landing page (App Store funnel)
   sw.js             ← Cleanup worker (unregisters legacy root SW)
   icons/
-    icon.svg        ← Favicon for the marketing site
-  app/
-    index.html      ← Ambience synth (self-contained, ~2MB)
-    manifest.json   ← PWA manifest (install to home screen)
-    sw.js           ← Service worker (offline support)
-    pitch-shifter-worklet.js
-    icons/
-      icon.svg
-      icon-maskable.svg
+    icon.svg
 ```
 
-The marketing site lives at `/`; the synth itself runs at `/app`. Replace
-the `href="#"` on the App Store buttons in `public/index.html` with the
-real App Store URL once the app is live.
+Replace the `href="#"` on the App Store buttons in `public/index.html`
+with the real App Store URL once the app is live (two spots — search for
+`TODO: replace href`).
 
 ## Local dev
 
@@ -42,15 +36,3 @@ npm run dev
 4. Add custom domain in Railway settings
 
 The `start` script uses `serve` to host the `public/` directory. Railway provides `$PORT` automatically.
-
-## Install on phone
-
-**Android:** Open `/app` in Chrome → three-dot menu → Add to Home Screen
-
-**iPhone:** Open `/app` in Safari → Share → Add to Home Screen
-
-The app caches fully after first load and works offline.
-
-## iOS app
-
-The Xcode project wrapping the synth in a WKWebView lives in this repo alongside the web app. See `ios/` (coming).
