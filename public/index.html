@@ -58,6 +58,9 @@
   .app-version{position:absolute;bottom:6px;right:10px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none;font-variant-numeric:tabular-nums}
   .bpm-click-group{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:14px;padding:4px 8px}
   .evolve-pill{padding:8px 22px;border-radius:20px;font-size:10px;letter-spacing:2.5px;text-transform:uppercase;font-weight:500;cursor:pointer;transition:all 0.3s;border:1px solid transparent}
+  .fade-btn{padding:8px 18px;border-radius:20px;font-size:10px;letter-spacing:2.5px;text-transform:uppercase;font-weight:500;cursor:pointer;transition:all 0.3s;border:1px solid rgba(212,107,138,0.35);background:rgba(212,107,138,0.08);color:rgba(212,107,138,0.7);touch-action:manipulation}
+  .fade-btn.fading{background:rgba(212,107,138,0.18);border-color:rgba(212,107,138,0.6);color:rgba(212,107,138,1);animation:fade-pulse 1.2s ease-in-out infinite}
+  @keyframes fade-pulse{0%,100%{opacity:1}50%{opacity:0.5}}
   .evolve-pill.on{background:rgba(106,159,216,0.12);border-color:rgba(106,159,216,0.28);color:rgba(106,159,216,0.8)}
   .evolve-pill.off{background:rgba(255,255,255,0.04);border-color:rgba(255,255,255,0.1);color:rgba(255,255,255,0.28)}
   /* ── Edit backdrop ── */
@@ -148,7 +151,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v0.38</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v0.39</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -180,12 +183,13 @@
   <div class="perf-setlist" id="perfSetlist"></div>
   <div class="perf-keys" id="keyRow"></div>
   <div class="perf-bottom">
+    <button id="fadeBtn" class="fade-btn" onclick="triggerFade()">Fade</button>
     <button id="evolveBtn" class="evolve-pill on" onclick="toggleEvolving()">Evolving</button>
     <div class="bpm-click-group">
       <button class="bpm-tap-main" id="bpmTapMain" onclick="tapTempo()" title="Tap for BPM"><span id="bpmDisplay">70</span><span class="bpm-tap-label">BPM</span></button>
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
     </div>
-    <div class="app-version">v0.38</div>
+    <div class="app-version">v0.39</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -1099,6 +1103,32 @@ function startVis(){
   draw();
 }
 
+let _fadeTimer=null,_fadeCountT=null,_fadeActive=false;
+function triggerFade(){
+  if(!ctx||!master)return;
+  if(_fadeActive){cancelFade();return;}
+  _fadeActive=true;
+  const DUR=6;
+  master.gain.cancelScheduledValues(ctx.currentTime);
+  master.gain.setValueAtTime(master.gain.value,ctx.currentTime);
+  master.gain.linearRampToValueAtTime(0,ctx.currentTime+DUR);
+  if(clickActive)stopClick();
+  const btn=document.getElementById('fadeBtn');
+  let remaining=DUR;
+  function tick(){btn.textContent=remaining+'s';remaining--;if(remaining>0)_fadeCountT=setTimeout(tick,1000);}
+  if(btn){btn.classList.add('fading');tick();}
+  _fadeTimer=setTimeout(()=>{
+    _fadeActive=false;audioPaused=true;
+    if(btn){btn.classList.remove('fading');btn.textContent='Fade';}
+  },DUR*1000+100);
+}
+function cancelFade(){
+  clearTimeout(_fadeTimer);clearTimeout(_fadeCountT);_fadeTimer=null;_fadeCountT=null;_fadeActive=false;
+  master.gain.cancelScheduledValues(ctx.currentTime);
+  master.gain.setValueAtTime(master.gain.value,ctx.currentTime);
+  master.gain.linearRampToValueAtTime(masterVol,ctx.currentTime+0.5);
+  const btn=document.getElementById('fadeBtn');if(btn){btn.classList.remove('fading');btn.textContent='Fade';}
+}
 function toggleEvolving(){evolving=!evolving;const btn=document.getElementById('evolveBtn');btn.className='evolve-pill '+(evolving?'on':'off');btn.textContent=evolving?'Evolving':'Static';saveSettings();if(evolving)scheduleEvolve()}
 function toggleTextureOct(){textureOctUp=!textureOctUp;saveSettings();buildEditSheet()}
 function toggleFoundationSub(){
