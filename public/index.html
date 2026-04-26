@@ -626,7 +626,7 @@ function buildGroup(def,freqs,vol,atk){
   const spread=0.5;
   freqs.forEach((bf,ni)=>{def.octaves.forEach(oo=>{const f=bf*Math.pow(2,oo);def.timbres.forEach(tb=>{const w=waves[tb.wave];for(let vi=0;vi<tb.count;vi++){const t=tb.count>1?(vi/(tb.count-1))*2-1:0;const o=ctx.createOscillator();o.setPeriodicWave(w);o.frequency.value=f;o.detune.value=t*tb.ds*spread*2.5;const vg=ctx.createGain();vg.gain.value=tb.gain;const pn=ctx.createStereoPanner();pn.pan.value=t*tb.pan*(ni%2===0?1:-1)*(0.3+spread*0.7);const lfo=ctx.createOscillator();lfo.type="sine";lfo.frequency.value=0.01+Math.random()*0.05;const lg=ctx.createGain();lg.gain.value=(0.2+Math.random()*1.5)*(0.1+spread*0.9);lfo.connect(lg);lg.connect(o.detune);lfo.start();lfos.push(lfo);const h=ctx.createDelay(0.01);h.delayTime.value=Math.random()*0.004*spread;o.connect(vg);vg.connect(pn);pn.connect(h);h.connect(flt);o.start();oscs.push(o)}})})});
   flt.connect(gG);gG.connect(master);
-  return{oscs,lfos,gain:gG,filter:flt,filterLG:fG};
+  return{oscs,lfos,gain:gG,filter:flt,filterLG:fG,ampMod:aG};
 }
 
 function fadeOut(nodes,time){
@@ -1108,7 +1108,7 @@ function buildEditSheet(){
       layerState[l.id].volume=vol;queueSave();
       inp.style.background='linear-gradient(to right,'+l.color+'55 '+raw*100+'%,rgba(255,255,255,0.06) '+raw*100+'%)';
       if(l.type==="granular"){if(vol>0&&wasZero)startGranular(vol);else if(vol<=0)stopGranular();else if(granularGain)granularGain.gain.linearRampToValueAtTime(vol*0.8,ctx.currentTime+0.1)}
-      else{if(vol>0&&wasZero&&!staticNodes[l.id])startPad(l,vol,homeRoot,currentEvolve);else{const t=ctx.currentTime+0.08;if(staticNodes[l.id])staticNodes[l.id].gain.gain.linearRampToValueAtTime(vol,t);if(evolveNodes[l.id])evolveNodes[l.id].gain.gain.linearRampToValueAtTime(vol,t)}}
+      else{if(vol>0&&wasZero&&!staticNodes[l.id])startPad(l,vol,homeRoot,currentEvolve);else{const t=ctx.currentTime+0.08;if(staticNodes[l.id]){staticNodes[l.id].gain.gain.linearRampToValueAtTime(vol,t);if(staticNodes[l.id].ampMod)staticNodes[l.id].ampMod.gain.linearRampToValueAtTime(l.aMod*vol,t);}if(evolveNodes[l.id]){evolveNodes[l.id].gain.gain.linearRampToValueAtTime(vol,t);if(evolveNodes[l.id].ampMod)evolveNodes[l.id].ampMod.gain.linearRampToValueAtTime(l.aMod*vol,t);}}}
       const row=inp.closest('.edit-layer'),on=vol>0;
       const db=row.querySelector('.layer-dot-btn');db.style.borderColor=on?l.color+'55':'rgba(255,255,255,0.1)';db.style.background=on?l.color+'15':'transparent';
       const dot=row.querySelector('.layer-dot');dot.style.background=on?l.color:'rgba(255,255,255,0.15)';dot.style.boxShadow=on?'0 0 10px '+l.color+'50':'none';
