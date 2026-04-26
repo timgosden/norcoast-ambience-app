@@ -82,7 +82,7 @@
   #editBackdrop{position:fixed;inset:0;background:rgba(0,0,0,0);pointer-events:none;z-index:40;transition:background 0.3s}
   #editBackdrop.visible{background:rgba(0,0,0,0.52);pointer-events:all}
   /* ── Edit sheet ── */
-  #editSheet{position:fixed;left:0;right:0;bottom:0;background:linear-gradient(180deg,#171b2e 0%,#111628 100%);border-radius:24px 24px 0 0;border-top:1px solid rgba(255,255,255,0.15);box-shadow:0 -8px 40px rgba(0,0,0,0.5);transform:translateY(100%);transition:transform 0.4s cubic-bezier(0.32,0.72,0,1);max-height:84vh;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;z-index:50;padding-bottom:env(safe-area-inset-bottom);padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
+  #editSheet{position:fixed;left:0;right:0;bottom:0;background:linear-gradient(180deg,#0e1120 0%,#090c16 100%);border-radius:24px 24px 0 0;border-top:1px solid rgba(255,255,255,0.15);box-shadow:0 -8px 40px rgba(0,0,0,0.5);transform:translateY(100%);transition:transform 0.4s cubic-bezier(0.32,0.72,0,1);max-height:84vh;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;z-index:50;padding-bottom:env(safe-area-inset-bottom);padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
   #editSheet.open{transform:translateY(0)}
   .sheet-handle{width:36px;height:4px;background:rgba(255,255,255,0.15);border-radius:2px;margin:12px auto 2px;cursor:pointer}
   /* ── Edit content ── */
@@ -1062,7 +1062,32 @@ function buildEditSheet(){
   h+=eqSliderRowHTML('eqH','High',eqHighGain);
   h+='</div>';
   h+='</div><div class="edit-divider"></div>';
-  /* MIDI section hidden until next week */
+  // ── MIDI ──
+  h+='<div class="edit-section"><div class="edit-title">MIDI</div>';
+  if(!midiReady){
+    h+='<div style="font-size:11px;color:rgba(255,255,255,0.3);padding:4px 0 12px">MIDI not available — use Chrome or Edge</div>';
+  }else{
+    // Clock source
+    h+='<div class="slope-row"><span class="slope-label">Clock</span>';
+    h+='<button class="slope-btn'+(midiClockIn?'':' active')+'" onclick="setMidiClockIn(false)">Internal</button>';
+    h+='<button class="slope-btn'+(midiClockIn?' active':'')+'" onclick="setMidiClockIn(true)">Ext In</button>';
+    if(midiClockIn)h+='<span style="font-size:10px;color:rgba(94,184,138,0.7);margin-left:4px">'+clickBPM+' bpm</span>';
+    h+='</div>';
+    // Clock out
+    h+='<div class="slope-row"><span class="slope-label">Clock Out</span>';
+    h+='<button class="slope-btn'+(midiClockOut?'':' active')+'" onclick="setMidiClockOut(false)">Off</button>';
+    h+='<button class="slope-btn'+(midiClockOut?' active':'')+'" onclick="setMidiClockOut(true)">On</button>';
+    if(midiOutputs.length)h+='<span style="font-size:10px;color:rgba(255,255,255,0.3);margin-left:4px">'+midiOutputs.length+' port'+(midiOutputs.length>1?'s':'')+'</span>';
+    h+='</div>';
+    // CC Learn mode
+    h+='<div class="slope-row"><span class="slope-label">Map CCs</span>';
+    h+='<button class="slope-btn'+(midiLearnMode?' active':'')+'" onclick="toggleMIDILearn()">'+(midiLearnMode?'Done ✓':'Learn')+'</button>';
+    if(midiLearnMode)h+='<span style="font-size:10px;color:rgba(196,145,94,0.9);margin-left:6px">Tap a control, then move a knob</span>';
+    h+='</div>';
+    const nMapped=Object.keys(midiMappings).length;
+    if(nMapped>0&&!midiLearnMode)h+='<div style="font-size:10px;color:rgba(255,255,255,0.25);padding:2px 0 8px">'+nMapped+' CC mapping'+(nMapped>1?'s':'')+' active</div>';
+  }
+  h+='</div><div class="edit-divider"></div>';
   // ── Evolution ──
   h+='<div class="edit-section"><div class="edit-title">Evolution</div>';
   h+=sliderRowHTML('spd','Speed','#c4915e',volToFader(evolveSpeed),Math.round(evolveSpeed*100)+'%',evolveOnBeat);
@@ -1365,13 +1390,24 @@ async function setOutputDevice(deviceId){
 // ─── CLICK TRACK ───
 function startClick(){
   if(clickActive)return;clickActive=true;clickBeat=0;
-  clickNextTime=ctx.currentTime+0.05;scheduleClicks();
+  clickNextTime=ctx.currentTime+0.05;
+  midiPulseNext=clickNextTime;
+  if(midiClockOut)midiOutputs.forEach(o=>{try{o.send([0xFA])}catch(e){}});
+  scheduleClicks();
   const btn=document.getElementById('clickBtn');if(btn){btn.className='evolve-pill '+(clickMuted?'off':'on');}
 }
-function stopClick(){clickActive=false;if(clickSchedId){clearTimeout(clickSchedId);clickSchedId=null}}
+function stopClick(){
+  clickActive=false;
+  if(clickSchedId){clearTimeout(clickSchedId);clickSchedId=null}
+  if(midiClockOut)midiOutputs.forEach(o=>{try{o.send([0xFC])}catch(e){}});
+}
 function scheduleClicks(){
   if(!clickActive)return;const now=ctx.currentTime;
   while(clickNextTime<now+0.12){fireClick(clickNextTime);clickNextTime+=60/clickBPM}
+  if(midiClockOut&&midiOutputs.length){
+    const pInt=60/clickBPM/24;
+    while(midiPulseNext<now+0.12){_midiSend([0xF8],midiPulseNext);midiPulseNext+=pInt;}
+  }
   clickSchedId=setTimeout(scheduleClicks,25);
 }
 function fireClick(t){
@@ -1426,7 +1462,7 @@ function toggleClick(){
   clickMuted=!clickMuted;
   const btn=document.getElementById('clickBtn');if(btn){btn.className='evolve-pill '+(clickMuted?'off':'on');}
 }
-function setBPM(v){clickBPM=Math.max(50,Math.min(200,parseInt(v)||120));const d=document.getElementById('bpmDisplay');if(d)d.textContent=clickBPM;if(clickActive){stopClick();startClick()}applyDelaySync();}
+function setBPM(v){clickBPM=Math.max(50,Math.min(200,parseInt(v)||120));const d=document.getElementById('bpmDisplay');if(d)d.textContent=clickBPM;if(clickActive&&!midiClockIn){stopClick();startClick()}applyDelaySync();}
 function getDelayTime(){const beat=60/clickBPM;const divs={'1/2':beat*2,'q.':beat*1.5,'q':beat,'1/8.':beat*0.75,'1/8':beat*0.5};return Math.min(divs[delaySyncDiv]||beat*1.5,1.9)}
 function applyDelaySync(){if(!delaySync||!delayNode)return;const _dt=getDelayTime();delayNode.delayTime.cancelScheduledValues(ctx.currentTime);delayNode.delayTime.setValueAtTime(delayNode.delayTime.value,ctx.currentTime);delayNode.delayTime.linearRampToValueAtTime(_dt,ctx.currentTime+1.2);}
 function toggleDelaySync(){delaySync=!delaySync;applyDelaySync();saveSettings();buildEditSheet()}
@@ -1528,12 +1564,28 @@ function updatePerfSetlist(){
 }
 // ─── MIDI ───
 let midiReady=false,midiLearnMode=false,midiLearnPending=null,midiMappings={};
+let midiOutputs=[],midiClockOut=false,midiClockIn=false;
+const _midiClkTimes=[];
+let midiPulseNext=0;
 const MIDI_NOTE_NAMES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 function loadMidiMappings(){try{midiMappings=JSON.parse(localStorage.getItem('norcoast_midi')||'{}')}catch(e){midiMappings={}}}
 function saveMidiMappings(){localStorage.setItem('norcoast_midi',JSON.stringify(midiMappings))}
 function toggleMIDILearn(){midiLearnMode=!midiLearnMode;midiLearnPending=null;if(document.getElementById('editSheet').classList.contains('open'))buildEditSheet()}
 function startLearnForParam(id){midiLearnPending=id;if(document.getElementById('editSheet').classList.contains('open'))buildEditSheet()}
 function clearLearn(id){delete midiMappings[id];saveMidiMappings();if(document.getElementById('editSheet').classList.contains('open'))buildEditSheet()}
+function setMidiClockIn(v){midiClockIn=v;_midiClkTimes.length=0;if(document.getElementById('editSheet').classList.contains('open'))buildEditSheet()}
+function setMidiClockOut(v){
+  midiClockOut=v;
+  if(v&&clickActive){midiPulseNext=ctx.currentTime;midiOutputs.forEach(o=>{try{o.send([0xFA])}catch(e){}})}
+  if(!v&&clickActive){midiOutputs.forEach(o=>{try{o.send([0xFC])}catch(e){}})}
+  if(document.getElementById('editSheet').classList.contains('open'))buildEditSheet();
+}
+function _midiSend(bytes,t){// t = Web Audio time; convert to perf.now ms for scheduled MIDI send
+  if(!midiOutputs.length)return;
+  const ms=performance.now()+(t-ctx.currentTime)*1000;
+  const sendAt=Math.max(ms,performance.now());
+  midiOutputs.forEach(o=>{try{o.send(bytes,sendAt)}catch(e){}});
+}
 function applyMidiParam(id,val){
   switch(id){
     case'rev':reverbMix=val;if(reverbGain){reverbGain.gain.value=val;dryGain.gain.value=1-val*0.35}break;
@@ -1556,6 +1608,33 @@ function applyMidiParam(id,val){
 }
 function handleMIDI(msg){
   const [s,d1,d2]=msg.data;const type=s&0xF0;
+  // ── System Realtime (single-byte, high priority) ──
+  if(s===0xF8){// MIDI timing clock (24 ppqn)
+    if(midiClockIn){
+      const t=performance.now();
+      _midiClkTimes.push(t);
+      if(_midiClkTimes.length>48)_midiClkTimes.shift();
+      if(_midiClkTimes.length>=25){
+        const beatMs=(_midiClkTimes[_midiClkTimes.length-1]-_midiClkTimes[_midiClkTimes.length-25])/24;
+        const bpm=Math.round(60000/beatMs);
+        if(bpm>=40&&bpm<=300&&bpm!==clickBPM){
+          clickBPM=bpm;
+          const d=document.getElementById('bpmDisplay');if(d)d.textContent=bpm;
+          const inp=document.getElementById('bpmInput');if(inp)inp.value=bpm;
+          applyDelaySync();
+        }
+      }
+    }
+    return;
+  }
+  if(s===0xFA){// MIDI Start
+    if(midiClockIn){_midiClkTimes.length=0;if(ctx&&!clickActive)startClick();}
+    return;
+  }
+  if(s===0xFC){// MIDI Stop
+    if(midiClockIn){_midiClkTimes.length=0;stopClick();}
+    return;
+  }
   if(type===0xB0){// CC
     const val=d2/127;
     // Learn mode: capture this CC for the pending param
@@ -1603,7 +1682,12 @@ async function initMIDI(){
     const acc=await navigator.requestMIDIAccess();midiReady=true;
     const el=document.getElementById('midiBtn');if(el){el.className='evolve-pill on';el.textContent='MIDI ✓'}
     acc.inputs.forEach(i=>{i.onmidimessage=handleMIDI});
-    acc.onstatechange=e=>{if(e.port.type==='input'&&e.port.state==='connected')e.port.onmidimessage=handleMIDI};
+    midiOutputs=[];acc.outputs.forEach(o=>midiOutputs.push(o));
+    acc.onstatechange=e=>{
+      if(e.port.type==='input'&&e.port.state==='connected')e.port.onmidimessage=handleMIDI;
+      if(e.port.type==='output'){midiOutputs=[];acc.outputs.forEach(o=>midiOutputs.push(o));}
+    };
+    if(document.getElementById('editSheet').classList.contains('open'))buildEditSheet();
   }catch(e){}
 }
 
