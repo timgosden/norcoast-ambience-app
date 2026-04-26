@@ -153,7 +153,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v0.46</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v0.47</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -191,7 +191,7 @@
       <button class="bpm-tap-main" id="bpmTapMain" onclick="tapTempo()" title="Tap for BPM"><span id="bpmDisplay">70</span><span class="bpm-tap-label">BPM</span></button>
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
     </div>
-    <div class="app-version">v0.46</div>
+    <div class="app-version">v0.47</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -292,62 +292,84 @@ function initWaves(){
 function initReverb(opts){
   opts=opts||{};
   const inp=ctx.createGain(),out=ctx.createGain();
-  // Pre-delay — sense of room size before diffusion begins
+
+  // Pre-delay
   const pre=ctx.createDelay(0.08);pre.delayTime.value=opts.preDelay||0.018;
   inp.connect(pre);
 
-  // 8 parallel comb filters — the body of the reverb
-  // Delay times chosen to be mutually prime → no flutter echo, dense response
-  const cTimes=[0.0297,0.0371,0.0411,0.0437,0.0539,0.0593,0.0671,0.0737];
-  // Per-comb HF damping — simulates air/material absorption; later combs darker
-  const baseDamp=opts.bright?8000:4000;
-  const cDampHz=cTimes.map((_,i)=>baseDamp-i*(opts.bright?300:200));
-  // Slight per-comb feedback variation — prevents parallel "pinging" at resonances
-  const cFBScale=[1.000,0.995,0.990,0.985,0.980,0.975,0.970,0.965];
+  // 4-stage serial allpass pre-diffusion — builds dense early-scatter cloud
+  const preFreqs=opts.bright?[149,367,751,1597]:[113,281,563,1129];
+  let ds=pre;
+  preFreqs.forEach(f=>{
+    const ap=ctx.createBiquadFilter();ap.type='allpass';ap.frequency.value=f;ap.Q.value=2.8;
+    ds.connect(ap);ds=ap;
+  });
+  const tankIn=ds;
 
-  const apMods=[],combFBs=[];
-  const cSum=ctx.createGain();cSum.gain.value=0.15;
+  // 8-line ring-coupled FDN
+  // Feedback split: 70% self-loop + 30% forward-ring = total always = v → provably stable
+  // Ring coupling circulates energy between all lines → smooth, non-metallic tail
+  const dTimes=[0.0283,0.0353,0.0431,0.0479,0.0557,0.0619,0.0691,0.0761];
+  const N=8;
+  const baseDamp=opts.bright?6500:3400;
+  const fbScale=[1.000,0.996,0.992,0.988,0.984,0.980,0.976,0.972];
+  const SELF=0.70,RING=0.30;
 
-  cTimes.forEach((t,i)=>{
-    const d=ctx.createDelay(0.12);d.delayTime.value=t;
+  const delays=[],selfGs=[],ringGs=[],dampFs=[],dcFs=[],lfoGs=[];
+  for(let i=0;i<N;i++){
+    const d=ctx.createDelay(0.12);d.delayTime.value=dTimes[i];
+    const sg=ctx.createGain();sg.gain.value=0.82*fbScale[i]*SELF;
+    const rg=ctx.createGain();rg.gain.value=0.82*RING;
     const damp=ctx.createBiquadFilter();damp.type='lowpass';
-    damp.frequency.value=cDampHz[i];damp.Q.value=0.15;
-    const cfb=ctx.createGain();cfb.gain.value=0.82*cFBScale[i];
-    combFBs.push(cfb);
-    // Per-comb LFO — de-correlates comb resonances, prevents metallic flutter
-    const lfo=ctx.createOscillator();lfo.type='sine';
-    lfo.frequency.value=0.06+i*0.035;
+    damp.frequency.value=baseDamp-i*170;damp.Q.value=0.1;
+    const dc=ctx.createBiquadFilter();dc.type='highpass';dc.frequency.value=55;dc.Q.value=0.4;
+    const lfo=ctx.createOscillator();lfo.type='sine';lfo.frequency.value=0.037+i*0.028;
     const lg=ctx.createGain();lg.gain.value=(0.0003+i*0.00015)*reverbMod;
-    apMods.push(lg);lfo.connect(lg);lg.connect(d.delayTime);lfo.start();
-    // Comb loop: pre → delay → damp → feedback → delay (loop); tap → sum
-    pre.connect(d);d.connect(damp);damp.connect(cfb);cfb.connect(d);d.connect(cSum);
+    lfo.connect(lg);lg.connect(d.delayTime);lfo.start();
+    delays.push(d);selfGs.push(sg);ringGs.push(rg);dampFs.push(damp);dcFs.push(dc);lfoGs.push(lg);
+  }
+  for(let i=0;i<N;i++){
+    const next=(i+1)%N;
+    // d[i] → damp → dc → [self→d[i], ring→d[next]]
+    delays[i].connect(dampFs[i]);dampFs[i].connect(dcFs[i]);
+    dcFs[i].connect(selfGs[i]);selfGs[i].connect(delays[i]);
+    dcFs[i].connect(ringGs[i]);ringGs[i].connect(delays[next]);
+    tankIn.connect(delays[i]);
+  }
+
+  // Stereo output taps: even → L, odd → R
+  const sumL=ctx.createGain();sumL.gain.value=0.25;
+  const sumR=ctx.createGain();sumR.gain.value=0.25;
+  for(let i=0;i<N;i++){if(i%2===0)delays[i].connect(sumL);else delays[i].connect(sumR);}
+
+  // Dual-mono post-diffusion — detuned L/R for stereo decorrelation
+  const postFreqs=[503,1201,2803,5501];
+  let ppL=sumL,ppR=sumR;
+  postFreqs.forEach((f,j)=>{
+    const apL=ctx.createBiquadFilter();apL.type='allpass';apL.frequency.value=f;apL.Q.value=1.1-j*0.08;
+    const apR=ctx.createBiquadFilter();apR.type='allpass';apR.frequency.value=f*1.013;apR.Q.value=1.1-j*0.08;
+    ppL.connect(apL);ppL=apL;ppR.connect(apR);ppR=apR;
   });
 
-  // Sub-bass cut before diffusion — prevents DC/LF buildup in the reverb tail
-  const tailHP=ctx.createBiquadFilter();tailHP.type='highpass';tailHP.frequency.value=60;tailHP.Q.value=0.5;
-  cSum.connect(tailHP);
-  // 4 allpass diffusers — smooth comb resonances, thicken the tail; Q=1.5 avoids tonal coloration
-  let prev=tailHP;
-  [120,380,900,2100,4800,9000].forEach(f=>{
-    const ap=ctx.createBiquadFilter();ap.type='allpass';ap.frequency.value=f;ap.Q.value=1.1;
-    prev.connect(ap);prev=ap;
-  });
-  // Gentle air shelf compensates for HF damping in comb tails — keeps the top end alive
-  const airShelf=ctx.createBiquadFilter();airShelf.type='highshelf';
-  airShelf.frequency.value=3000;airShelf.gain.value=opts.bright?3:2;
-  prev.connect(airShelf);airShelf.connect(out);
+  // Air shelf + stereo pan to output
+  const airL=ctx.createBiquadFilter();airL.type='highshelf';airL.frequency.value=3000;airL.gain.value=opts.bright?2.5:1.5;
+  const airR=ctx.createBiquadFilter();airR.type='highshelf';airR.frequency.value=3000;airR.gain.value=opts.bright?2.5:1.5;
+  ppL.connect(airL);ppR.connect(airR);
+  const panL=ctx.createStereoPanner();panL.pan.value=-0.6;
+  const panR=ctx.createStereoPanner();panR.pan.value=0.6;
+  airL.connect(panL);airR.connect(panR);panL.connect(out);panR.connect(out);
 
-  // fbGain proxy — presents AudioParam-like interface, controls all 8 comb feedbacks
-  const fbGain={gain:{
+  // fbGain proxy — scales self (70%×scale) and ring (30%) together to keep total = v
+  const fbProxy={gain:{
     _v:0.82,
     get value(){return this._v},
-    set value(v){this._v=v;combFBs.forEach((fb,i)=>fb.gain.value=v*cFBScale[i])},
-    setValueAtTime(v,t){this._v=v;combFBs.forEach((fb,i)=>fb.gain.setValueAtTime(v*cFBScale[i],t))},
-    linearRampToValueAtTime(v,t){this._v=v;combFBs.forEach((fb,i)=>fb.gain.linearRampToValueAtTime(v*cFBScale[i],t))},
-    cancelScheduledValues(t){combFBs.forEach(fb=>fb.gain.cancelScheduledValues(t))}
+    set value(v){this._v=v;selfGs.forEach((sg,i)=>sg.gain.value=v*fbScale[i]*SELF);ringGs.forEach(rg=>rg.gain.value=v*RING)},
+    setValueAtTime(v,t){this._v=v;selfGs.forEach((sg,i)=>sg.gain.setValueAtTime(v*fbScale[i]*SELF,t));ringGs.forEach(rg=>rg.gain.setValueAtTime(v*RING,t))},
+    linearRampToValueAtTime(v,t){this._v=v;selfGs.forEach((sg,i)=>sg.gain.linearRampToValueAtTime(v*fbScale[i]*SELF,t));ringGs.forEach(rg=>rg.gain.linearRampToValueAtTime(v*RING,t))},
+    cancelScheduledValues(t){selfGs.forEach(sg=>sg.gain.cancelScheduledValues(t));ringGs.forEach(rg=>rg.gain.cancelScheduledValues(t))}
   }};
 
-  return{input:inp,output:out,fbGain,damp:null,damp2:null,apMods};
+  return{input:inp,output:out,fbGain:fbProxy,damp:null,damp2:null,apMods:lfoGs};
 }
 
 // ─── DECODE EMBEDDED SAMPLE ───
