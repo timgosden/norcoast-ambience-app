@@ -153,7 +153,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v0.48</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v0.49</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -191,7 +191,7 @@
       <button class="bpm-tap-main" id="bpmTapMain" onclick="tapTempo()" title="Tap for BPM"><span id="bpmDisplay">70</span><span class="bpm-tap-label">BPM</span></button>
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
     </div>
-    <div class="app-version">v0.48</div>
+    <div class="app-version">v0.49</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -250,11 +250,11 @@ let dulcimerBuf=null; // decoded audio buffer
 let homeRoot="C",evolving=true,evolveSpeed=0.5,currentEvolve=0;
 let delayTimeVal=DELAY_Q;
 let lpfValue=0.7,hpfValue=0;
-let reverbMix=0.6,reverbSize=0.78,reverbMod=0.5,delayMixVal=0.1,delayFeedback=0.4,delayTone=0.5,masterVol=0.5;
+let reverbMix=0.6,reverbSize=0.78,reverbMod=0.5,delayMixVal=0.1,delayFeedback=0.4,delayTone=0.5,masterVol=0.5,satAmt=0;
 let textureOctUp=true,foundationSubOct=false;
 let widthMod=0;
 let arpVol=0,arpRate=0.5,arpOct=0,arpStep=0,arpTimer=null;
-let limiter=null,clickOutBus=null,arpRevSend=null;
+let limiter=null,clickOutBus=null,arpRevSend=null,satDriveNode=null,satCompNode=null;
 let multiOutActive=false,_multiOutMerger=null,_multiOutSplitter=null;
 let staticNodes={},evolveNodes={},layerState={};
 let shimmerGainNode=null,shimmerVol=0;
@@ -296,6 +296,21 @@ function initReverb(opts){
   // Pre-delay
   const pre=ctx.createDelay(0.08);pre.delayTime.value=opts.preDelay||0.018;
   inp.connect(pre);
+
+  // Early reflections — 6 discrete taps at 7–43ms, panned for stereo width
+  // These arrive before the diffuse tail and give the sense of a physical space.
+  // Gains decrease with time (inverse-square absorption); alternating pan = width.
+  const erTaps=[{t:0.007,g:0.60,p:-0.30},{t:0.013,g:0.48,p:+0.45},
+                {t:0.019,g:0.37,p:-0.55},{t:0.027,g:0.27,p:+0.20},
+                {t:0.035,g:0.19,p:-0.40},{t:0.043,g:0.12,p:+0.65}];
+  const erOut=ctx.createGain();erOut.gain.value=opts.bright?0.22:0.28;
+  erTaps.forEach(({t,g,p})=>{
+    const d=ctx.createDelay(0.06);d.delayTime.value=t;
+    const gn=ctx.createGain();gn.gain.value=g;
+    const pn=ctx.createStereoPanner();pn.pan.value=p;
+    pre.connect(d);d.connect(gn);gn.connect(pn);pn.connect(erOut);
+  });
+  erOut.connect(out);
 
   // 4-stage serial allpass pre-diffusion — builds dense early-scatter cloud
   const preFreqs=opts.bright?[149,367,751,1597]:[113,281,563,1129];
@@ -577,7 +592,16 @@ async function initAudio(){
   limiter.threshold.value=-3;limiter.knee.value=3;limiter.ratio.value=20;
   limiter.attack.value=0.001;limiter.release.value=0.12;
   clickOutBus=ctx.createGain();clickOutBus.gain.value=1;
-  analyser.connect(limiter);limiter.connect(ctx.destination);
+  // Saturation: tanh soft-clip, drive controlled via satDriveNode pre-gain
+  // At satAmt=0 the signal stays in the linear region of tanh (clean)
+  // At satAmt=1 the pre-gain of 2.5 pushes into the shoulder (warm, thick)
+  const satCurve=new Float32Array(512);
+  for(let i=0;i<512;i++){const x=(i*2/511)-1;satCurve[i]=Math.tanh(x*2.5)/Math.tanh(2.5);}
+  const satWS=ctx.createWaveShaper();satWS.curve=satCurve;satWS.oversample='4x';
+  satDriveNode=ctx.createGain();satDriveNode.gain.value=1;
+  satCompNode=ctx.createGain();satCompNode.gain.value=1;
+  analyser.connect(satDriveNode);satDriveNode.connect(satWS);satWS.connect(satCompNode);satCompNode.connect(limiter);
+  limiter.connect(ctx.destination);
   clickOutBus.connect(ctx.destination);
   // Arp reverb send — enters filter chain so HPF/LPF affect it correctly
   arpRevSend=ctx.createGain();arpRevSend.gain.value=0.42;
@@ -1005,6 +1029,7 @@ function buildEditSheet(){
   // ── Master ──
   h+='<div class="edit-section"><div class="edit-title">Master</div>';
   h+=sliderRowHTML('mst','Volume','#c4915e',volToFader(masterVol),Math.round(masterVol*100)+'%');
+  h+=sliderRowHTML('sat','Drive','#c4915e',satAmt,Math.round(satAmt*100)+'%');
   // Multi-output routing
   const _maxCh=ctx?ctx.destination.maxChannelCount:2;
   h+='<div class="slope-row" style="flex-wrap:wrap;gap:6px 8px"><span class="slope-label">Multi-Out</span>';
@@ -1078,6 +1103,7 @@ function buildEditSheet(){
   wireEQSlider(c,'eqLM',db=>{eqLoMidGain=db;eqLoMidNode.gain.linearRampToValueAtTime(db,ctx.currentTime+0.05);});
   wireEQSlider(c,'eqHM',db=>{eqHiMidGain=db;eqHiMidNode.gain.linearRampToValueAtTime(db,ctx.currentTime+0.05);});
   wireEQSlider(c,'eqH',db=>{eqHighGain=db;eqHighNode.gain.linearRampToValueAtTime(db,ctx.currentTime+0.05);});
+  wireSR(c,'sat',r=>{satAmt=r;if(satDriveNode)satDriveNode.gain.linearRampToValueAtTime(1+r*1.5,ctx.currentTime+0.05);if(satCompNode)satCompNode.gain.linearRampToValueAtTime(1/(1+r*0.3),ctx.currentTime+0.05);queueSave();return Math.round(r*100)+'%'});
   // Wire other sliders
   wireSR(c,'arp',r=>{const wasOff=arpVol<=0;arpVol=r;if(r>0&&wasOff)startArp();else if(r<=0)stopArp();const arpRow=c.querySelector('.edit-layer[data-lid="arp"]');if(arpRow){const on=r>0;const db=arpRow.querySelector('.layer-dot-btn');if(db){db.style.borderColor=on?'#9b7fd455':'rgba(255,255,255,0.1)';db.style.background=on?'#9b7fd415':'transparent';}const dot=arpRow.querySelector('.layer-dot');if(dot){dot.style.background=on?'#9b7fd4':'rgba(255,255,255,0.15)';dot.style.boxShadow=on?'0 0 10px #9b7fd450':'none';}const nm=arpRow.querySelector('.edit-layer-name');if(nm)nm.style.color=on?'rgba(255,255,255,0.8)':'rgba(255,255,255,0.35)';}return Math.round(r*100)+'%'});
   wireSR(c,'spd',r=>{evolveSpeed=faderToVol(r);return Math.round(evolveSpeed*100)+'%'});
@@ -1177,8 +1203,8 @@ function toggleSlope(type){
   }
   saveSettings();buildEditSheet();
 }
-function saveSettings(){try{const s={homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,lpfQ,hpfQ,lpfSlope,hpfSlope,eqLowGain,eqLoMidGain,eqHiMidGain,eqHighGain,chorusMix,widthMod,reverbMix,reverbSize,reverbMod,delayMixVal,delayFeedback,delayTone,delaySync,delaySyncDiv,delayTimeVal,shimmerVol,masterVol,textureOctUp,foundationSubOct,arpVol,arpRate,arpOct,clickBPM,evolveOnBeat,evolveBars,enabledEvolveIdx:[...enabledEvolveIdx],layers:{}};PAD_LAYERS.forEach(l=>{s.layers[l.id]={volume:layerState[l.id].volume}});localStorage.setItem('norcoast_v1',JSON.stringify(s))}catch(e){}}
-function loadSettings(){try{const raw=localStorage.getItem('norcoast_v1');if(!raw)return;const s=JSON.parse(raw);if(s.homeRoot)homeRoot=s.homeRoot;if(s.evolving!=null)evolving=s.evolving;if(s.evolveSpeed!=null)evolveSpeed=s.evolveSpeed;if(s.lpfValue!=null)lpfValue=s.lpfValue;if(s.hpfValue!=null)hpfValue=s.hpfValue;if(s.lpfQ!=null)lpfQ=s.lpfQ;if(s.hpfQ!=null)hpfQ=s.hpfQ;if(s.lpfSlope!=null)lpfSlope=s.lpfSlope;if(s.hpfSlope!=null)hpfSlope=s.hpfSlope;if(s.eqLowGain!=null)eqLowGain=s.eqLowGain;if(s.eqLoMidGain!=null)eqLoMidGain=s.eqLoMidGain;if(s.eqHiMidGain!=null)eqHiMidGain=s.eqHiMidGain;if(s.eqHighGain!=null)eqHighGain=s.eqHighGain;if(s.chorusMix!=null)chorusMix=s.chorusMix;if(s.widthMod!=null)widthMod=s.widthMod;if(s.shimmerVol!=null)shimmerVol=s.shimmerVol;if(s.reverbMix!=null)reverbMix=s.reverbMix;if(s.reverbSize!=null)reverbSize=s.reverbSize;if(s.reverbMod!=null)reverbMod=s.reverbMod;if(s.delayMixVal!=null)delayMixVal=s.delayMixVal;if(s.delayFeedback!=null)delayFeedback=s.delayFeedback;if(s.delayTone!=null)delayTone=s.delayTone;if(s.delaySync!=null)delaySync=s.delaySync;if(s.delaySyncDiv)delaySyncDiv=s.delaySyncDiv;if(s.delayTimeVal!=null)delayTimeVal=s.delayTimeVal;if(s.masterVol!=null)masterVol=s.masterVol;if(s.textureOctUp!=null)textureOctUp=s.textureOctUp;if(s.foundationSubOct!=null)foundationSubOct=s.foundationSubOct;if(s.clickBPM!=null)clickBPM=s.clickBPM;if(s.evolveOnBeat!=null)evolveOnBeat=s.evolveOnBeat;if(s.evolveBars!=null)evolveBars=s.evolveBars;if(s.arpVol!=null)arpVol=s.arpVol;if(s.arpRate!=null)arpRate=s.arpRate;if(s.arpOct!=null)arpOct=s.arpOct;if(Array.isArray(s.enabledEvolveIdx))enabledEvolveIdx=new Set(s.enabledEvolveIdx);if(s.layers)PAD_LAYERS.forEach(l=>{if(s.layers[l.id]!=null)layerState[l.id].volume=s.layers[l.id].volume??0})}catch(e){}}
+function saveSettings(){try{const s={homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,lpfQ,hpfQ,lpfSlope,hpfSlope,eqLowGain,eqLoMidGain,eqHiMidGain,eqHighGain,chorusMix,widthMod,reverbMix,reverbSize,reverbMod,delayMixVal,delayFeedback,delayTone,delaySync,delaySyncDiv,delayTimeVal,shimmerVol,masterVol,satAmt,textureOctUp,foundationSubOct,arpVol,arpRate,arpOct,clickBPM,evolveOnBeat,evolveBars,enabledEvolveIdx:[...enabledEvolveIdx],layers:{}};PAD_LAYERS.forEach(l=>{s.layers[l.id]={volume:layerState[l.id].volume}});localStorage.setItem('norcoast_v1',JSON.stringify(s))}catch(e){}}
+function loadSettings(){try{const raw=localStorage.getItem('norcoast_v1');if(!raw)return;const s=JSON.parse(raw);if(s.homeRoot)homeRoot=s.homeRoot;if(s.evolving!=null)evolving=s.evolving;if(s.evolveSpeed!=null)evolveSpeed=s.evolveSpeed;if(s.lpfValue!=null)lpfValue=s.lpfValue;if(s.hpfValue!=null)hpfValue=s.hpfValue;if(s.lpfQ!=null)lpfQ=s.lpfQ;if(s.hpfQ!=null)hpfQ=s.hpfQ;if(s.lpfSlope!=null)lpfSlope=s.lpfSlope;if(s.hpfSlope!=null)hpfSlope=s.hpfSlope;if(s.eqLowGain!=null)eqLowGain=s.eqLowGain;if(s.eqLoMidGain!=null)eqLoMidGain=s.eqLoMidGain;if(s.eqHiMidGain!=null)eqHiMidGain=s.eqHiMidGain;if(s.eqHighGain!=null)eqHighGain=s.eqHighGain;if(s.chorusMix!=null)chorusMix=s.chorusMix;if(s.widthMod!=null)widthMod=s.widthMod;if(s.shimmerVol!=null)shimmerVol=s.shimmerVol;if(s.reverbMix!=null)reverbMix=s.reverbMix;if(s.reverbSize!=null)reverbSize=s.reverbSize;if(s.reverbMod!=null)reverbMod=s.reverbMod;if(s.delayMixVal!=null)delayMixVal=s.delayMixVal;if(s.delayFeedback!=null)delayFeedback=s.delayFeedback;if(s.delayTone!=null)delayTone=s.delayTone;if(s.delaySync!=null)delaySync=s.delaySync;if(s.delaySyncDiv)delaySyncDiv=s.delaySyncDiv;if(s.delayTimeVal!=null)delayTimeVal=s.delayTimeVal;if(s.masterVol!=null)masterVol=s.masterVol;if(s.satAmt!=null){satAmt=s.satAmt;if(satDriveNode)satDriveNode.gain.value=1+satAmt*1.5;if(satCompNode)satCompNode.gain.value=1/(1+satAmt*0.3);}if(s.textureOctUp!=null)textureOctUp=s.textureOctUp;if(s.foundationSubOct!=null)foundationSubOct=s.foundationSubOct;if(s.clickBPM!=null)clickBPM=s.clickBPM;if(s.evolveOnBeat!=null)evolveOnBeat=s.evolveOnBeat;if(s.evolveBars!=null)evolveBars=s.evolveBars;if(s.arpVol!=null)arpVol=s.arpVol;if(s.arpRate!=null)arpRate=s.arpRate;if(s.arpOct!=null)arpOct=s.arpOct;if(Array.isArray(s.enabledEvolveIdx))enabledEvolveIdx=new Set(s.enabledEvolveIdx);if(s.layers)PAD_LAYERS.forEach(l=>{if(s.layers[l.id]!=null)layerState[l.id].volume=s.layers[l.id].volume??0})}catch(e){}}
 let _saveT=null;function queueSave(){clearTimeout(_saveT);_saveT=setTimeout(saveSettings,500)}
 
 // ─── PRESETS ───
@@ -1480,6 +1506,7 @@ function applyMidiParam(id,val){
     case'hpf':hpfValue=val;{const hz=hpfFaderToHz(val);if(globalHPF){globalHPF.frequency.linearRampToValueAtTime(hz,ctx.currentTime+0.1);if(globalHPF2&&hpfSlope===24)globalHPF2.frequency.linearRampToValueAtTime(hz,ctx.currentTime+0.1)}}break;
     case'spd':evolveSpeed=faderToVol(val);break;
     case'mst':masterVol=faderToVol(val);if(master)master.gain.linearRampToValueAtTime(masterVol,ctx.currentTime+0.1);break;
+    case'sat':satAmt=val;if(satDriveNode)satDriveNode.gain.linearRampToValueAtTime(1+val*1.5,ctx.currentTime+0.05);if(satCompNode)satCompNode.gain.linearRampToValueAtTime(1/(1+val*0.3),ctx.currentTime+0.05);break;
   }
   queueSave();
 }
