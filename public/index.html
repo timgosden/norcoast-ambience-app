@@ -148,7 +148,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v0.37</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v0.38</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -185,7 +185,7 @@
       <button class="bpm-tap-main" id="bpmTapMain" onclick="tapTempo()" title="Tap for BPM"><span id="bpmDisplay">70</span><span class="bpm-tap-label">BPM</span></button>
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
     </div>
-    <div class="app-version">v0.37</div>
+    <div class="app-version">v0.38</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -921,6 +921,7 @@ function buildEditSheet(){
   h+='<button class="slope-btn'+(arpOct===0?' active':'')+'" onclick="setArpOct(0)" style="padding:6px 10px">Mid</button>';
   h+='<button class="slope-btn'+(arpOct===1?' active':'')+'" onclick="setArpOct(1)" style="padding:6px 10px">+8ve</button>';
   h+='</div>';
+  h+=sliderRowHTML('dns','Density','#a08060',densityValue,Math.round(densityValue*100)+'%');
   h+='</div><div class="edit-divider"></div>';
   // ── Effects ──
   const rvSz=(reverbSize-0.62)/0.28;
@@ -1048,7 +1049,7 @@ function buildEditSheet(){
   wireEQSlider(c,'eqHM',db=>{eqHiMidGain=db;eqHiMidNode.gain.linearRampToValueAtTime(db,ctx.currentTime+0.05);});
   wireEQSlider(c,'eqH',db=>{eqHighGain=db;eqHighNode.gain.linearRampToValueAtTime(db,ctx.currentTime+0.05);});
   // Wire other sliders
-
+  wireSR(c,'dns',r=>{densityValue=r;PAD_LAYERS.forEach(l=>{if(l.type!=='granular'&&layerState[l.id].volume>0)startPad(l,layerState[l.id].volume,homeRoot,currentEvolve)});queueSave();return Math.round(r*100)+'%'});
   wireSR(c,'arp',r=>{const wasOff=arpVol<=0;arpVol=r;if(r>0&&wasOff)startArp();else if(r<=0)stopArp();const arpRow=c.querySelector('.edit-layer[data-lid="arp"]');if(arpRow){const on=r>0;const db=arpRow.querySelector('.layer-dot-btn');if(db){db.style.borderColor=on?'#9b7fd455':'rgba(255,255,255,0.1)';db.style.background=on?'#9b7fd415':'transparent';}const dot=arpRow.querySelector('.layer-dot');if(dot){dot.style.background=on?'#9b7fd4':'rgba(255,255,255,0.15)';dot.style.boxShadow=on?'0 0 10px #9b7fd450':'none';}const nm=arpRow.querySelector('.edit-layer-name');if(nm)nm.style.color=on?'rgba(255,255,255,0.8)':'rgba(255,255,255,0.35)';}return Math.round(r*100)+'%'});
   wireSR(c,'spd',r=>{evolveSpeed=faderToVol(r);return Math.round(evolveSpeed*100)+'%'});
   wireSR(c,'mst',r=>{masterVol=faderToVol(r);master.gain.linearRampToValueAtTime(masterVol,ctx.currentTime+0.1);return Math.round(masterVol*100)+'%'});
@@ -1149,7 +1150,7 @@ function loadPreset(name){try{
   if(s.evolveBars!=null)evolveBars=s.evolveBars;
   if(s.arpRate!=null)arpRate=s.arpRate;
   if(s.arpOct!=null)arpOct=s.arpOct;
-  if(s.arpVol!=null){arpVol=s.arpVol;arpStep=0;if(arpVol>0)startArp();else stopArp();}
+  if(s.arpVol!=null){arpVol=s.arpVol;arpStep=0;if(ctx&&arpVol>0)startArp();else stopArp();}
   if(s.clickBPM!=null){clickBPM=s.clickBPM;if(clickActive){stopClick();startClick()}}
   if(Array.isArray(s.enabledEvolveIdx)&&s.enabledEvolveIdx.length>0)enabledEvolveIdx=new Set(s.enabledEvolveIdx);
   if(s.layers)PAD_LAYERS.forEach(l=>{if(s.layers[l.id]!=null)layerState[l.id].volume=s.layers[l.id].volume??0});
@@ -1414,7 +1415,7 @@ function applyMidiParam(id,val){
     case'dlyT':delayTimeVal=0.05*Math.pow(2.0/0.05,val);if(delayNode&&!delaySync)delayNode.delayTime.linearRampToValueAtTime(delayTimeVal,ctx.currentTime+0.1);break;
     case'dlyTone':delayTone=val;if(dToneNode)dToneNode.gain.linearRampToValueAtTime((val-0.5)*24,ctx.currentTime+0.05);break;
     case'chr':chorusMix=val;if(chorusGainNode)chorusGainNode.gain.linearRampToValueAtTime(val*0.5,ctx.currentTime+0.1);break;
-    case'shm':{const sv=faderToVol(val),wasS=shimmerVol;shimmerVol=sv;if(sv>0&&wasS===0)startShimmer(sv);else if(sv<=0)stopShimmer();else if(shimmerNode)shimmerNode.output.gain.linearRampToValueAtTime(sv*0.28,ctx.currentTime+0.1);break}
+    case'shm':{const wasS=shimmerVol;shimmerVol=val;if(val>0&&wasS===0)startShimmer(val);else if(val<=0)stopShimmer();else if(shimmerNode)shimmerNode.output.gain.linearRampToValueAtTime(val*0.28,ctx.currentTime+0.1);break}
     case'lpf':lpfValue=val;{const hz=lpfFaderToHz(val);if(globalLPF){globalLPF.frequency.linearRampToValueAtTime(hz,ctx.currentTime+0.1);if(globalLPF2&&lpfSlope===24)globalLPF2.frequency.linearRampToValueAtTime(hz,ctx.currentTime+0.1)}}break;
     case'hpf':hpfValue=val;{const hz=hpfFaderToHz(val);if(globalHPF){globalHPF.frequency.linearRampToValueAtTime(hz,ctx.currentTime+0.1);if(globalHPF2&&hpfSlope===24)globalHPF2.frequency.linearRampToValueAtTime(hz,ctx.currentTime+0.1)}}break;
     case'spd':evolveSpeed=faderToVol(val);break;
@@ -1445,7 +1446,7 @@ function handleMIDI(msg){
       22:r=>{hpfValue=r;if(globalHPF){globalHPF.frequency.linearRampToValueAtTime(hpfFaderToHz(r),ctx.currentTime+0.05);if(globalHPF2&&hpfSlope===24)globalHPF2.frequency.linearRampToValueAtTime(hpfFaderToHz(r),ctx.currentTime+0.05)}},
       23:r=>{delayMixVal=r;if(delayGainN)delayGainN.gain.value=r*0.7},
       24:r=>{const was=shimmerVol;shimmerVol=r;if(r>0&&was===0)startShimmer(r);else if(r<=0)stopShimmer();else if(shimmerNode){shimmerNode.output.gain.cancelScheduledValues(ctx.currentTime);shimmerNode.output.gain.setValueAtTime(shimmerNode.output.gain.value,ctx.currentTime);shimmerNode.output.gain.linearRampToValueAtTime(r*0.28,ctx.currentTime+0.15)}},
-      25:r=>{densityValue=r},
+      25:r=>{densityValue=r;PAD_LAYERS.forEach(l=>{if(l.type!=='granular'&&layerState[l.id].volume>0)startPad(l,layerState[l.id].volume,homeRoot,currentEvolve)})},
       26:r=>{chorusMix=r;if(chorusGainNode)chorusGainNode.gain.linearRampToValueAtTime(chorusMix*0.5,ctx.currentTime+0.05)},
       27:r=>{reverbSize=reverbSizeToFB(r);if(reverb&&reverb.fbGain)reverb.fbGain.gain.linearRampToValueAtTime(reverbSize,ctx.currentTime+0.1)},
       28:r=>{delayFeedback=r*0.85;if(delayFB)delayFB.gain.linearRampToValueAtTime(delayFeedback,ctx.currentTime+0.1)},
