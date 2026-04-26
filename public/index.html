@@ -20,7 +20,11 @@
   @media(min-width:500px){
     #perf{left:50%;right:auto;width:min(680px,100vw);transform:translateX(-50%);border-left:1px solid rgba(255,255,255,0.06);border-right:1px solid rgba(255,255,255,0.06)}
     #editSheet{left:50%;transform:translateX(-50%);right:auto;width:min(680px,100vw)}
-    .perf-keys{grid-template-columns:repeat(6,1fr)}
+    .perf-keys{grid-template-columns:repeat(6,1fr);gap:6px}
+    .key-btn{aspect-ratio:unset;height:clamp(52px,8vh,72px);border-radius:12px;font-size:15px}
+    .key-btn.sharp{font-size:12px}
+    .perf-vis-wrap{height:44px}
+    .perf-bottom{padding:6px 16px 10px}
   }  .bpm-tap-main{display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(196,145,94,0.1);border:1px solid rgba(196,145,94,0.3);border-radius:10px;padding:5px 12px;cursor:pointer;color:rgba(196,145,94,0.9);transition:background 0.1s,border-color 0.1s;gap:0;min-width:56px;touch-action:manipulation;-webkit-user-select:none;user-select:none}
   .bpm-tap-main:active{background:rgba(196,145,94,0.22);border-color:rgba(196,145,94,0.6)}
   .bpm-tap-main #bpmDisplay{font-size:18px;font-weight:700;font-family:'Open Sans',sans-serif;line-height:1}
