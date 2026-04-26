@@ -44,7 +44,8 @@ targets:
         CFBundleDisplayName: "Norcoast"
         CFBundleVersion: "1"
         CFBundleShortVersionString: "1.0"
-        UILaunchStoryboardName: LaunchScreen
+        UILaunchScreen:
+          UIColorName: LaunchBackgroundColor
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
         UIStatusBarHidden: true
