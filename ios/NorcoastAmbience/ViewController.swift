@@ -4,6 +4,8 @@ import MediaPlayer
 
 final class ViewController: UIViewController {
 
+    private static let iCloudPresetsKey = "norcoast_presets"
+
     private var webView: WKWebView!
 
     // MARK: - Lifecycle
@@ -14,8 +16,8 @@ final class ViewController: UIViewController {
         setupWebView()
         setupNowPlaying()
         setupRemoteControls()
-        loadApp()
         setupiCloudSync()
+        loadApp()
     }
 
     // MARK: - WebView
@@ -69,7 +71,7 @@ final class ViewController: UIViewController {
 
     // MARK: - iCloud KV Sync
 
-    func setupiCloudSync() {
+    private func setupiCloudSync() {
         let kv = NSUbiquitousKeyValueStore.default
         NotificationCenter.default.addObserver(
             self,
@@ -78,7 +80,7 @@ final class ViewController: UIViewController {
             object: kv
         )
         kv.synchronize()
-        injectCloudPresets()
+        // Injection deferred to webView(_:didFinish:) — page must load first.
     }
 
     @objc private func iCloudDidChange(_ notification: Notification) {
@@ -86,14 +88,15 @@ final class ViewController: UIViewController {
     }
 
     private func injectCloudPresets() {
-        guard let json = NSUbiquitousKeyValueStore.default.string(forKey: "norcoast_presets") else { return }
-        let escaped = json.replacingOccurrences(of: "\\", with: "\\\\")
-                          .replacingOccurrences(of: "'", with: "\\'")
+        guard let json = NSUbiquitousKeyValueStore.default.string(forKey: Self.iCloudPresetsKey) else { return }
+        let escaped = json
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "'", with: "\\'")
         webView.evaluateJavaScript("norcoast_setCloudPresets('\(escaped)')", completionHandler: nil)
     }
 
-    func savePresetsToiCloud(_ json: String) {
-        NSUbiquitousKeyValueStore.default.set(json, forKey: "norcoast_presets")
+    private func savePresetsToiCloud(_ json: String) {
+        NSUbiquitousKeyValueStore.default.set(json, forKey: Self.iCloudPresetsKey)
         NSUbiquitousKeyValueStore.default.synchronize()
     }
 
@@ -124,13 +127,11 @@ final class ViewController: UIViewController {
         cc.previousTrackCommand.isEnabled = false
 
         cc.playCommand.addTarget { [weak self] _ in
-            self?.sendToWebApp("norcoast_resume()")
-            MPNowPlayingInfoCenter.default().playbackState = .playing
+            self?.setPlayback(true)
             return .success
         }
         cc.pauseCommand.addTarget { [weak self] _ in
-            self?.sendToWebApp("norcoast_pause()")
-            MPNowPlayingInfoCenter.default().playbackState = .paused
+            self?.setPlayback(false)
             return .success
         }
         cc.togglePlayPauseCommand.addTarget { [weak self] _ in
@@ -145,16 +146,9 @@ final class ViewController: UIViewController {
         webView.evaluateJavaScript(js, completionHandler: nil)
     }
 
-    /// Called by SceneDelegate when a phone call or Siri begins.
-    func pauseForInterruption() {
-        sendToWebApp("norcoast_pause()")
-        MPNowPlayingInfoCenter.default().playbackState = .paused
-    }
-
-    /// Called by SceneDelegate after a phone-call / Siri interruption ends.
-    func resumeAfterInterruption() {
-        sendToWebApp("norcoast_resume()")
-        MPNowPlayingInfoCenter.default().playbackState = .playing
+    private func setPlayback(_ playing: Bool) {
+        sendToWebApp(playing ? "norcoast_resume()" : "norcoast_pause()")
+        MPNowPlayingInfoCenter.default().playbackState = playing ? .playing : .paused
     }
 
     // MARK: - System UI
@@ -165,6 +159,13 @@ final class ViewController: UIViewController {
     override var supportedInterfaceOrientations: UIInterfaceOrientationMask { .portrait }
 }
 
+// MARK: - NorcoastAudioControllable
+
+extension ViewController: NorcoastAudioControllable {
+    func pauseForInterruption() { setPlayback(false) }
+    func resumeAfterInterruption() { setPlayback(true) }
+}
+
 // MARK: - WKNavigationDelegate
 
 extension ViewController: WKNavigationDelegate {
@@ -173,12 +174,12 @@ extension ViewController: WKNavigationDelegate {
         decidePolicyFor navigationAction: WKNavigationAction,
         decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
     ) {
-        // Block any external links — all navigation stays local.
-        if navigationAction.navigationType == .linkActivated {
-            decisionHandler(.cancel)
-        } else {
-            decisionHandler(.allow)
-        }
+        decisionHandler(navigationAction.navigationType == .linkActivated ? .cancel : .allow)
+    }
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        // Page is fully loaded — safe to inject iCloud presets into JS globals.
+        injectCloudPresets()
     }
 }
 

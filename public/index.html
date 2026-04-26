@@ -262,6 +262,7 @@ const PAD_LAYERS=[
 ];
 
 const ATTACK=4,RELEASE=5,XFADE=5,ROOT_OCT=3,DELAY_Q=60/70;
+const STORE_SETTINGS=STORE_SETTINGS,STORE_PRESETS=STORE_PRESETS,STORE_MIDI=STORE_MIDI;
 
 // ─── STATE ───
 let ctx,waves,master,reverb,reverbGain,dryGain,delayNode,delayGainN,delayFB,dToneNode,analyser;
@@ -1297,15 +1298,17 @@ function toggleSlope(type){
   }
   saveSettings();buildEditSheet();
 }
-function saveSettings(){try{const s={homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,lpfQ,hpfQ,lpfSlope,hpfSlope,eqLowGain,eqLoMidGain,eqHiMidGain,eqHighGain,chorusMix,widthMod,reverbMix,reverbSize,reverbMod,delayMixVal,delayFeedback,delayTone,delaySync,delaySyncDiv,delayTimeVal,shimmerVol,masterVol,satAmt,textureOctUp,foundationSubOct,arpVol,arpRate,arpOct,arpVoice,clickBPM,evolveOnBeat,evolveBars,enabledEvolveIdx:[...enabledEvolveIdx],layers:{}};PAD_LAYERS.forEach(l=>{s.layers[l.id]={volume:layerState[l.id].volume}});localStorage.setItem('norcoast_v1',JSON.stringify(s))}catch(e){}}
-function loadSettings(){try{const raw=localStorage.getItem('norcoast_v1');if(!raw)return;const s=JSON.parse(raw);if(s.homeRoot)homeRoot=s.homeRoot;if(s.evolving!=null)evolving=s.evolving;if(s.evolveSpeed!=null)evolveSpeed=s.evolveSpeed;if(s.lpfValue!=null)lpfValue=s.lpfValue;if(s.hpfValue!=null)hpfValue=s.hpfValue;if(s.lpfQ!=null)lpfQ=s.lpfQ;if(s.hpfQ!=null)hpfQ=s.hpfQ;if(s.lpfSlope!=null)lpfSlope=s.lpfSlope;if(s.hpfSlope!=null)hpfSlope=s.hpfSlope;if(s.eqLowGain!=null)eqLowGain=s.eqLowGain;if(s.eqLoMidGain!=null)eqLoMidGain=s.eqLoMidGain;if(s.eqHiMidGain!=null)eqHiMidGain=s.eqHiMidGain;if(s.eqHighGain!=null)eqHighGain=s.eqHighGain;if(s.chorusMix!=null)chorusMix=s.chorusMix;if(s.widthMod!=null)widthMod=s.widthMod;if(s.shimmerVol!=null)shimmerVol=s.shimmerVol;if(s.reverbMix!=null)reverbMix=s.reverbMix;if(s.reverbSize!=null)reverbSize=s.reverbSize;if(s.reverbMod!=null)reverbMod=s.reverbMod;if(s.delayMixVal!=null)delayMixVal=s.delayMixVal;if(s.delayFeedback!=null)delayFeedback=s.delayFeedback;if(s.delayTone!=null)delayTone=s.delayTone;if(s.delaySync!=null)delaySync=s.delaySync;if(s.delaySyncDiv)delaySyncDiv=s.delaySyncDiv;if(s.delayTimeVal!=null)delayTimeVal=s.delayTimeVal;if(s.masterVol!=null)masterVol=s.masterVol;if(s.satAmt!=null){satAmt=s.satAmt;if(satDriveNode)satDriveNode.gain.value=1+satAmt*1.5;if(satCompNode)satCompNode.gain.value=1/(1+satAmt*0.3);}if(s.textureOctUp!=null)textureOctUp=s.textureOctUp;if(s.foundationSubOct!=null)foundationSubOct=s.foundationSubOct;if(s.clickBPM!=null)clickBPM=s.clickBPM;if(s.evolveOnBeat!=null)evolveOnBeat=s.evolveOnBeat;if(s.evolveBars!=null)evolveBars=s.evolveBars;if(s.arpVol!=null)arpVol=s.arpVol;if(s.arpRate!=null)arpRate=s.arpRate;if(s.arpOct!=null)arpOct=s.arpOct;if(s.arpVoice)arpVoice=s.arpVoice;if(Array.isArray(s.enabledEvolveIdx))enabledEvolveIdx=new Set(s.enabledEvolveIdx);if(s.layers)PAD_LAYERS.forEach(l=>{if(s.layers[l.id]!=null)layerState[l.id].volume=s.layers[l.id].volume??0})}catch(e){}}
+function saveSettings(){try{const s={homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,lpfQ,hpfQ,lpfSlope,hpfSlope,eqLowGain,eqLoMidGain,eqHiMidGain,eqHighGain,chorusMix,widthMod,reverbMix,reverbSize,reverbMod,delayMixVal,delayFeedback,delayTone,delaySync,delaySyncDiv,delayTimeVal,shimmerVol,masterVol,satAmt,textureOctUp,foundationSubOct,arpVol,arpRate,arpOct,arpVoice,clickBPM,evolveOnBeat,evolveBars,enabledEvolveIdx:[...enabledEvolveIdx],layers:{}};PAD_LAYERS.forEach(l=>{s.layers[l.id]={volume:layerState[l.id].volume}});localStorage.setItem(STORE_SETTINGS,JSON.stringify(s))}catch(e){}}
+function loadSettings(){try{const raw=localStorage.getItem(STORE_SETTINGS);if(!raw)return;const s=JSON.parse(raw);if(s.homeRoot)homeRoot=s.homeRoot;if(s.evolving!=null)evolving=s.evolving;if(s.evolveSpeed!=null)evolveSpeed=s.evolveSpeed;if(s.lpfValue!=null)lpfValue=s.lpfValue;if(s.hpfValue!=null)hpfValue=s.hpfValue;if(s.lpfQ!=null)lpfQ=s.lpfQ;if(s.hpfQ!=null)hpfQ=s.hpfQ;if(s.lpfSlope!=null)lpfSlope=s.lpfSlope;if(s.hpfSlope!=null)hpfSlope=s.hpfSlope;if(s.eqLowGain!=null)eqLowGain=s.eqLowGain;if(s.eqLoMidGain!=null)eqLoMidGain=s.eqLoMidGain;if(s.eqHiMidGain!=null)eqHiMidGain=s.eqHiMidGain;if(s.eqHighGain!=null)eqHighGain=s.eqHighGain;if(s.chorusMix!=null)chorusMix=s.chorusMix;if(s.widthMod!=null)widthMod=s.widthMod;if(s.shimmerVol!=null)shimmerVol=s.shimmerVol;if(s.reverbMix!=null)reverbMix=s.reverbMix;if(s.reverbSize!=null)reverbSize=s.reverbSize;if(s.reverbMod!=null)reverbMod=s.reverbMod;if(s.delayMixVal!=null)delayMixVal=s.delayMixVal;if(s.delayFeedback!=null)delayFeedback=s.delayFeedback;if(s.delayTone!=null)delayTone=s.delayTone;if(s.delaySync!=null)delaySync=s.delaySync;if(s.delaySyncDiv)delaySyncDiv=s.delaySyncDiv;if(s.delayTimeVal!=null)delayTimeVal=s.delayTimeVal;if(s.masterVol!=null)masterVol=s.masterVol;if(s.satAmt!=null){satAmt=s.satAmt;if(satDriveNode)satDriveNode.gain.value=1+satAmt*1.5;if(satCompNode)satCompNode.gain.value=1/(1+satAmt*0.3);}if(s.textureOctUp!=null)textureOctUp=s.textureOctUp;if(s.foundationSubOct!=null)foundationSubOct=s.foundationSubOct;if(s.clickBPM!=null)clickBPM=s.clickBPM;if(s.evolveOnBeat!=null)evolveOnBeat=s.evolveOnBeat;if(s.evolveBars!=null)evolveBars=s.evolveBars;if(s.arpVol!=null)arpVol=s.arpVol;if(s.arpRate!=null)arpRate=s.arpRate;if(s.arpOct!=null)arpOct=s.arpOct;if(s.arpVoice)arpVoice=s.arpVoice;if(Array.isArray(s.enabledEvolveIdx))enabledEvolveIdx=new Set(s.enabledEvolveIdx);if(s.layers)PAD_LAYERS.forEach(l=>{if(s.layers[l.id]!=null)layerState[l.id].volume=s.layers[l.id].volume??0})}catch(e){}}
 let _saveT=null;function queueSave(){clearTimeout(_saveT);_saveT=setTimeout(saveSettings,500)}
 
 // ─── PRESETS ───
 function escapeHTML(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
-function getPresets(){try{return JSON.parse(localStorage.getItem('norcoast_presets')||'{}')}catch(e){return{}}}
-function prevPreset(){const ps=getPresets();const names=Object.keys(ps);if(!names.length)return;const idx=names.indexOf(currentPresetName??'');loadPreset(names[(idx-1+names.length)%names.length]);}
-function nextPreset(){const ps=getPresets();const names=Object.keys(ps);if(!names.length)return;const idx=names.indexOf(currentPresetName??'');loadPreset(names[(idx+1)%names.length]);}
+function getPresets(){try{return JSON.parse(localStorage.getItem(STORE_PRESETS)||'{}')}catch(e){return{}}}
+function _savePresets(ps){localStorage.setItem(STORE_PRESETS,JSON.stringify(ps));try{window.webkit.messageHandlers.bridge.postMessage('presets:'+JSON.stringify(ps))}catch(_){}}
+function cyclePreset(dir){const names=Object.keys(getPresets());if(!names.length)return;loadPreset(names[(names.indexOf(currentPresetName??'')+dir+names.length)%names.length]);}
+function prevPreset(){cyclePreset(-1);}
+function nextPreset(){cyclePreset(1);}
 function toggleClockRun(){if(!ctx)return;if(clickActive)stopClick();else startClick();const b=document.getElementById('navClockBtn');if(b){b.className='nav-clock'+(clickActive?' running':'');b.textContent=clickActive?'▶ CLK':'■ CLK';}}
 function captureState(){
   const s={homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,lpfQ,hpfQ,lpfSlope,hpfSlope,eqLowGain,eqLoMidGain,eqHiMidGain,eqHighGain,chorusMix,widthMod,reverbMix,reverbSize,reverbMod,delayMixVal,delayFeedback,delayTone,delaySync,delaySyncDiv,delayTimeVal,shimmerVol,masterVol,satAmt,textureOctUp,foundationSubOct,arpVol,arpRate,arpOct,arpVoice,clickBPM,evolveOnBeat,evolveBars,enabledEvolveIdx:[...enabledEvolveIdx],layers:{}};
@@ -1313,17 +1316,13 @@ function captureState(){
 }
 function savePreset(name){
   if(!name.trim())return;const ps=getPresets();ps[name.trim()]=captureState();
-  localStorage.setItem('norcoast_presets',JSON.stringify(ps));buildEditSheet();updatePerfSetlist();
-  try{window.webkit.messageHandlers.bridge.postMessage('presets:'+JSON.stringify(ps))}catch(_){}
+  _savePresets(ps);buildEditSheet();updatePerfSetlist();
 }
 // Called by Swift when iCloud presets arrive (on launch or remote change).
 function norcoast_setCloudPresets(json){
   try{
-    const cloud=JSON.parse(json);
-    const local=getPresets();
-    // Merge: cloud wins for any key that differs.
-    const merged=Object.assign({},local,cloud);
-    localStorage.setItem('norcoast_presets',JSON.stringify(merged));
+    const merged=Object.assign({},getPresets(),JSON.parse(json));
+    localStorage.setItem(STORE_PRESETS,JSON.stringify(merged));
     if(document.getElementById('editSheet').classList.contains('open'))buildEditSheet();
     updatePerfSetlist();
   }catch(e){}
@@ -1380,8 +1379,7 @@ function loadPreset(name){try{
 }catch(e){console.error('loadPreset:',e);}}
 
 function deletePreset(name){
-  const ps=getPresets();delete ps[name];localStorage.setItem('norcoast_presets',JSON.stringify(ps));buildEditSheet();updatePerfSetlist();
-  try{window.webkit.messageHandlers.bridge.postMessage('presets:'+JSON.stringify(ps))}catch(_){};
+  const ps=getPresets();delete ps[name];_savePresets(ps);buildEditSheet();updatePerfSetlist();
 }
 function exportPresets(btn){
   const json=JSON.stringify(getPresets(),null,2);
@@ -1532,16 +1530,14 @@ function movePreset(name,dir){
   const j=i+dir;if(j<0||j>=keys.length)return;
   [keys[i],keys[j]]=[keys[j],keys[i]];
   const newPs={};keys.forEach(k=>{newPs[k]=ps[k]});
-  localStorage.setItem('norcoast_presets',JSON.stringify(newPs));
-  buildEditSheet();updatePerfSetlist();
+  _savePresets(newPs);buildEditSheet();updatePerfSetlist();
 }
 function movePresetTo(name,targetIdx){
   const ps=getPresets();const keys=Object.keys(ps);
   const fromIdx=keys.indexOf(name);if(fromIdx<0||targetIdx<0||targetIdx>=keys.length)return;
   keys.splice(fromIdx,1);keys.splice(targetIdx,0,name);
   const newPs={};keys.forEach(k=>{newPs[k]=ps[k]});
-  localStorage.setItem('norcoast_presets',JSON.stringify(newPs));
-  buildEditSheet();updatePerfSetlist();
+  _savePresets(newPs);buildEditSheet();updatePerfSetlist();
 }
 function initPresetDrag(container){
   if(_dragCleanup){_dragCleanup();_dragCleanup=null;}
@@ -1610,8 +1606,8 @@ let midiOutputs=[],midiClockOut=false,midiClockIn=false;
 const _midiClkTimes=[];
 let midiPulseNext=0;
 const MIDI_NOTE_NAMES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
-function loadMidiMappings(){try{midiMappings=JSON.parse(localStorage.getItem('norcoast_midi')||'{}')}catch(e){midiMappings={}}}
-function saveMidiMappings(){localStorage.setItem('norcoast_midi',JSON.stringify(midiMappings))}
+function loadMidiMappings(){try{midiMappings=JSON.parse(localStorage.getItem(STORE_MIDI)||'{}')}catch(e){midiMappings={}}}
+function saveMidiMappings(){localStorage.setItem(STORE_MIDI,JSON.stringify(midiMappings))}
 function toggleMIDILearn(){midiLearnMode=!midiLearnMode;midiLearnPending=null;if(document.getElementById('editSheet').classList.contains('open'))buildEditSheet()}
 function startLearnForParam(id){midiLearnPending=id;if(document.getElementById('editSheet').classList.contains('open'))buildEditSheet()}
 function clearLearn(id){delete midiMappings[id];saveMidiMappings();if(document.getElementById('editSheet').classList.contains('open'))buildEditSheet()}

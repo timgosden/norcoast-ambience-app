@@ -2,9 +2,16 @@ import UIKit
 import AVFoundation
 import Sentry
 
+protocol NorcoastAudioControllable: AnyObject {
+    func pauseForInterruption()
+    func resumeAfterInterruption()
+}
+
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     var window: UIWindow?
+
+    // MARK: - Lifecycle
 
     func scene(
         _ scene: UIScene,
@@ -38,8 +45,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     private func configureAudioSession() {
         do {
-            // .playback: overrides the silent switch and enables true background audio.
-            // The web app's MediaStreamDestination hack is redundant here but harmless.
+            // .playback category: overrides the silent switch and keeps audio running in the background.
             try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
             try AVAudioSession.sharedInstance().setActive(true)
         } catch {
@@ -54,7 +60,6 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         )
     }
 
-    // Re-activate after phone calls, Siri, etc.
     @objc private func handleAudioInterruption(_ notification: Notification) {
         guard
             let info = notification.userInfo,
@@ -62,21 +67,20 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
             let type = AVAudioSession.InterruptionType(rawValue: typeValue)
         else { return }
 
+        let controllable = window?.rootViewController as? NorcoastAudioControllable
+
         switch type {
         case .began:
-            if let vc = window?.rootViewController as? ViewController {
-                vc.pauseForInterruption()
-            }
+            controllable?.pauseForInterruption()
         case .ended:
             try? AVAudioSession.sharedInstance().setActive(true)
-            let optionsValue = info[AVAudioSessionInterruptionOptionKey] as? UInt ?? 0
-            let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue)
+            let options = AVAudioSession.InterruptionOptions(
+                rawValue: info[AVAudioSessionInterruptionOptionKey] as? UInt ?? 0
+            )
             if options.contains(.shouldResume) {
-                // Short delay lets the audio system stabilise before we resume.
+                // Short delay lets the audio system stabilise before resuming.
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    if let vc = self.window?.rootViewController as? ViewController {
-                        vc.resumeAfterInterruption()
-                    }
+                    controllable?.resumeAfterInterruption()
                 }
             }
         @unknown default:
