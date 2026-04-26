@@ -153,7 +153,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v0.49</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v0.52</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -191,7 +191,7 @@
       <button class="bpm-tap-main" id="bpmTapMain" onclick="tapTempo()" title="Tap for BPM"><span id="bpmDisplay">70</span><span class="bpm-tap-label">BPM</span></button>
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
     </div>
-    <div class="app-version">v0.49</div>
+    <div class="app-version">v0.52</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -255,6 +255,9 @@ let textureOctUp=true,foundationSubOct=false;
 let widthMod=0;
 let arpVol=0,arpRate=0.5,arpOct=0,arpVoice='juno',arpStep=0,arpTimer=null;
 let limiter=null,clickOutBus=null,arpRevSend=null,satDriveNode=null,satCompNode=null;
+let clickBPM=70,clickActive=false,clickMuted=true,clickNextTime=0,clickSchedId=null,clickBeat=0;
+let delaySync=true,delaySyncDiv='q';
+let evolveOnBeat=true,evolveBars=4,pendingEvolve=-1;
 let multiOutActive=false,_multiOutMerger=null,_multiOutSplitter=null;
 let staticNodes={},evolveNodes={},layerState={};
 let shimmerGainNode=null,shimmerVol=0;
@@ -539,7 +542,7 @@ async function initAudio(){
   const lgR=ctx.createGain();lgR.gain.value=0.003;lR.connect(lgR);lgR.connect(dR.delayTime);lR.start();
   const pL=ctx.createStereoPanner();pL.pan.value=-0.65;
   const pR=ctx.createStereoPanner();pR.pan.value=0.65;
-  reverb=initReverb();reverb.fbGain.gain.value=reverbSize;
+  reverb=initReverb();reverb.fbGain.gain.value=reverbSizeToFB(reverbSize);
   reverbGain=ctx.createGain();reverbGain.gain.value=reverbMix;
   dryGain=ctx.createGain();dryGain.gain.value=1-reverbMix*0.35;
   delayNode=ctx.createDelay(2);delayNode.delayTime.value=delayTimeVal;
@@ -1007,7 +1010,7 @@ function buildEditSheet(){
 
   h+='</div><div class="edit-divider"></div>';
   // ── Effects ──
-  const rvSz=(reverbSize-0.62)/0.28;
+  const rvSz=reverbSize;
   const rvSzSecs=(rvSz*11.5+0.5).toFixed(1)+'s';
   h+='<div class="edit-section">';
   h+='<div class="fx-section-header" style="background:rgba(106,159,216,0.08);border-left:3px solid #6a9fd8">Reverb</div>';
@@ -1113,7 +1116,7 @@ function buildEditSheet(){
   });
   // Wire Effects sliders
   wireSR(c,'rev',r=>{reverbMix=r;reverbGain.gain.value=r;dryGain.gain.value=1-r*0.35;return Math.round(r*100)+'%'});
-  wireSR(c,'rvSz',r=>{reverbSize=reverbSizeToFB(r);if(reverb&&reverb.fbGain)reverb.fbGain.gain.linearRampToValueAtTime(reverbSize,ctx.currentTime+0.1);const secs=(r*11.5+0.5).toFixed(1);return secs+'s'});
+  wireSR(c,'rvSz',r=>{reverbSize=r;if(reverb&&reverb.fbGain)reverb.fbGain.gain.linearRampToValueAtTime(reverbSizeToFB(r),ctx.currentTime+0.1);const secs=(r*11.5+0.5).toFixed(1);return secs+'s'});
   wireSR(c,'rvMod',r=>{reverbMod=r;if(reverb&&reverb.apMods)reverb.apMods.forEach((lg,i)=>{lg.gain.linearRampToValueAtTime((0.0003+i*0.00015)*r,ctx.currentTime+0.1)});if(reverbModWet)reverbModWet.gain.linearRampToValueAtTime(r*0.5,ctx.currentTime+0.1);if(reverbModLGain)reverbModLGain.gain.linearRampToValueAtTime(0.001*r,ctx.currentTime+0.1);if(reverbModRGain)reverbModRGain.gain.linearRampToValueAtTime(0.001*r,ctx.currentTime+0.1);return Math.round(r*100)+'%'});
   wireSR(c,'dly',r=>{delayMixVal=r;delayGainN.gain.value=r*0.7;return Math.round(r*100)+'%'});
   wireSR(c,'dlyFB',r=>{delayFeedback=r*0.85;if(delayFB)delayFB.gain.linearRampToValueAtTime(delayFeedback,ctx.currentTime+0.1);return Math.round(r*100)+'%'});
@@ -1240,7 +1243,7 @@ let _saveT=null;function queueSave(){clearTimeout(_saveT);_saveT=setTimeout(save
 function escapeHTML(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
 function getPresets(){try{return JSON.parse(localStorage.getItem('norcoast_presets')||'{}')}catch(e){return{}}}
 function captureState(){
-  const s={homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,lpfQ,hpfQ,lpfSlope,hpfSlope,eqLowGain,eqLoMidGain,eqHiMidGain,eqHighGain,chorusMix,widthMod,reverbMix,reverbSize,reverbMod,delayMixVal,delayFeedback,delayTone,delaySync,delaySyncDiv,delayTimeVal,shimmerVol,textureOctUp,foundationSubOct,arpVol,arpRate,arpOct,clickBPM,evolveOnBeat,evolveBars,enabledEvolveIdx:[...enabledEvolveIdx],layers:{}};
+  const s={homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,lpfQ,hpfQ,lpfSlope,hpfSlope,eqLowGain,eqLoMidGain,eqHiMidGain,eqHighGain,chorusMix,widthMod,reverbMix,reverbSize,reverbMod,delayMixVal,delayFeedback,delayTone,delaySync,delaySyncDiv,delayTimeVal,shimmerVol,masterVol,satAmt,textureOctUp,foundationSubOct,arpVol,arpRate,arpOct,arpVoice,clickBPM,evolveOnBeat,evolveBars,enabledEvolveIdx:[...enabledEvolveIdx],layers:{}};
   PAD_LAYERS.forEach(l=>{s.layers[l.id]={volume:layerState[l.id].volume}});return s;
 }
 function savePreset(name){
@@ -1261,6 +1264,9 @@ function loadPreset(name){try{
   if(s.evolveBars!=null)evolveBars=s.evolveBars;
   if(s.arpRate!=null)arpRate=s.arpRate;
   if(s.arpOct!=null)arpOct=s.arpOct;
+  if(s.arpVoice)arpVoice=s.arpVoice;
+  if(s.masterVol!=null){masterVol=s.masterVol;if(master)master.gain.linearRampToValueAtTime(masterVol,ctx.currentTime+0.1);}
+  if(s.satAmt!=null){satAmt=s.satAmt;if(satDriveNode)satDriveNode.gain.linearRampToValueAtTime(1+satAmt*1.5,ctx.currentTime+0.05);if(satCompNode)satCompNode.gain.linearRampToValueAtTime(1/(1+satAmt*0.3),ctx.currentTime+0.05);}
   if(s.arpVol!=null){arpVol=s.arpVol;arpStep=0;if(ctx&&arpVol>0)startArp();else stopArp();}
   if(s.clickBPM!=null){clickBPM=s.clickBPM;if(clickActive){stopClick();startClick()}}
   if(Array.isArray(s.enabledEvolveIdx)&&s.enabledEvolveIdx.length>0)enabledEvolveIdx=new Set(s.enabledEvolveIdx);
@@ -1274,7 +1280,7 @@ function loadPreset(name){try{
   if(globalHPF2)globalHPF2.frequency.value=hpfSlope===24?hpfFaderToHz(hpfValue):20;
   if(eqLowNode)eqLowNode.gain.value=eqLowGain;if(eqLoMidNode)eqLoMidNode.gain.value=eqLoMidGain;if(eqHiMidNode)eqHiMidNode.gain.value=eqHiMidGain;if(eqHighNode)eqHighNode.gain.value=eqHighGain;if(chorusGainNode)chorusGainNode.gain.value=chorusMix*0.5;
   if(reverbGain){reverbGain.gain.value=reverbMix;dryGain.gain.value=1-reverbMix*0.35}
-  if(reverb&&reverb.fbGain)reverb.fbGain.gain.value=reverbSize;
+  if(reverb&&reverb.fbGain)reverb.fbGain.gain.value=reverbSizeToFB(reverbSize);
   if(reverb&&reverb.apMods)reverb.apMods.forEach((lg,i)=>{lg.gain.value=(0.0003+i*0.00015)*reverbMod});
   if(reverbModWet)reverbModWet.gain.value=reverbMod*0.5;
   if(reverbModLGain)reverbModLGain.gain.value=0.001*reverbMod;
@@ -1344,10 +1350,6 @@ async function setOutputDevice(deviceId){
 }
 
 // ─── CLICK TRACK ───
-let clickBPM=70,clickActive=false,clickMuted=true,clickNextTime=0,clickSchedId=null,clickBeat=0;
-let delaySync=true,delaySyncDiv='q';
-let evolveOnBeat=true,evolveBars=4,pendingEvolve=-1;
-
 function startClick(){
   if(clickActive)return;clickActive=true;clickBeat=0;
   clickNextTime=ctx.currentTime+0.05;scheduleClicks();
@@ -1522,7 +1524,7 @@ function clearLearn(id){delete midiMappings[id];saveMidiMappings();if(document.g
 function applyMidiParam(id,val){
   switch(id){
     case'rev':reverbMix=val;if(reverbGain){reverbGain.gain.value=val;dryGain.gain.value=1-val*0.35}break;
-    case'rvSz':reverbSize=reverbSizeToFB(val);if(reverb&&reverb.fbGain)reverb.fbGain.gain.linearRampToValueAtTime(reverbSize,ctx.currentTime+0.1);break;
+    case'rvSz':reverbSize=val;if(reverb&&reverb.fbGain)reverb.fbGain.gain.linearRampToValueAtTime(reverbSizeToFB(val),ctx.currentTime+0.1);break;
     case'rvMod':reverbMod=val;if(reverb&&reverb.apMods)reverb.apMods.forEach((lg,i)=>{lg.gain.linearRampToValueAtTime((0.0003+i*0.00015)*val,ctx.currentTime+0.1)});if(reverbModWet)reverbModWet.gain.linearRampToValueAtTime(val*0.5,ctx.currentTime+0.1);if(reverbModLGain)reverbModLGain.gain.linearRampToValueAtTime(0.001*val,ctx.currentTime+0.1);if(reverbModRGain)reverbModRGain.gain.linearRampToValueAtTime(0.001*val,ctx.currentTime+0.1);break;
     case'dly':delayMixVal=val;if(delayGainN)delayGainN.gain.value=val*0.7;break;
     case'dlyFB':delayFeedback=val*0.85;if(delayFB)delayFB.gain.linearRampToValueAtTime(delayFeedback,ctx.currentTime+0.1);break;
@@ -1563,7 +1565,7 @@ function handleMIDI(msg){
       23:r=>{delayMixVal=r;if(delayGainN)delayGainN.gain.value=r*0.7},
       24:r=>{const was=shimmerVol;shimmerVol=r;if(r>0&&was===0)startShimmer(r);else if(r<=0)stopShimmer();else if(shimmerNode)shimmerNode.output.gain.linearRampToValueAtTime(r*0.28,ctx.currentTime+0.1)},
       26:r=>{chorusMix=r;if(chorusGainNode)chorusGainNode.gain.linearRampToValueAtTime(chorusMix*0.5,ctx.currentTime+0.05)},
-      27:r=>{reverbSize=reverbSizeToFB(r);if(reverb&&reverb.fbGain)reverb.fbGain.gain.linearRampToValueAtTime(reverbSize,ctx.currentTime+0.1)},
+      27:r=>{reverbSize=r;if(reverb&&reverb.fbGain)reverb.fbGain.gain.linearRampToValueAtTime(reverbSizeToFB(r),ctx.currentTime+0.1)},
       28:r=>{delayFeedback=r*0.85;if(delayFB)delayFB.gain.linearRampToValueAtTime(delayFeedback,ctx.currentTime+0.1)},
     })[d1]?.(val);queueSave();
   }
