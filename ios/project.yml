@@ -37,21 +37,4 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.norcoast.ambience
-    info:
-      path: NorcoastAmbience/Info.plist
-      properties:
-        CFBundleName: "Norcoast"
-        CFBundleDisplayName: "Norcoast"
-        CFBundleVersion: "1"
-        CFBundleShortVersionString: "1.0"
-        UILaunchScreen:
-          UIColorName: LaunchBackgroundColor
-        UISupportedInterfaceOrientations:
-          - UIInterfaceOrientationPortrait
-        UIStatusBarHidden: true
-        UIViewControllerBasedStatusBarAppearance: false
-        UIBackgroundModes:
-          - audio
-        NSMicrophoneUsageDescription: "Norcoast does not use the microphone."
-        UIRequiresFullScreen: true
-        ITSAppUsesNonExemptEncryption: false
+        INFOPLIST_FILE: NorcoastAmbience/Info.plist
