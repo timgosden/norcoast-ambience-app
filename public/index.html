@@ -1627,8 +1627,13 @@ async function initAndStart(){
     if(shimmerVol>0)startShimmer(shimmerVol);
     startClick();
     if(arpVol>0)startArp();
-    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&ctx&&ctx.state==='suspended'&&!audioPaused)ctx.resume()});
+    document.addEventListener('visibilitychange',()=>{
+      if(!ctx)return;
+      if(document.visibilityState==='visible'){if(ctx.state==='suspended'&&!audioPaused)ctx.resume();}
+      else ctx.suspend();
+    });
     window.addEventListener('focus',()=>{if(ctx&&ctx.state==='suspended'&&!audioPaused)ctx.resume()});
+    window.addEventListener('pagehide',()=>{if(ctx)ctx.close();});
     loadMidiMappings();buildKeys();startVis();scheduleEvolve();initMIDI();updatePerfSetlist();
     // Swipe down to close edit sheet
     {const sheet=document.getElementById('editSheet');let _sy=0,_sw=false;
