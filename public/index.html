@@ -253,7 +253,7 @@ let lpfValue=0.7,hpfValue=0;
 let reverbMix=0.6,reverbSize=0.78,reverbMod=0.5,delayMixVal=0.1,delayFeedback=0.4,delayTone=0.5,masterVol=0.5,satAmt=0;
 let textureOctUp=true,foundationSubOct=false;
 let widthMod=0;
-let arpVol=0,arpRate=0.5,arpOct=0,arpStep=0,arpTimer=null;
+let arpVol=0,arpRate=0.5,arpOct=0,arpVoice='juno',arpStep=0,arpTimer=null;
 let limiter=null,clickOutBus=null,arpRevSend=null,satDriveNode=null,satCompNode=null;
 let multiOutActive=false,_multiOutMerger=null,_multiOutSplitter=null;
 let staticNodes={},evolveNodes={},layerState={};
@@ -745,37 +745,61 @@ function fireArpNote(){
   const octShift=Math.floor(arpStep/4)%2;
   const freq=semiFreq(noteFreq(homeRoot,ROOT_OCT+1+octShift+arpOct),semitone);
   const noteDur=arpRate*_arpBarSec();
-  const atk=0.003; // near-instant attack — hard pluck
-  const dec=Math.min(noteDur*0.35,0.9);
-  const rel=Math.min(noteDur*0.55,1.8);
-  // Three-voice unison: left-detuned, center, right-detuned — classic Juno spread
-  [[-0.55,-9,1.0],[0,0,0.82],[0.55,+9,1.0]].forEach(([panV,det,velScale])=>{
-    const osc=ctx.createOscillator();
-    const filt=ctx.createBiquadFilter();
-    const env=ctx.createGain();
-    const pan=ctx.createStereoPanner();
-    osc.type='sawtooth'; // DCO sawtooth — the Juno signature
-    osc.frequency.value=freq;
-    osc.detune.value=det;
-    // Filter envelope: bright attack snap, decays to warm body
-    filt.type='lowpass';filt.Q.value=1.8;
-    const brightHz=Math.min(5500+freq*2.2,18000);
-    const darkHz=Math.max(550+freq*0.38,180);
-    filt.frequency.setValueAtTime(brightHz,ctx.currentTime);
-    filt.frequency.exponentialRampToValueAtTime(darkHz,ctx.currentTime+dec);
-    // Amplitude: fast attack → sustain at 45% peak → release
-    const pk=arpVol*0.19*velScale;
-    env.gain.setValueAtTime(0,ctx.currentTime);
-    env.gain.linearRampToValueAtTime(pk,ctx.currentTime+atk);
-    if(noteDur>atk+rel){env.gain.setValueAtTime(pk*0.45,ctx.currentTime+dec);}
-    env.gain.linearRampToValueAtTime(0,ctx.currentTime+noteDur);
-    pan.pan.value=panV;
-    osc.connect(filt);filt.connect(env);env.connect(pan);
-    pan.connect(master);
-    if(arpRevSend)pan.connect(arpRevSend); // extra reverb send — makes arp swim in verb
-    osc.start();osc.stop(ctx.currentTime+noteDur+0.5);
-    osc.onended=()=>{try{osc.disconnect();filt.disconnect();env.disconnect();pan.disconnect()}catch(e){}};
-  });
+  if(arpVoice==='soft'){
+    // Soft voice: triangle, 40ms attack, warm fixed filter, gentle detune
+    const atk=0.04;
+    [[-0.4,-4,0.9],[0,0,0.75],[0.4,+4,0.9]].forEach(([panV,det,velScale])=>{
+      const osc=ctx.createOscillator();
+      const filt=ctx.createBiquadFilter();
+      const env=ctx.createGain();
+      const pan=ctx.createStereoPanner();
+      osc.type='triangle';
+      osc.frequency.value=freq;
+      osc.detune.value=det;
+      filt.type='lowpass';filt.frequency.value=Math.min(1400+freq*0.5,3500);filt.Q.value=0.8;
+      const pk=arpVol*0.22*velScale;
+      env.gain.setValueAtTime(0,ctx.currentTime);
+      env.gain.linearRampToValueAtTime(pk,ctx.currentTime+atk);
+      env.gain.setValueAtTime(pk*0.65,ctx.currentTime+Math.min(noteDur*0.4,0.6));
+      env.gain.linearRampToValueAtTime(0,ctx.currentTime+noteDur);
+      pan.pan.value=panV;
+      osc.connect(filt);filt.connect(env);env.connect(pan);
+      pan.connect(master);
+      if(arpRevSend)pan.connect(arpRevSend);
+      osc.start();osc.stop(ctx.currentTime+noteDur+0.5);
+      osc.onended=()=>{try{osc.disconnect();filt.disconnect();env.disconnect();pan.disconnect()}catch(e){}};
+    });
+  } else {
+    // Juno voice: sawtooth, instant attack, filter sweep
+    const atk=0.003;
+    const dec=Math.min(noteDur*0.35,0.9);
+    const rel=Math.min(noteDur*0.55,1.8);
+    [[-0.55,-9,1.0],[0,0,0.82],[0.55,+9,1.0]].forEach(([panV,det,velScale])=>{
+      const osc=ctx.createOscillator();
+      const filt=ctx.createBiquadFilter();
+      const env=ctx.createGain();
+      const pan=ctx.createStereoPanner();
+      osc.type='sawtooth';
+      osc.frequency.value=freq;
+      osc.detune.value=det;
+      filt.type='lowpass';filt.Q.value=1.8;
+      const brightHz=Math.min(5500+freq*2.2,18000);
+      const darkHz=Math.max(550+freq*0.38,180);
+      filt.frequency.setValueAtTime(brightHz,ctx.currentTime);
+      filt.frequency.exponentialRampToValueAtTime(darkHz,ctx.currentTime+dec);
+      const pk=arpVol*0.19*velScale;
+      env.gain.setValueAtTime(0,ctx.currentTime);
+      env.gain.linearRampToValueAtTime(pk,ctx.currentTime+atk);
+      if(noteDur>atk+rel){env.gain.setValueAtTime(pk*0.45,ctx.currentTime+dec);}
+      env.gain.linearRampToValueAtTime(0,ctx.currentTime+noteDur);
+      pan.pan.value=panV;
+      osc.connect(filt);filt.connect(env);env.connect(pan);
+      pan.connect(master);
+      if(arpRevSend)pan.connect(arpRevSend);
+      osc.start();osc.stop(ctx.currentTime+noteDur+0.5);
+      osc.onended=()=>{try{osc.disconnect();filt.disconnect();env.disconnect();pan.disconnect()}catch(e){}};
+    });
+  }
   arpStep++;
 }
 function scheduleArp(){
@@ -791,6 +815,7 @@ function stopArp(){if(arpTimer)clearTimeout(arpTimer);arpTimer=null;}
 function toggleArp(){if(arpVol>0){arpVol=0;stopArp();}else{arpVol=0.5;startArp();}buildEditSheet();}
 function setArpRate(b){arpRate=b;if(arpVol>0&&!clickActive){if(arpTimer)clearTimeout(arpTimer);scheduleArp();}saveSettings();buildEditSheet();}
 function setArpOct(o){arpOct=o;arpStep=0;saveSettings();buildEditSheet();}
+function setArpVoice(v){arpVoice=v;saveSettings();buildEditSheet();}
 
 // ─── FILTER MATH ───
 function dampFaderToHz(v){return Math.exp(Math.log(800)+v*(Math.log(8000)-Math.log(800)))}
@@ -974,6 +999,10 @@ function buildEditSheet(){
   h+='<button class="slope-btn'+(arpOct===-1?' active':'')+'" onclick="setArpOct(-1)" style="padding:6px 10px;margin-left:6px">−8ve</button>';
   h+='<button class="slope-btn'+(arpOct===0?' active':'')+'" onclick="setArpOct(0)" style="padding:6px 10px">Mid</button>';
   h+='<button class="slope-btn'+(arpOct===1?' active':'')+'" onclick="setArpOct(1)" style="padding:6px 10px">+8ve</button>';
+  h+='</div>';
+  h+='<div class="slope-row" style="padding:2px 12px 10px"><span class="slope-label">Voice</span>';
+  h+='<button class="slope-btn'+(arpVoice==='juno'?' active':'')+'" onclick="setArpVoice(\'juno\')" style="padding:6px 10px">Juno</button>';
+  h+='<button class="slope-btn'+(arpVoice==='soft'?' active':'')+'" onclick="setArpVoice(\'soft\')" style="padding:6px 10px">Soft</button>';
   h+='</div>';
 
   h+='</div><div class="edit-divider"></div>';
@@ -1203,8 +1232,8 @@ function toggleSlope(type){
   }
   saveSettings();buildEditSheet();
 }
-function saveSettings(){try{const s={homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,lpfQ,hpfQ,lpfSlope,hpfSlope,eqLowGain,eqLoMidGain,eqHiMidGain,eqHighGain,chorusMix,widthMod,reverbMix,reverbSize,reverbMod,delayMixVal,delayFeedback,delayTone,delaySync,delaySyncDiv,delayTimeVal,shimmerVol,masterVol,satAmt,textureOctUp,foundationSubOct,arpVol,arpRate,arpOct,clickBPM,evolveOnBeat,evolveBars,enabledEvolveIdx:[...enabledEvolveIdx],layers:{}};PAD_LAYERS.forEach(l=>{s.layers[l.id]={volume:layerState[l.id].volume}});localStorage.setItem('norcoast_v1',JSON.stringify(s))}catch(e){}}
-function loadSettings(){try{const raw=localStorage.getItem('norcoast_v1');if(!raw)return;const s=JSON.parse(raw);if(s.homeRoot)homeRoot=s.homeRoot;if(s.evolving!=null)evolving=s.evolving;if(s.evolveSpeed!=null)evolveSpeed=s.evolveSpeed;if(s.lpfValue!=null)lpfValue=s.lpfValue;if(s.hpfValue!=null)hpfValue=s.hpfValue;if(s.lpfQ!=null)lpfQ=s.lpfQ;if(s.hpfQ!=null)hpfQ=s.hpfQ;if(s.lpfSlope!=null)lpfSlope=s.lpfSlope;if(s.hpfSlope!=null)hpfSlope=s.hpfSlope;if(s.eqLowGain!=null)eqLowGain=s.eqLowGain;if(s.eqLoMidGain!=null)eqLoMidGain=s.eqLoMidGain;if(s.eqHiMidGain!=null)eqHiMidGain=s.eqHiMidGain;if(s.eqHighGain!=null)eqHighGain=s.eqHighGain;if(s.chorusMix!=null)chorusMix=s.chorusMix;if(s.widthMod!=null)widthMod=s.widthMod;if(s.shimmerVol!=null)shimmerVol=s.shimmerVol;if(s.reverbMix!=null)reverbMix=s.reverbMix;if(s.reverbSize!=null)reverbSize=s.reverbSize;if(s.reverbMod!=null)reverbMod=s.reverbMod;if(s.delayMixVal!=null)delayMixVal=s.delayMixVal;if(s.delayFeedback!=null)delayFeedback=s.delayFeedback;if(s.delayTone!=null)delayTone=s.delayTone;if(s.delaySync!=null)delaySync=s.delaySync;if(s.delaySyncDiv)delaySyncDiv=s.delaySyncDiv;if(s.delayTimeVal!=null)delayTimeVal=s.delayTimeVal;if(s.masterVol!=null)masterVol=s.masterVol;if(s.satAmt!=null){satAmt=s.satAmt;if(satDriveNode)satDriveNode.gain.value=1+satAmt*1.5;if(satCompNode)satCompNode.gain.value=1/(1+satAmt*0.3);}if(s.textureOctUp!=null)textureOctUp=s.textureOctUp;if(s.foundationSubOct!=null)foundationSubOct=s.foundationSubOct;if(s.clickBPM!=null)clickBPM=s.clickBPM;if(s.evolveOnBeat!=null)evolveOnBeat=s.evolveOnBeat;if(s.evolveBars!=null)evolveBars=s.evolveBars;if(s.arpVol!=null)arpVol=s.arpVol;if(s.arpRate!=null)arpRate=s.arpRate;if(s.arpOct!=null)arpOct=s.arpOct;if(Array.isArray(s.enabledEvolveIdx))enabledEvolveIdx=new Set(s.enabledEvolveIdx);if(s.layers)PAD_LAYERS.forEach(l=>{if(s.layers[l.id]!=null)layerState[l.id].volume=s.layers[l.id].volume??0})}catch(e){}}
+function saveSettings(){try{const s={homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,lpfQ,hpfQ,lpfSlope,hpfSlope,eqLowGain,eqLoMidGain,eqHiMidGain,eqHighGain,chorusMix,widthMod,reverbMix,reverbSize,reverbMod,delayMixVal,delayFeedback,delayTone,delaySync,delaySyncDiv,delayTimeVal,shimmerVol,masterVol,satAmt,textureOctUp,foundationSubOct,arpVol,arpRate,arpOct,arpVoice,clickBPM,evolveOnBeat,evolveBars,enabledEvolveIdx:[...enabledEvolveIdx],layers:{}};PAD_LAYERS.forEach(l=>{s.layers[l.id]={volume:layerState[l.id].volume}});localStorage.setItem('norcoast_v1',JSON.stringify(s))}catch(e){}}
+function loadSettings(){try{const raw=localStorage.getItem('norcoast_v1');if(!raw)return;const s=JSON.parse(raw);if(s.homeRoot)homeRoot=s.homeRoot;if(s.evolving!=null)evolving=s.evolving;if(s.evolveSpeed!=null)evolveSpeed=s.evolveSpeed;if(s.lpfValue!=null)lpfValue=s.lpfValue;if(s.hpfValue!=null)hpfValue=s.hpfValue;if(s.lpfQ!=null)lpfQ=s.lpfQ;if(s.hpfQ!=null)hpfQ=s.hpfQ;if(s.lpfSlope!=null)lpfSlope=s.lpfSlope;if(s.hpfSlope!=null)hpfSlope=s.hpfSlope;if(s.eqLowGain!=null)eqLowGain=s.eqLowGain;if(s.eqLoMidGain!=null)eqLoMidGain=s.eqLoMidGain;if(s.eqHiMidGain!=null)eqHiMidGain=s.eqHiMidGain;if(s.eqHighGain!=null)eqHighGain=s.eqHighGain;if(s.chorusMix!=null)chorusMix=s.chorusMix;if(s.widthMod!=null)widthMod=s.widthMod;if(s.shimmerVol!=null)shimmerVol=s.shimmerVol;if(s.reverbMix!=null)reverbMix=s.reverbMix;if(s.reverbSize!=null)reverbSize=s.reverbSize;if(s.reverbMod!=null)reverbMod=s.reverbMod;if(s.delayMixVal!=null)delayMixVal=s.delayMixVal;if(s.delayFeedback!=null)delayFeedback=s.delayFeedback;if(s.delayTone!=null)delayTone=s.delayTone;if(s.delaySync!=null)delaySync=s.delaySync;if(s.delaySyncDiv)delaySyncDiv=s.delaySyncDiv;if(s.delayTimeVal!=null)delayTimeVal=s.delayTimeVal;if(s.masterVol!=null)masterVol=s.masterVol;if(s.satAmt!=null){satAmt=s.satAmt;if(satDriveNode)satDriveNode.gain.value=1+satAmt*1.5;if(satCompNode)satCompNode.gain.value=1/(1+satAmt*0.3);}if(s.textureOctUp!=null)textureOctUp=s.textureOctUp;if(s.foundationSubOct!=null)foundationSubOct=s.foundationSubOct;if(s.clickBPM!=null)clickBPM=s.clickBPM;if(s.evolveOnBeat!=null)evolveOnBeat=s.evolveOnBeat;if(s.evolveBars!=null)evolveBars=s.evolveBars;if(s.arpVol!=null)arpVol=s.arpVol;if(s.arpRate!=null)arpRate=s.arpRate;if(s.arpOct!=null)arpOct=s.arpOct;if(s.arpVoice)arpVoice=s.arpVoice;if(Array.isArray(s.enabledEvolveIdx))enabledEvolveIdx=new Set(s.enabledEvolveIdx);if(s.layers)PAD_LAYERS.forEach(l=>{if(s.layers[l.id]!=null)layerState[l.id].volume=s.layers[l.id].volume??0})}catch(e){}}
 let _saveT=null;function queueSave(){clearTimeout(_saveT);_saveT=setTimeout(saveSettings,500)}
 
 // ─── PRESETS ───
