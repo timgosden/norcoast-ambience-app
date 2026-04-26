@@ -13,10 +13,11 @@
 <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-  html,body{height:100%;overflow:hidden;background:#030508}
+  html,body{height:100%;overflow:hidden;background:linear-gradient(160deg,#07090e,#0b0f1a 40%,#06080d)}
   body{font-family:'Open Sans',sans-serif;color:#fff;-webkit-tap-highlight-color:transparent;-webkit-font-smoothing:antialiased;user-select:none;-webkit-user-select:none}
   /* ── Performance layout ── */
-  #perf{position:fixed;inset:0;display:flex;flex-direction:column;background:linear-gradient(160deg,#07090e,#0b0f1a 40%,#06080d);padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}  .bpm-tap-main{display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(196,145,94,0.1);border:1px solid rgba(196,145,94,0.3);border-radius:10px;padding:5px 12px;cursor:pointer;color:rgba(196,145,94,0.9);transition:background 0.1s,border-color 0.1s;gap:0;min-width:56px;touch-action:manipulation;-webkit-user-select:none;user-select:none}
+  #perf{position:fixed;inset:0;display:flex;flex-direction:column;background:transparent;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
+  @media(min-width:500px){#perf{left:50%;right:auto;width:430px;transform:translateX(-50%);border-left:1px solid rgba(255,255,255,0.06);border-right:1px solid rgba(255,255,255,0.06)}#editSheet{left:calc(50% - 215px);right:auto;width:430px}}  .bpm-tap-main{display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(196,145,94,0.1);border:1px solid rgba(196,145,94,0.3);border-radius:10px;padding:5px 12px;cursor:pointer;color:rgba(196,145,94,0.9);transition:background 0.1s,border-color 0.1s;gap:0;min-width:56px;touch-action:manipulation;-webkit-user-select:none;user-select:none}
   .bpm-tap-main:active{background:rgba(196,145,94,0.22);border-color:rgba(196,145,94,0.6)}
   .bpm-tap-main #bpmDisplay{font-size:18px;font-weight:700;font-family:'Open Sans',sans-serif;line-height:1}
   .bpm-tap-label{font-size:9px;letter-spacing:1px;opacity:0.7;margin-top:1px}
@@ -807,7 +808,7 @@ function fireArpNote(){
 }
 function scheduleArp(){
   if(arpTimer)clearTimeout(arpTimer);
-  if(arpVol<=0)return;
+  if(arpVol<=0||audioPaused)return;
   if(clickActive)return; // click mode: driven from fireClick
   fireArpNote();
   const noteDur=arpRate*_arpBarSec();
@@ -891,8 +892,8 @@ function buildKeys(){
     btn.onclick=()=>{
       if(n===homeRoot){
         audioPaused=!audioPaused;
-        if(audioPaused){master.gain.linearRampToValueAtTime(0,ctx.currentTime+0.4);btn.classList.add('paused');if('mediaSession' in navigator)navigator.mediaSession.playbackState='paused';}
-        else{ctx.resume();master.gain.linearRampToValueAtTime(masterVol,ctx.currentTime+0.4);btn.classList.remove('paused');if('mediaSession' in navigator)navigator.mediaSession.playbackState='playing';}
+        if(audioPaused){master.gain.linearRampToValueAtTime(0,ctx.currentTime+0.4);stopArp();btn.classList.add('paused');if('mediaSession' in navigator)navigator.mediaSession.playbackState='paused';}
+        else{ctx.resume();if(arpVol>0)startArp();master.gain.linearRampToValueAtTime(masterVol,ctx.currentTime+0.4);btn.classList.remove('paused');if('mediaSession' in navigator)navigator.mediaSession.playbackState='playing';}
         return;
       }
       homeRoot=n;currentPresetName=null;document.getElementById('stateRoot').textContent=n;
@@ -1200,7 +1201,7 @@ function triggerFade(){
   function tick(){btn.textContent=remaining+'s';remaining--;if(remaining>0)_fadeCountT=setTimeout(tick,1000);}
   if(btn){btn.classList.add('fading');tick();}
   _fadeTimer=setTimeout(()=>{
-    _fadeActive=false;audioPaused=true;
+    _fadeActive=false;audioPaused=true;stopArp();
     if(btn){btn.classList.remove('fading');btn.textContent='Fade';}
   },DUR*1000+100);
 }
@@ -1364,7 +1365,7 @@ function scheduleClicks(){
 function fireClick(t){
   const beat=clickBeat++;
   const isDown=(beat%(evolveBars*4))===0;
-  if(!clickMuted&&!_fadeActive){
+  if(!clickMuted&&!_fadeActive&&!audioPaused){
     const osc=ctx.createOscillator();const env=ctx.createGain();
     osc.type='sine';osc.frequency.value=1200;
     env.gain.setValueAtTime(0.32,t);env.gain.exponentialRampToValueAtTime(0.001,t+0.018);
@@ -1610,6 +1611,7 @@ function norcoast_resume(){
 function norcoast_pause(){
   if(!ctx||audioPaused)return;
   audioPaused=true;
+  stopArp();
   master.gain.linearRampToValueAtTime(0,ctx.currentTime+0.4);
   const ab=document.querySelector('.key-btn.active');if(ab)ab.classList.add('paused');
   if('mediaSession' in navigator)navigator.mediaSession.playbackState='paused';
