@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Norcoast Ambience — iOS project setup
-# Run this once after cloning to generate the Xcode project.
+# Run after cloning AND after every git pull to keep the Xcode project in sync.
 # Requires: Homebrew, Xcode command-line tools
 
 set -e
