@@ -153,7 +153,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v0.43</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v0.44</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -191,7 +191,7 @@
       <button class="bpm-tap-main" id="bpmTapMain" onclick="tapTempo()" title="Tap for BPM"><span id="bpmDisplay">70</span><span class="bpm-tap-label">BPM</span></button>
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
     </div>
-    <div class="app-version">v0.43</div>
+    <div class="app-version">v0.44</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -249,7 +249,7 @@ let chorusGainNode=null,chorusMix=0;
 let dulcimerBuf=null; // decoded audio buffer
 let homeRoot="C",evolving=true,evolveSpeed=0.5,currentEvolve=0;
 let delayTimeVal=DELAY_Q;
-let lpfValue=0.7,hpfValue=0,densityValue=0.5;
+let lpfValue=0.7,hpfValue=0;
 let reverbMix=0.6,reverbSize=0.78,reverbMod=0.5,delayMixVal=0.1,delayFeedback=0.4,delayTone=0.5,masterVol=0.5;
 let textureOctUp=true,foundationSubOct=false;
 let widthMod=0;
@@ -573,7 +573,7 @@ function buildGroup(def,freqs,vol,atk){
   const aG=ctx.createGain();aG.gain.value=def.aMod*vol;
   aL.connect(aG);aG.connect(gG.gain);aL.start();
   const oscs=[],lfos=[fL,aL];
-  const spread=densityValue;// 0=pure unison, 1=wide chorus
+  const spread=0.5;
   freqs.forEach((bf,ni)=>{def.octaves.forEach(oo=>{const f=bf*Math.pow(2,oo);def.timbres.forEach(tb=>{const w=waves[tb.wave];for(let vi=0;vi<tb.count;vi++){const t=tb.count>1?(vi/(tb.count-1))*2-1:0;const o=ctx.createOscillator();o.setPeriodicWave(w);o.frequency.value=f;o.detune.value=t*tb.ds*spread*2.5;const vg=ctx.createGain();vg.gain.value=tb.gain;const pn=ctx.createStereoPanner();pn.pan.value=t*tb.pan*(ni%2===0?1:-1)*(0.3+spread*0.7);const lfo=ctx.createOscillator();lfo.type="sine";lfo.frequency.value=0.01+Math.random()*0.05;const lg=ctx.createGain();lg.gain.value=(0.2+Math.random()*1.5)*(0.1+spread*0.9);lfo.connect(lg);lg.connect(o.detune);lfo.start();lfos.push(lfo);const h=ctx.createDelay(0.01);h.delayTime.value=Math.random()*0.004*spread;o.connect(vg);vg.connect(pn);pn.connect(h);h.connect(flt);o.start();oscs.push(o)}})})});
   flt.connect(gG);gG.connect(master);
   return{oscs,lfos,gain:gG,filter:flt,filterLG:fG};
@@ -929,7 +929,7 @@ function buildEditSheet(){
   h+='<button class="slope-btn'+(arpOct===0?' active':'')+'" onclick="setArpOct(0)" style="padding:6px 10px">Mid</button>';
   h+='<button class="slope-btn'+(arpOct===1?' active':'')+'" onclick="setArpOct(1)" style="padding:6px 10px">+8ve</button>';
   h+='</div>';
-  h+=sliderRowHTML('dns','Density','#a08060',densityValue,Math.round(densityValue*100)+'%');
+
   h+='</div><div class="edit-divider"></div>';
   // ── Effects ──
   const rvSz=(reverbSize-0.62)/0.28;
@@ -1057,7 +1057,6 @@ function buildEditSheet(){
   wireEQSlider(c,'eqHM',db=>{eqHiMidGain=db;eqHiMidNode.gain.linearRampToValueAtTime(db,ctx.currentTime+0.05);});
   wireEQSlider(c,'eqH',db=>{eqHighGain=db;eqHighNode.gain.linearRampToValueAtTime(db,ctx.currentTime+0.05);});
   // Wire other sliders
-  wireSR(c,'dns',r=>{densityValue=r;PAD_LAYERS.forEach(l=>{if(l.type!=='granular'&&layerState[l.id].volume>0)startPad(l,layerState[l.id].volume,homeRoot,currentEvolve)});queueSave();return Math.round(r*100)+'%'});
   wireSR(c,'arp',r=>{const wasOff=arpVol<=0;arpVol=r;if(r>0&&wasOff)startArp();else if(r<=0)stopArp();const arpRow=c.querySelector('.edit-layer[data-lid="arp"]');if(arpRow){const on=r>0;const db=arpRow.querySelector('.layer-dot-btn');if(db){db.style.borderColor=on?'#9b7fd455':'rgba(255,255,255,0.1)';db.style.background=on?'#9b7fd415':'transparent';}const dot=arpRow.querySelector('.layer-dot');if(dot){dot.style.background=on?'#9b7fd4':'rgba(255,255,255,0.15)';dot.style.boxShadow=on?'0 0 10px #9b7fd450':'none';}const nm=arpRow.querySelector('.edit-layer-name');if(nm)nm.style.color=on?'rgba(255,255,255,0.8)':'rgba(255,255,255,0.35)';}return Math.round(r*100)+'%'});
   wireSR(c,'spd',r=>{evolveSpeed=faderToVol(r);return Math.round(evolveSpeed*100)+'%'});
   wireSR(c,'mst',r=>{masterVol=faderToVol(r);master.gain.linearRampToValueAtTime(masterVol,ctx.currentTime+0.1);return Math.round(masterVol*100)+'%'});
@@ -1157,15 +1156,15 @@ function toggleSlope(type){
   }
   saveSettings();buildEditSheet();
 }
-function saveSettings(){try{const s={homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,lpfQ,hpfQ,lpfSlope,hpfSlope,densityValue,eqLowGain,eqLoMidGain,eqHiMidGain,eqHighGain,chorusMix,widthMod,reverbMix,reverbSize,reverbMod,delayMixVal,delayFeedback,delayTone,delaySync,delaySyncDiv,delayTimeVal,shimmerVol,masterVol,textureOctUp,foundationSubOct,arpVol,arpRate,arpOct,clickBPM,evolveOnBeat,evolveBars,enabledEvolveIdx:[...enabledEvolveIdx],layers:{}};PAD_LAYERS.forEach(l=>{s.layers[l.id]={volume:layerState[l.id].volume}});localStorage.setItem('norcoast_v1',JSON.stringify(s))}catch(e){}}
-function loadSettings(){try{const raw=localStorage.getItem('norcoast_v1');if(!raw)return;const s=JSON.parse(raw);if(s.homeRoot)homeRoot=s.homeRoot;if(s.evolving!=null)evolving=s.evolving;if(s.evolveSpeed!=null)evolveSpeed=s.evolveSpeed;if(s.lpfValue!=null)lpfValue=s.lpfValue;if(s.hpfValue!=null)hpfValue=s.hpfValue;if(s.lpfQ!=null)lpfQ=s.lpfQ;if(s.hpfQ!=null)hpfQ=s.hpfQ;if(s.lpfSlope!=null)lpfSlope=s.lpfSlope;if(s.hpfSlope!=null)hpfSlope=s.hpfSlope;if(s.densityValue!=null)densityValue=s.densityValue;if(s.eqLowGain!=null)eqLowGain=s.eqLowGain;if(s.eqLoMidGain!=null)eqLoMidGain=s.eqLoMidGain;if(s.eqHiMidGain!=null)eqHiMidGain=s.eqHiMidGain;if(s.eqHighGain!=null)eqHighGain=s.eqHighGain;if(s.chorusMix!=null)chorusMix=s.chorusMix;if(s.widthMod!=null)widthMod=s.widthMod;if(s.shimmerVol!=null)shimmerVol=s.shimmerVol;if(s.reverbMix!=null)reverbMix=s.reverbMix;if(s.reverbSize!=null)reverbSize=s.reverbSize;if(s.reverbMod!=null)reverbMod=s.reverbMod;if(s.delayMixVal!=null)delayMixVal=s.delayMixVal;if(s.delayFeedback!=null)delayFeedback=s.delayFeedback;if(s.delayTone!=null)delayTone=s.delayTone;if(s.delaySync!=null)delaySync=s.delaySync;if(s.delaySyncDiv)delaySyncDiv=s.delaySyncDiv;if(s.delayTimeVal!=null)delayTimeVal=s.delayTimeVal;if(s.masterVol!=null)masterVol=s.masterVol;if(s.textureOctUp!=null)textureOctUp=s.textureOctUp;if(s.foundationSubOct!=null)foundationSubOct=s.foundationSubOct;if(s.clickBPM!=null)clickBPM=s.clickBPM;if(s.evolveOnBeat!=null)evolveOnBeat=s.evolveOnBeat;if(s.evolveBars!=null)evolveBars=s.evolveBars;if(s.arpVol!=null)arpVol=s.arpVol;if(s.arpRate!=null)arpRate=s.arpRate;if(s.arpOct!=null)arpOct=s.arpOct;if(Array.isArray(s.enabledEvolveIdx))enabledEvolveIdx=new Set(s.enabledEvolveIdx);if(s.layers)PAD_LAYERS.forEach(l=>{if(s.layers[l.id]!=null)layerState[l.id].volume=s.layers[l.id].volume??0})}catch(e){}}
+function saveSettings(){try{const s={homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,lpfQ,hpfQ,lpfSlope,hpfSlope,eqLowGain,eqLoMidGain,eqHiMidGain,eqHighGain,chorusMix,widthMod,reverbMix,reverbSize,reverbMod,delayMixVal,delayFeedback,delayTone,delaySync,delaySyncDiv,delayTimeVal,shimmerVol,masterVol,textureOctUp,foundationSubOct,arpVol,arpRate,arpOct,clickBPM,evolveOnBeat,evolveBars,enabledEvolveIdx:[...enabledEvolveIdx],layers:{}};PAD_LAYERS.forEach(l=>{s.layers[l.id]={volume:layerState[l.id].volume}});localStorage.setItem('norcoast_v1',JSON.stringify(s))}catch(e){}}
+function loadSettings(){try{const raw=localStorage.getItem('norcoast_v1');if(!raw)return;const s=JSON.parse(raw);if(s.homeRoot)homeRoot=s.homeRoot;if(s.evolving!=null)evolving=s.evolving;if(s.evolveSpeed!=null)evolveSpeed=s.evolveSpeed;if(s.lpfValue!=null)lpfValue=s.lpfValue;if(s.hpfValue!=null)hpfValue=s.hpfValue;if(s.lpfQ!=null)lpfQ=s.lpfQ;if(s.hpfQ!=null)hpfQ=s.hpfQ;if(s.lpfSlope!=null)lpfSlope=s.lpfSlope;if(s.hpfSlope!=null)hpfSlope=s.hpfSlope;if(s.eqLowGain!=null)eqLowGain=s.eqLowGain;if(s.eqLoMidGain!=null)eqLoMidGain=s.eqLoMidGain;if(s.eqHiMidGain!=null)eqHiMidGain=s.eqHiMidGain;if(s.eqHighGain!=null)eqHighGain=s.eqHighGain;if(s.chorusMix!=null)chorusMix=s.chorusMix;if(s.widthMod!=null)widthMod=s.widthMod;if(s.shimmerVol!=null)shimmerVol=s.shimmerVol;if(s.reverbMix!=null)reverbMix=s.reverbMix;if(s.reverbSize!=null)reverbSize=s.reverbSize;if(s.reverbMod!=null)reverbMod=s.reverbMod;if(s.delayMixVal!=null)delayMixVal=s.delayMixVal;if(s.delayFeedback!=null)delayFeedback=s.delayFeedback;if(s.delayTone!=null)delayTone=s.delayTone;if(s.delaySync!=null)delaySync=s.delaySync;if(s.delaySyncDiv)delaySyncDiv=s.delaySyncDiv;if(s.delayTimeVal!=null)delayTimeVal=s.delayTimeVal;if(s.masterVol!=null)masterVol=s.masterVol;if(s.textureOctUp!=null)textureOctUp=s.textureOctUp;if(s.foundationSubOct!=null)foundationSubOct=s.foundationSubOct;if(s.clickBPM!=null)clickBPM=s.clickBPM;if(s.evolveOnBeat!=null)evolveOnBeat=s.evolveOnBeat;if(s.evolveBars!=null)evolveBars=s.evolveBars;if(s.arpVol!=null)arpVol=s.arpVol;if(s.arpRate!=null)arpRate=s.arpRate;if(s.arpOct!=null)arpOct=s.arpOct;if(Array.isArray(s.enabledEvolveIdx))enabledEvolveIdx=new Set(s.enabledEvolveIdx);if(s.layers)PAD_LAYERS.forEach(l=>{if(s.layers[l.id]!=null)layerState[l.id].volume=s.layers[l.id].volume??0})}catch(e){}}
 let _saveT=null;function queueSave(){clearTimeout(_saveT);_saveT=setTimeout(saveSettings,500)}
 
 // ─── PRESETS ───
 function escapeHTML(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
 function getPresets(){try{return JSON.parse(localStorage.getItem('norcoast_presets')||'{}')}catch(e){return{}}}
 function captureState(){
-  const s={homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,lpfQ,hpfQ,lpfSlope,hpfSlope,densityValue,eqLowGain,eqLoMidGain,eqHiMidGain,eqHighGain,chorusMix,widthMod,reverbMix,reverbSize,reverbMod,delayMixVal,delayFeedback,delayTone,delaySync,delaySyncDiv,delayTimeVal,shimmerVol,textureOctUp,foundationSubOct,arpVol,arpRate,arpOct,clickBPM,evolveOnBeat,evolveBars,enabledEvolveIdx:[...enabledEvolveIdx],layers:{}};
+  const s={homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,lpfQ,hpfQ,lpfSlope,hpfSlope,eqLowGain,eqLoMidGain,eqHiMidGain,eqHighGain,chorusMix,widthMod,reverbMix,reverbSize,reverbMod,delayMixVal,delayFeedback,delayTone,delaySync,delaySyncDiv,delayTimeVal,shimmerVol,textureOctUp,foundationSubOct,arpVol,arpRate,arpOct,clickBPM,evolveOnBeat,evolveBars,enabledEvolveIdx:[...enabledEvolveIdx],layers:{}};
   PAD_LAYERS.forEach(l=>{s.layers[l.id]={volume:layerState[l.id].volume}});return s;
 }
 function savePreset(name){
@@ -1176,7 +1175,7 @@ function loadPreset(name){try{
   const ps=getPresets();const s=ps[name];if(!s)return;
   if(s.homeRoot)homeRoot=s.homeRoot;if(s.evolving!=null)evolving=s.evolving;if(s.evolveSpeed!=null)evolveSpeed=s.evolveSpeed;
   if(s.lpfValue!=null)lpfValue=s.lpfValue;if(s.hpfValue!=null)hpfValue=s.hpfValue;if(s.lpfQ!=null)lpfQ=s.lpfQ;if(s.hpfQ!=null)hpfQ=s.hpfQ;
-  if(s.densityValue!=null)densityValue=s.densityValue;if(s.eqLowGain!=null)eqLowGain=s.eqLowGain;if(s.eqLoMidGain!=null)eqLoMidGain=s.eqLoMidGain;if(s.eqHiMidGain!=null)eqHiMidGain=s.eqHiMidGain;if(s.eqHighGain!=null)eqHighGain=s.eqHighGain;if(s.chorusMix!=null)chorusMix=s.chorusMix;if(s.widthMod!=null){widthMod=s.widthMod;if(widthLFOGain)widthLFOGain.gain.value=widthMod*0.5;}
+  if(s.eqLowGain!=null)eqLowGain=s.eqLowGain;if(s.eqLoMidGain!=null)eqLoMidGain=s.eqLoMidGain;if(s.eqHiMidGain!=null)eqHiMidGain=s.eqHiMidGain;if(s.eqHighGain!=null)eqHighGain=s.eqHighGain;if(s.chorusMix!=null)chorusMix=s.chorusMix;if(s.widthMod!=null){widthMod=s.widthMod;if(widthLFOGain)widthLFOGain.gain.value=widthMod*0.5;}
   if(s.reverbMix!=null)reverbMix=s.reverbMix;if(s.reverbSize!=null)reverbSize=s.reverbSize;if(s.reverbMod!=null)reverbMod=s.reverbMod;
   if(s.delayMixVal!=null)delayMixVal=s.delayMixVal;if(s.delayFeedback!=null)delayFeedback=s.delayFeedback;if(s.delayTone!=null)delayTone=s.delayTone;if(s.shimmerVol!=null)shimmerVol=s.shimmerVol;
   if(s.delaySync!=null)delaySync=s.delaySync;if(s.delaySyncDiv)delaySyncDiv=s.delaySyncDiv;if(s.delayTimeVal!=null)delayTimeVal=s.delayTimeVal;
@@ -1272,7 +1271,7 @@ async function setOutputDevice(deviceId){
 let clickBPM=70,clickActive=false,clickNextTime=0,clickSchedId=null,clickBeat=0;
 let delaySync=true,delaySyncDiv='q';
 let evolveOnBeat=true,evolveBars=4,pendingEvolve=-1;
-let _densityRebuildT=null;
+
 function startClick(){
   if(clickActive)return;clickActive=true;clickBeat=0;
   clickNextTime=ctx.currentTime+0.05;scheduleClicks();
@@ -1487,7 +1486,6 @@ function handleMIDI(msg){
       22:r=>{hpfValue=r;if(globalHPF){globalHPF.frequency.linearRampToValueAtTime(hpfFaderToHz(r),ctx.currentTime+0.05);if(globalHPF2&&hpfSlope===24)globalHPF2.frequency.linearRampToValueAtTime(hpfFaderToHz(r),ctx.currentTime+0.05)}},
       23:r=>{delayMixVal=r;if(delayGainN)delayGainN.gain.value=r*0.7},
       24:r=>{const was=shimmerVol;shimmerVol=r;if(r>0&&was===0)startShimmer(r);else if(r<=0)stopShimmer();else if(shimmerNode)shimmerNode.output.gain.linearRampToValueAtTime(r*0.28,ctx.currentTime+0.1)},
-      25:r=>{densityValue=r;PAD_LAYERS.forEach(l=>{if(l.type!=='granular'&&layerState[l.id].volume>0)startPad(l,layerState[l.id].volume,homeRoot,currentEvolve)})},
       26:r=>{chorusMix=r;if(chorusGainNode)chorusGainNode.gain.linearRampToValueAtTime(chorusMix*0.5,ctx.currentTime+0.05)},
       27:r=>{reverbSize=reverbSizeToFB(r);if(reverb&&reverb.fbGain)reverb.fbGain.gain.linearRampToValueAtTime(reverbSize,ctx.currentTime+0.1)},
       28:r=>{delayFeedback=r*0.85;if(delayFB)delayFB.gain.linearRampToValueAtTime(delayFeedback,ctx.currentTime+0.1)},
