@@ -1594,6 +1594,29 @@ async function initMIDI(){
   }catch(e){}
 }
 
+// ─── NATIVE BRIDGE API ───
+// Called by the iOS Swift wrapper via evaluateJavaScript()
+function norcoast_resume(){
+  if(!ctx||!audioPaused)return;
+  audioPaused=false;
+  ctx.resume();
+  master.gain.cancelScheduledValues(ctx.currentTime);
+  master.gain.setValueAtTime(master.gain.value,ctx.currentTime);
+  master.gain.linearRampToValueAtTime(masterVol,ctx.currentTime+0.3);
+  const ab=document.querySelector('.key-btn.active');if(ab)ab.classList.remove('paused');
+  if('mediaSession' in navigator)navigator.mediaSession.playbackState='playing';
+  try{window.webkit.messageHandlers.bridge.postMessage('playing')}catch(_){}
+}
+function norcoast_pause(){
+  if(!ctx||audioPaused)return;
+  audioPaused=true;
+  master.gain.linearRampToValueAtTime(0,ctx.currentTime+0.4);
+  const ab=document.querySelector('.key-btn.active');if(ab)ab.classList.add('paused');
+  if('mediaSession' in navigator)navigator.mediaSession.playbackState='paused';
+  try{window.webkit.messageHandlers.bridge.postMessage('paused')}catch(_){}
+}
+function norcoast_togglePause(){if(audioPaused)norcoast_resume();else norcoast_pause();}
+
 // ─── START ───
 async function initAndStart(){
   const prompt=document.getElementById('audioPrompt');
@@ -1603,20 +1626,21 @@ async function initAndStart(){
   try{
     await initAudio();
     await ctx.resume();
-    // Force iOS audio session to 'playback' category so silent switch is ignored.
-    // Web Audio defaults to 'ambient' (muted by silent switch); routing through a
-    // <audio playsinline> element is the only web API that overrides this.
-    try{
-      const _msd=ctx.createMediaStreamDestination();
-      const _sb=ctx.createBuffer(1,1,ctx.sampleRate);
-      const _ss=ctx.createBufferSource();_ss.buffer=_sb;_ss.loop=true;
-      _ss.connect(_msd);_ss.start();
-      const _ae=document.createElement('audio');
-      _ae.setAttribute('playsinline','');_ae.setAttribute('x-webkit-airplay','deny');
-      _ae.srcObject=_msd.stream;_ae.volume=0.001;
-      document.body.appendChild(_ae);
-      await _ae.play();
-    }catch(_){}
+    // In the native iOS app the AVAudioSession is already set to .playback,
+    // so the MediaStream workaround is unnecessary. Skip it to avoid redundant routing.
+    if(!window.__NATIVE_APP__){
+      try{
+        const _msd=ctx.createMediaStreamDestination();
+        const _sb=ctx.createBuffer(1,1,ctx.sampleRate);
+        const _ss=ctx.createBufferSource();_ss.buffer=_sb;_ss.loop=true;
+        _ss.connect(_msd);_ss.start();
+        const _ae=document.createElement('audio');
+        _ae.setAttribute('playsinline','');_ae.setAttribute('x-webkit-airplay','deny');
+        _ae.srcObject=_msd.stream;_ae.volume=0.001;
+        document.body.appendChild(_ae);
+        await _ae.play();
+      }catch(_){}
+    }
     if('mediaSession' in navigator){
       navigator.mediaSession.playbackState='playing';
       try{navigator.mediaSession.metadata=new MediaMetadata({title:'NorCoast Ambience'})}catch(_){}
