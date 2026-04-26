@@ -13,17 +13,17 @@
 <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-  html,body{height:100%;overflow:hidden;background:linear-gradient(160deg,#07090e,#0b0f1a 40%,#06080d)}
+  html,body{height:100%;overflow:hidden;background:#030508}
   body{font-family:'Open Sans',sans-serif;color:#fff;-webkit-tap-highlight-color:transparent;-webkit-font-smoothing:antialiased;user-select:none;-webkit-user-select:none}
   /* ── Performance layout ── */
-  #perf{position:fixed;inset:0;display:flex;flex-direction:column;background:transparent;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
+  #perf{position:fixed;inset:0;display:flex;flex-direction:column;background:linear-gradient(160deg,#07090e,#0b0f1a 40%,#06080d);padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
   @media(min-width:500px){
     .perf-keys{grid-template-columns:repeat(6,1fr);gap:6px;padding:0 20px 4px}
     .key-btn{aspect-ratio:unset;height:clamp(52px,8vh,72px);border-radius:12px;font-size:15px}
     .key-btn.sharp{font-size:12px}
     .perf-vis-wrap{height:44px;padding:4px 20px}
     .perf-bottom{padding:6px 20px 12px}
-    #editSheet{max-width:800px;left:50%;transform:translateX(-50%);right:auto}
+    #editSheet{left:0;right:0;transform:none;max-width:none}
   }
   @media(min-width:1100px){
     .perf-keys{grid-template-columns:repeat(12,1fr);gap:8px;padding:0 28px 4px}
