@@ -153,7 +153,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v0.44</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v0.45</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -191,7 +191,7 @@
       <button class="bpm-tap-main" id="bpmTapMain" onclick="tapTempo()" title="Tap for BPM"><span id="bpmDisplay">70</span><span class="bpm-tap-label">BPM</span></button>
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
     </div>
-    <div class="app-version">v0.44</div>
+    <div class="app-version">v0.45</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -1116,6 +1116,7 @@ function triggerFade(){
   master.gain.setValueAtTime(master.gain.value,ctx.currentTime);
   master.gain.linearRampToValueAtTime(0,ctx.currentTime+DUR);
   if(clickActive)stopClick();
+  stopArp();
   const btn=document.getElementById('fadeBtn');
   let remaining=DUR;
   function tick(){btn.textContent=remaining+'s';remaining--;if(remaining>0)_fadeCountT=setTimeout(tick,1000);}
@@ -1132,6 +1133,7 @@ function cancelFade(){
     master.gain.setValueAtTime(master.gain.value,ctx.currentTime);
     master.gain.linearRampToValueAtTime(masterVol,ctx.currentTime+0.5);
   }
+  if(arpVol>0&&!clickActive)startArp();
   const btn=document.getElementById('fadeBtn');if(btn){btn.classList.remove('fading');btn.textContent='Fade';}
 }
 function toggleEvolving(){evolving=!evolving;const btn=document.getElementById('evolveBtn');btn.className='evolve-pill '+(evolving?'on':'off');btn.textContent=evolving?'Evolving':'Static';saveSettings();if(evolving)scheduleEvolve()}
