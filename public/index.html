@@ -166,7 +166,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v0.95</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v0.96</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -205,7 +205,7 @@
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
       <button id="clickX2Btn" class="evolve-pill off" onclick="toggleClickX2()" style="padding:8px 10px;font-size:9px;letter-spacing:1px">x2</button>
     </div>
-    <div class="app-version">v0.95</div>
+    <div class="app-version">v0.96</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -387,7 +387,7 @@ function initReverb(opts){
     damp.frequency.value=baseDamp-i*170;damp.Q.value=0.7;
     const dc=ctx.createBiquadFilter();dc.type='highpass';dc.frequency.value=30;dc.Q.value=0.7;
     const lfo=ctx.createOscillator();lfo.type='sine';lfo.frequency.value=0.037+i*0.028;
-    const lg=ctx.createGain();lg.gain.value=(0.0003+i*0.00015)*reverbMod;
+    const lg=ctx.createGain();lg.gain.value=(0.0006+i*0.0003)*reverbMod;
     lfo.connect(lg);lg.connect(d.delayTime);lfo.start();
     delays.push(d);selfGs.push(sg);ringGs.push(rg);dampFs.push(damp);dcFs.push(dc);lfoGs.push(lg);
   }
@@ -401,8 +401,8 @@ function initReverb(opts){
   }
 
   // Stereo output taps: even → L, odd → R
-  const sumL=ctx.createGain();sumL.gain.value=0.80;
-  const sumR=ctx.createGain();sumR.gain.value=0.80;
+  const sumL=ctx.createGain();sumL.gain.value=0.65;
+  const sumR=ctx.createGain();sumR.gain.value=0.65;
   for(let i=0;i<N;i++){if(i%2===0)delays[i].connect(sumL);else delays[i].connect(sumR);}
 
   // Dual-mono post-diffusion — detuned L/R for stereo decorrelation
@@ -619,14 +619,14 @@ async function initAudio(){
   rvModL.delayTime.value=0.008;rvModR.delayTime.value=0.011;
   const rvModLFOL=ctx.createOscillator();rvModLFOL.type='sine';rvModLFOL.frequency.value=0.7;
   const rvModLFOR=ctx.createOscillator();rvModLFOR.type='sine';rvModLFOR.frequency.value=0.97;
-  reverbModLGain=ctx.createGain();reverbModLGain.gain.value=0.001*reverbMod;
-  reverbModRGain=ctx.createGain();reverbModRGain.gain.value=0.001*reverbMod;
+  reverbModLGain=ctx.createGain();reverbModLGain.gain.value=0.0025*reverbMod;
+  reverbModRGain=ctx.createGain();reverbModRGain.gain.value=0.0025*reverbMod;
   rvModLFOL.connect(reverbModLGain);reverbModLGain.connect(rvModL.delayTime);
   rvModLFOR.connect(reverbModRGain);reverbModRGain.connect(rvModR.delayTime);
   rvModLFOL.start();rvModLFOR.start();
   const rvModPanL=ctx.createStereoPanner();rvModPanL.pan.value=-0.6;
   const rvModPanR=ctx.createStereoPanner();rvModPanR.pan.value=0.6;
-  reverbModWet=ctx.createGain();reverbModWet.gain.value=reverbMod*0.5*reverbMix;
+  reverbModWet=ctx.createGain();reverbModWet.gain.value=reverbMod*0.7*reverbMix;
   reverb.output.connect(rvModL);reverb.output.connect(rvModR);
   rvModL.connect(rvModPanL);rvModR.connect(rvModPanR);
   rvModPanL.connect(reverbModWet);rvModPanR.connect(reverbModWet);reverbModWet.connect(_sumBus);
@@ -652,7 +652,7 @@ async function initAudio(){
   movementReverb=createMovementReverb();
   _drumHPF=ctx.createBiquadFilter();_drumHPF.type='highpass';_drumHPF.frequency.value=hpfFaderToHz(hpfValue);_drumHPF.Q.value=hpfQ;
   _drumLPF=ctx.createBiquadFilter();_drumLPF.type='lowpass';_drumLPF.frequency.value=lpfFaderToHz(lpfValue);_drumLPF.Q.value=lpfQ;
-  _drumDelaySend=ctx.createGain();_drumDelaySend.gain.value=delayMixVal*0.5;
+  _drumDelaySend=ctx.createGain();_drumDelaySend.gain.value=delayMixVal*1.5;
   movementReverb.output.connect(_drumHPF);_drumHPF.connect(_drumLPF);
   _drumLPF.connect(_sumBus);
   _drumLPF.connect(_drumDelaySend);_drumDelaySend.connect(delayNode);
@@ -1029,7 +1029,7 @@ function setMovementPattern(p){movementPattern=p;movementStep=0;saveSettings();b
 
 // ─── FILTER MATH ───
 function dampFaderToHz(v){return Math.exp(Math.log(800)+v*(Math.log(8000)-Math.log(800)))}
-function reverbSizeToFB(v){return 0.75+v*0.22}
+function reverbSizeToFB(v){return 0.85+v*0.14}
 // Rebuild the WaveShaper curve for the given saturation amount.
 // At amt=0 the curve is identity (no coloration). At amt=1 it's tanh(x*2.5)/tanh(2.5).
 function buildSatCurve(amt){
@@ -1381,10 +1381,10 @@ function buildEditSheet(){
     });
   });
   // Wire Effects sliders
-  wireSR(c,'rev',r=>{reverbMix=r;reverbGain.gain.linearRampToValueAtTime(r,ctx.currentTime+0.05);dryGain.gain.linearRampToValueAtTime(1-r,ctx.currentTime+0.05);if(reverbModWet)reverbModWet.gain.linearRampToValueAtTime(reverbMod*0.5*r,ctx.currentTime+0.05);return Math.round(r*100)+'%'});
-  wireSR(c,'rvSz',r=>{reverbSize=r;if(reverb&&reverb.fbGain)reverb.fbGain.gain.linearRampToValueAtTime(reverbSizeToFB(r),ctx.currentTime+0.1);const secs=(r*11.5+0.5).toFixed(1);return secs+'s'});
-  wireSR(c,'rvMod',r=>{reverbMod=r;if(reverb&&reverb.apMods)reverb.apMods.forEach((lg,i)=>{lg.gain.linearRampToValueAtTime((0.0003+i*0.00015)*r,ctx.currentTime+0.1)});if(reverbModWet)reverbModWet.gain.linearRampToValueAtTime(r*0.5*reverbMix,ctx.currentTime+0.1);if(reverbModLGain)reverbModLGain.gain.linearRampToValueAtTime(0.001*r,ctx.currentTime+0.1);if(reverbModRGain)reverbModRGain.gain.linearRampToValueAtTime(0.001*r,ctx.currentTime+0.1);return Math.round(r*100)+'%'});
-  wireSR(c,'dly',r=>{delayMixVal=r;delayGainN.gain.linearRampToValueAtTime(r*0.7,ctx.currentTime+0.05);if(_drumDelaySend)_drumDelaySend.gain.linearRampToValueAtTime(r*0.5,ctx.currentTime+0.05);return Math.round(r*100)+'%'});
+  wireSR(c,'rev',r=>{reverbMix=r;reverbGain.gain.linearRampToValueAtTime(r,ctx.currentTime+0.05);dryGain.gain.linearRampToValueAtTime(1-r,ctx.currentTime+0.05);if(reverbModWet)reverbModWet.gain.linearRampToValueAtTime(reverbMod*0.7*r,ctx.currentTime+0.05);return Math.round(r*100)+'%'});
+  wireSR(c,'rvSz',r=>{reverbSize=r;if(reverb&&reverb.fbGain)reverb.fbGain.gain.linearRampToValueAtTime(reverbSizeToFB(r),ctx.currentTime+0.1);const rt60=Math.round(-3*0.077/Math.log10(reverbSizeToFB(r)));return rt60+'s'});
+  wireSR(c,'rvMod',r=>{reverbMod=r;if(reverb&&reverb.apMods)reverb.apMods.forEach((lg,i)=>{lg.gain.linearRampToValueAtTime((0.0006+i*0.0003)*r,ctx.currentTime+0.1)});if(reverbModWet)reverbModWet.gain.linearRampToValueAtTime(r*0.7*reverbMix,ctx.currentTime+0.1);if(reverbModLGain)reverbModLGain.gain.linearRampToValueAtTime(0.0025*r,ctx.currentTime+0.1);if(reverbModRGain)reverbModRGain.gain.linearRampToValueAtTime(0.0025*r,ctx.currentTime+0.1);return Math.round(r*100)+'%'});
+  wireSR(c,'dly',r=>{delayMixVal=r;delayGainN.gain.linearRampToValueAtTime(r*0.7,ctx.currentTime+0.05);if(_drumDelaySend)_drumDelaySend.gain.linearRampToValueAtTime(r*1.5,ctx.currentTime+0.05);return Math.round(r*100)+'%'});
   wireSR(c,'dlyFB',r=>{delayFeedback=r*0.85;if(delayFB)delayFB.gain.linearRampToValueAtTime(delayFeedback,ctx.currentTime+0.1);return Math.round(r*100)+'%'});
   wireSR(c,'dlyT',r=>{delayTimeVal=0.05*Math.pow(2.0/0.05,r);if(delayNode&&!delaySync)delayNode.delayTime.linearRampToValueAtTime(delayTimeVal,ctx.currentTime+0.1);return Math.round(delayTimeVal*1000)+'ms'});
   wireSR(c,'dlyTone',r=>{delayTone=r;if(dToneNode)dToneNode.gain.linearRampToValueAtTime((r-0.5)*24,ctx.currentTime+0.05);return r<0.42?'Dark':r>0.58?'Bright':'Neutral'});
@@ -1552,12 +1552,12 @@ function loadPreset(name){try{
   if(eqLowNode)eqLowNode.gain.value=eqLowGain;if(eqLoMidNode)eqLoMidNode.gain.value=eqLoMidGain;if(eqHiMidNode)eqHiMidNode.gain.value=eqHiMidGain;if(eqHighNode)eqHighNode.gain.value=eqHighGain;if(chorusGainNode)chorusGainNode.gain.value=chorusMix*0.5;
   if(reverbGain){reverbGain.gain.value=reverbMix;dryGain.gain.value=1-reverbMix}
   if(reverb&&reverb.fbGain)reverb.fbGain.gain.value=reverbSizeToFB(reverbSize);
-  if(reverb&&reverb.apMods)reverb.apMods.forEach((lg,i)=>{lg.gain.value=(0.0003+i*0.00015)*reverbMod});
-  if(reverbModWet)reverbModWet.gain.value=reverbMod*0.5*reverbMix;
-  if(reverbModLGain)reverbModLGain.gain.value=0.001*reverbMod;
-  if(reverbModRGain)reverbModRGain.gain.value=0.001*reverbMod;
+  if(reverb&&reverb.apMods)reverb.apMods.forEach((lg,i)=>{lg.gain.value=(0.0006+i*0.0003)*reverbMod});
+  if(reverbModWet)reverbModWet.gain.value=reverbMod*0.7*reverbMix;
+  if(reverbModLGain)reverbModLGain.gain.value=0.0025*reverbMod;
+  if(reverbModRGain)reverbModRGain.gain.value=0.0025*reverbMod;
 
-  if(delayGainN)delayGainN.gain.value=delayMixVal*0.7;if(delayFB)delayFB.gain.value=delayFeedback;if(dToneNode)dToneNode.gain.value=(delayTone-0.5)*24;if(delayNode&&!delaySync)delayNode.delayTime.value=delayTimeVal;applyDelaySync();if(_drumDelaySend)_drumDelaySend.gain.value=delayMixVal*0.5;
+  if(delayGainN)delayGainN.gain.value=delayMixVal*0.7;if(delayFB)delayFB.gain.value=delayFeedback;if(dToneNode)dToneNode.gain.value=(delayTone-0.5)*24;if(delayNode&&!delaySync)delayNode.delayTime.value=delayTimeVal;applyDelaySync();if(_drumDelaySend)_drumDelaySend.gain.value=delayMixVal*1.5;
   // Restart layers
   PAD_LAYERS.forEach(l=>{if(l.type!=="granular")startPad(l,layerState[l.id].volume,homeRoot,currentEvolve)});
   if(layerState.texture&&layerState.texture.volume>0)startGranular(layerState.texture.volume);else stopGranular();
@@ -1887,9 +1887,9 @@ function _midiSend(bytes,t){// t = Web Audio time; convert to perf.now ms for sc
 }
 function applyMidiParam(id,val){
   switch(id){
-    case'rev':reverbMix=val;if(reverbGain){reverbGain.gain.value=val;dryGain.gain.value=1-val}if(reverbModWet)reverbModWet.gain.value=reverbMod*0.5*val;break;
+    case'rev':reverbMix=val;if(reverbGain){reverbGain.gain.value=val;dryGain.gain.value=1-val}if(reverbModWet)reverbModWet.gain.value=reverbMod*0.7*val;break;
     case'rvSz':reverbSize=val;if(reverb&&reverb.fbGain)reverb.fbGain.gain.linearRampToValueAtTime(reverbSizeToFB(val),ctx.currentTime+0.1);break;
-    case'rvMod':reverbMod=val;if(reverb&&reverb.apMods)reverb.apMods.forEach((lg,i)=>{lg.gain.linearRampToValueAtTime((0.0003+i*0.00015)*val,ctx.currentTime+0.1)});if(reverbModWet)reverbModWet.gain.linearRampToValueAtTime(val*0.5*reverbMix,ctx.currentTime+0.1);if(reverbModLGain)reverbModLGain.gain.linearRampToValueAtTime(0.001*val,ctx.currentTime+0.1);if(reverbModRGain)reverbModRGain.gain.linearRampToValueAtTime(0.001*val,ctx.currentTime+0.1);break;
+    case'rvMod':reverbMod=val;if(reverb&&reverb.apMods)reverb.apMods.forEach((lg,i)=>{lg.gain.linearRampToValueAtTime((0.0006+i*0.0003)*val,ctx.currentTime+0.1)});if(reverbModWet)reverbModWet.gain.linearRampToValueAtTime(val*0.7*reverbMix,ctx.currentTime+0.1);if(reverbModLGain)reverbModLGain.gain.linearRampToValueAtTime(0.0025*val,ctx.currentTime+0.1);if(reverbModRGain)reverbModRGain.gain.linearRampToValueAtTime(0.0025*val,ctx.currentTime+0.1);break;
     case'dly':delayMixVal=val;if(delayGainN)delayGainN.gain.value=val*0.7;break;
     case'dlyFB':delayFeedback=val*0.85;if(delayFB)delayFB.gain.linearRampToValueAtTime(delayFeedback,ctx.currentTime+0.1);break;
     case'dlyT':delayTimeVal=0.05*Math.pow(2.0/0.05,val);if(delayNode&&!delaySync)delayNode.delayTime.linearRampToValueAtTime(delayTimeVal,ctx.currentTime+0.1);break;
@@ -1948,12 +1948,12 @@ function handleMIDI(msg){
     const userParam=Object.keys(midiMappings).find(p=>midiMappings[p]===d1);
     if(userParam){applyMidiParam(userParam,val);return;}
     // Hardcoded fallbacks
-    ({1:r=>{reverbMix=r;if(reverbGain){reverbGain.gain.value=r;dryGain.gain.value=1-r}if(reverbModWet)reverbModWet.gain.value=reverbMod*0.5*r},
+    ({1:r=>{reverbMix=r;if(reverbGain){reverbGain.gain.value=r;dryGain.gain.value=1-r}if(reverbModWet)reverbModWet.gain.value=reverbMod*0.7*r},
       7:r=>{masterVol=r;if(master)master.gain.linearRampToValueAtTime(r,ctx.currentTime+0.05)},
       11:r=>{masterVol=r;if(master)master.gain.linearRampToValueAtTime(r,ctx.currentTime+0.05)},
       21:r=>{lpfValue=r;const hz21=lpfFaderToHz(r);if(globalLPF){globalLPF.frequency.linearRampToValueAtTime(hz21,ctx.currentTime+0.05);if(globalLPF2&&lpfSlope===24)globalLPF2.frequency.linearRampToValueAtTime(hz21,ctx.currentTime+0.05)}if(_drumLPF)_drumLPF.frequency.linearRampToValueAtTime(hz21,ctx.currentTime+0.05)},
       22:r=>{hpfValue=r;const hz22=hpfFaderToHz(r);if(globalHPF){globalHPF.frequency.linearRampToValueAtTime(hz22,ctx.currentTime+0.05);if(globalHPF2&&hpfSlope===24)globalHPF2.frequency.linearRampToValueAtTime(hz22,ctx.currentTime+0.05)}if(_drumHPF)_drumHPF.frequency.linearRampToValueAtTime(hz22,ctx.currentTime+0.05)},
-      23:r=>{delayMixVal=r;if(delayGainN)delayGainN.gain.value=r*0.7;if(_drumDelaySend)_drumDelaySend.gain.value=r*0.5},
+      23:r=>{delayMixVal=r;if(delayGainN)delayGainN.gain.value=r*0.7;if(_drumDelaySend)_drumDelaySend.gain.value=r*1.5},
       24:r=>{const v=r*0.5;const was=shimmerVol;shimmerVol=v;if(v>0&&was===0)startShimmer(v);else if(v<=0)stopShimmer();else if(shimmerNode)shimmerNode.output.gain.linearRampToValueAtTime(v*0.28,ctx.currentTime+0.1)},
       26:r=>{chorusMix=r;if(chorusGainNode)chorusGainNode.gain.linearRampToValueAtTime(chorusMix*0.5,ctx.currentTime+0.05)},
       27:r=>{reverbSize=r;if(reverb&&reverb.fbGain)reverb.fbGain.gain.linearRampToValueAtTime(reverbSizeToFB(r),ctx.currentTime+0.1)},
