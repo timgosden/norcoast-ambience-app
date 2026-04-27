@@ -9,42 +9,63 @@
 <meta property="og:title" content="Norcoast Ambience">
 <meta property="og:description" content="Generative pads for worship. $5. Once. No subscriptions, no tracking, no 2GB downloads.">
 <meta property="og:type" content="website">
+<meta property="og:image" content="./icons/splashscreen.png">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="./icons/splashscreen.png">
 <link rel="icon" type="image/svg+xml" href="./icons/icon.svg">
 <link rel="apple-touch-icon" href="./icons/icon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@200;300;400;500;600&display=swap" rel="stylesheet">
 <style>
-  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  /* ── Tokens (per STYLE_GUIDE.md) ── */
   :root{
     --bg:#06080d;
     --bg-2:#0b0f1a;
+    --bg-3:#07090e;
+
     --gold:#c4915e;
-    --gold-soft:rgba(196,145,94,0.7);
-    --green:rgba(94,184,138,0.6);
-    --pink:rgba(212,107,138,0.5);
+    --gold-dim:#a08060;
+
     --text:rgba(255,255,255,0.92);
+    --text-body:rgba(255,255,255,0.85);
     --text-mute:rgba(255,255,255,0.55);
     --text-dim:rgba(255,255,255,0.32);
+    --text-ghost:rgba(255,255,255,0.15);
+
     --line:rgba(255,255,255,0.08);
+    --line-strong:rgba(255,255,255,0.18);
+
+    --gold-bg-soft:rgba(196,145,94,0.08);
+    --gold-bg:rgba(196,145,94,0.15);
+    --gold-border:rgba(196,145,94,0.35);
+    --gold-glow:0 0 20px rgba(196,145,94,0.18);
   }
-  html,body{background:var(--bg);color:var(--text);font-family:'Open Sans',sans-serif;-webkit-font-smoothing:antialiased;line-height:1.55}
+
+  /* ── Reset ── */
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:var(--bg);color:var(--text);font-family:'Open Sans',sans-serif;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;line-height:1.55}
   body{background:linear-gradient(160deg,#07090e,#0b0f1a 40%,#06080d);background-attachment:fixed;min-height:100vh;overflow-x:hidden}
   a{color:inherit;text-decoration:none}
+  img{max-width:100%;display:block}
 
+  /* ── Layout ── */
   .wrap{max-width:880px;margin:0 auto;padding:0 24px}
 
   /* ── Nav ── */
   nav{display:flex;align-items:center;justify-content:space-between;padding:22px 24px;max-width:1120px;margin:0 auto}
-  .brand{display:flex;align-items:center;gap:10px;font-size:13px;letter-spacing:3px;text-transform:uppercase;color:var(--text-mute);font-weight:500}
-  .brand svg{width:26px;height:26px}
-  .nav-try{font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-mute);padding:8px 14px;border-radius:20px;border:1px solid var(--line);transition:all 0.2s}
-  .nav-try:hover{color:var(--gold);border-color:rgba(196,145,94,0.3)}
+  .brand{display:flex;align-items:center;gap:10px;font-size:11px;letter-spacing:5px;text-transform:uppercase;color:var(--text-mute);font-weight:600}
+  .brand svg{width:26px;height:26px;flex-shrink:0}
+  .nav-try{font-size:11px;letter-spacing:2.5px;text-transform:uppercase;color:var(--text-mute);padding:8px 14px;border-radius:20px;border:1px solid var(--line);transition:all 0.2s;font-weight:400}
+  .nav-try:hover{color:var(--gold);border-color:var(--gold-border)}
 
   /* ── Hero ── */
-  .hero{padding:60px 0 80px;text-align:center}
-  .hero-mark{width:96px;height:96px;margin:0 auto 32px;position:relative}
+  .hero{padding:40px 0 80px;text-align:center}
+  .hero-visual{margin:0 auto 36px;max-width:520px;animation:fade 0.8s ease-out 0.2s both}
+  .hero-visual img{margin:0 auto;border-radius:32px;box-shadow:0 24px 80px rgba(0,0,0,0.45),0 0 0 1px var(--line)}
+
+  /* fallback when splash image isn't available — uses the animated SVG mark */
+  .hero-mark{width:96px;height:96px;margin:0 auto 28px}
   .hero-mark svg{width:100%;height:100%}
   .ring{stroke-dasharray:289;stroke-dashoffset:289;animation:ring 1.6s cubic-bezier(0.4,0,0.2,1) 0.1s forwards;transform-origin:50px 50px;transform:rotate(-90deg)}
   .wave{stroke-dasharray:120;stroke-dashoffset:120;animation:wave 1.2s ease-out forwards}
@@ -54,13 +75,17 @@
   @keyframes ring{to{stroke-dashoffset:0}}
   @keyframes wave{to{stroke-dashoffset:0}}
   @keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-  .hero h1{font-size:clamp(44px,8vw,72px);font-weight:200;letter-spacing:-1px;margin-bottom:18px;animation:fade 0.8s ease-out 0.6s both}
+
+  .price-tag{font-size:11px;letter-spacing:2.5px;text-transform:uppercase;font-weight:600;color:var(--gold);background:var(--gold-bg-soft);border:1px solid rgba(196,145,94,0.25);padding:6px 14px;border-radius:20px;display:inline-block;margin-bottom:20px;animation:fade 0.8s ease-out 0.4s both}
+
+  /* Hero type — per style guide */
+  .hero h1{font-size:clamp(44px,8vw,72px);font-weight:200;letter-spacing:-1px;margin-bottom:18px;animation:fade 0.8s ease-out 0.6s both;line-height:1.05}
   .hero h1 .accent{color:var(--gold);font-weight:300}
-  .hero .lead{font-size:clamp(17px,2.4vw,21px);color:var(--text-mute);max-width:560px;margin:0 auto 14px;font-weight:300;animation:fade 0.8s ease-out 0.8s both}
-  .hero .sub{font-size:14px;color:var(--text-dim);max-width:520px;margin:0 auto 44px;animation:fade 0.8s ease-out 1s both}
+  .hero .lead{font-size:clamp(17px,2.4vw,21px);font-weight:300;color:var(--text-body);max-width:560px;margin:0 auto 14px;animation:fade 0.8s ease-out 0.8s both}
+  .hero .sub{font-size:14px;font-weight:300;color:var(--text-dim);max-width:520px;margin:0 auto 40px;animation:fade 0.8s ease-out 1s both}
   .cta-row{display:flex;flex-direction:column;align-items:center;gap:14px;animation:fade 0.8s ease-out 1.2s both}
 
-  /* ── App Store badge ── */
+  /* ── App Store badge (only pure-white surface allowed, per guide) ── */
   .appstore-btn{display:inline-flex;align-items:center;gap:14px;background:#fff;color:#000;padding:14px 26px;border-radius:14px;transition:transform 0.2s,box-shadow 0.2s;box-shadow:0 4px 30px rgba(196,145,94,0.15)}
   .appstore-btn:hover{transform:translateY(-1px);box-shadow:0 6px 36px rgba(196,145,94,0.22)}
   .appstore-btn .apple{width:28px;height:28px;flex-shrink:0}
@@ -68,49 +93,50 @@
   .appstore-btn .label .small{font-size:10px;letter-spacing:0.5px;font-weight:400}
   .appstore-btn .label .big{font-size:18px;font-weight:600;letter-spacing:-0.2px}
 
-  .try-link{font-size:13px;color:var(--text-dim);letter-spacing:0.5px}
-  .try-link a{color:var(--gold-soft);border-bottom:1px solid rgba(196,145,94,0.2);padding-bottom:1px}
-  .try-link a:hover{color:var(--gold)}
-  .price-tag{font-size:11px;letter-spacing:2.5px;text-transform:uppercase;color:var(--gold);background:rgba(196,145,94,0.08);border:1px solid rgba(196,145,94,0.25);padding:6px 14px;border-radius:20px;display:inline-block}
+  /* Ghost link / secondary CTA */
+  .try-link{font-size:13px;color:var(--text-dim);font-weight:300}
+  .try-link a{color:var(--gold);border-bottom:1px solid rgba(196,145,94,0.2);padding-bottom:1px;transition:color 0.15s}
+  .try-link a:hover{color:#e2b380}
 
-  /* ── Section ── */
-  section{padding:60px 0;border-top:1px solid var(--line)}
-  .eyebrow{font-size:10px;letter-spacing:3.5px;text-transform:uppercase;color:var(--gold-soft);margin-bottom:14px;font-weight:600}
-  h2{font-size:clamp(28px,4vw,40px);font-weight:200;letter-spacing:-0.5px;margin-bottom:28px;line-height:1.2}
+  /* ── Sections ── */
+  section{padding:64px 0;border-top:1px solid var(--line)}
+  .eyebrow{font-size:10px;letter-spacing:3.5px;text-transform:uppercase;color:rgba(196,145,94,0.7);margin-bottom:16px;font-weight:600}
+  h2{font-size:clamp(28px,4vw,40px);font-weight:200;letter-spacing:-0.5px;line-height:1.2;margin-bottom:32px;color:var(--text)}
 
   /* ── Three pillars ── */
   .pillars{display:grid;grid-template-columns:1fr;gap:18px}
   @media(min-width:680px){.pillars{grid-template-columns:repeat(3,1fr)}}
-  .pillar{padding:28px 24px;border:1px solid var(--line);border-radius:16px;background:rgba(255,255,255,0.015)}
-  .pillar .num{font-size:34px;font-weight:200;color:var(--gold);letter-spacing:-1px;margin-bottom:8px}
-  .pillar h3{font-size:14px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text);margin-bottom:8px}
-  .pillar p{font-size:14px;color:var(--text-mute);line-height:1.6}
+  .pillar{padding:28px 24px;border:1px solid var(--line);border-radius:16px;background:rgba(255,255,255,0.015);text-align:left}
+  .pillar .num{font-size:38px;font-weight:200;color:var(--gold);letter-spacing:-1.5px;margin-bottom:8px;line-height:1}
+  .pillar h3{font-size:11px;font-weight:600;letter-spacing:3px;text-transform:uppercase;color:var(--text);margin-bottom:10px}
+  .pillar p{font-size:14px;color:var(--text-mute);line-height:1.6;font-weight:300}
 
-  /* ── Features ── */
+  /* ── Features (left-aligned per guide §6) ── */
   .features{display:grid;grid-template-columns:1fr;gap:0;border-top:1px solid var(--line)}
   @media(min-width:680px){.features{grid-template-columns:1fr 1fr}}
-  .feat{padding:24px 4px;border-bottom:1px solid var(--line)}
-  @media(min-width:680px){.feat:nth-child(odd){padding-right:24px;border-right:1px solid var(--line)}.feat:nth-child(even){padding-left:24px}}
-  .feat h3{font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px;letter-spacing:0.2px}
-  .feat h3 .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--gold);margin-right:10px;vertical-align:middle;opacity:0.8}
-  .feat p{font-size:14px;color:var(--text-mute);line-height:1.55}
+  .feat{padding:22px 4px;border-bottom:1px solid var(--line)}
+  @media(min-width:680px){.feat:nth-child(odd){padding-right:28px;border-right:1px solid var(--line)}.feat:nth-child(even){padding-left:28px}}
+  .feat h3{font-size:15px;font-weight:500;color:var(--text);margin-bottom:6px;letter-spacing:0.2px}
+  .feat h3 .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--gold);margin-right:10px;vertical-align:middle;opacity:0.85}
+  .feat p{font-size:14px;color:var(--text-mute);line-height:1.55;font-weight:300}
 
   /* ── Quote ── */
-  .quote{padding:80px 0;text-align:center}
+  .quote{padding:88px 0;text-align:center}
   .quote blockquote{font-size:clamp(20px,3vw,26px);font-weight:300;line-height:1.5;color:var(--text);max-width:680px;margin:0 auto;letter-spacing:-0.2px}
   .quote blockquote::before{content:'"';color:var(--gold);font-size:48px;line-height:0;vertical-align:-12px;margin-right:6px;font-family:serif}
   .quote blockquote::after{content:'"';color:var(--gold);font-size:48px;line-height:0;vertical-align:-22px;margin-left:4px;font-family:serif}
-  .quote .attr{margin-top:24px;font-size:11px;letter-spacing:3px;text-transform:uppercase;color:var(--text-dim)}
+  .quote .attr{margin-top:24px;font-size:10px;letter-spacing:3.5px;text-transform:uppercase;color:var(--text-dim);font-weight:600}
 
   /* ── Final CTA ── */
   .final{padding:80px 0 60px;text-align:center;border-top:1px solid var(--line)}
   .final h2{margin-bottom:14px}
-  .final p{color:var(--text-mute);margin-bottom:32px;font-size:15px}
+  .final p{color:var(--text-mute);margin-bottom:32px;font-size:15px;font-weight:300}
 
   /* ── Footer ── */
-  footer{padding:32px 0 48px;text-align:center;font-size:12px;color:var(--text-dim);letter-spacing:0.5px}
+  footer{padding:32px 0 48px;text-align:center;font-size:11px;color:var(--text-dim);letter-spacing:0.5px;font-weight:300}
   footer .row{display:flex;justify-content:center;gap:18px;flex-wrap:wrap;margin-top:8px}
-  footer a:hover{color:var(--gold-soft)}
+  footer a{color:var(--text-dim)}
+  footer a:hover{color:var(--gold)}
 </style>
 </head>
 <body>
@@ -131,7 +157,12 @@
 
   <!-- ── Hero ── -->
   <header class="hero">
-    <div class="hero-mark">
+    <div class="hero-visual">
+      <img src="./icons/splashscreen.png" alt="Norcoast Ambience" loading="eager"
+           onerror="this.parentElement.style.display='none';document.getElementById('hero-fallback').style.display='block'">
+    </div>
+    <!-- Fallback animated mark if splashscreen.png is missing -->
+    <div class="hero-mark" id="hero-fallback" style="display:none">
       <svg viewBox="0 0 100 100" fill="none">
         <circle cx="50" cy="50" r="46" stroke="rgba(196,145,94,0.18)" stroke-width="1"/>
         <circle cx="50" cy="50" r="46" stroke="rgba(196,145,94,0.55)" stroke-width="1.5" class="ring"/>
@@ -141,9 +172,7 @@
       </svg>
     </div>
 
-    <div style="margin-bottom:18px;animation:fade 0.8s ease-out 0.4s both">
-      <span class="price-tag">$5 · once · forever</span>
-    </div>
+    <span class="price-tag">$5 · once · forever</span>
 
     <h1>Ambience<span class="accent">.</span></h1>
     <p class="lead">Generative ambient pads for worship — built by a producer, for the church.</p>
@@ -151,7 +180,7 @@
 
     <div class="cta-row">
       <!-- TODO: replace href with App Store URL when live -->
-      <a class="appstore-btn" href="#" id="appstore-link" aria-label="Download on the App Store">
+      <a class="appstore-btn" href="#" aria-label="Download on the App Store">
         <svg class="apple" viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>
         <span class="label">
           <span class="small">Download on the</span>
@@ -228,6 +257,7 @@
     <h2>Five dollars. Once.</h2>
     <p>The pad library you'll actually use every Sunday.</p>
     <div class="cta-row">
+      <!-- TODO: replace href with App Store URL when live -->
       <a class="appstore-btn" href="#" aria-label="Download on the App Store">
         <svg class="apple" viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>
         <span class="label">
@@ -252,8 +282,7 @@
 
 <script>
   document.getElementById('year').textContent = new Date().getFullYear();
-  // Unregister any legacy root-scope service worker so visitors who previously
-  // installed the synth at / cleanly switch over to the marketing site.
+  // Cleanup any legacy root-scope service worker from when the synth lived at /.
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.getRegistrations().then(regs => {
       regs.forEach(r => { if (r.scope.endsWith('/')) r.unregister(); });
