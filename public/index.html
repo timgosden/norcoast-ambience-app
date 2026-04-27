@@ -205,7 +205,7 @@
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
       <button id="clickX2Btn" class="evolve-pill off" onclick="toggleClickX2()" style="padding:8px 10px;font-size:9px;letter-spacing:1px">x2</button>
     </div>
-    <div class="app-version">v0.90</div>
+    <div class="app-version">v0.91</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -303,7 +303,7 @@ let textureOctUp=true,foundationSubOct=true;
 let widthMod=0.39;
 let arpVol=0.14,arpRate=0.125,arpOct=0,arpVoice='soft',arpStep=0,arpTimer=null;
 let movementVol=0,movementPattern=0,movementStep=0,movementTimer=null,movementReverb=null;
-let limiter=null,clickOutBus=null,satDriveNode=null,satCompNode=null,satWS=null;
+let limiter=null,clickOutBus=null,satCompNode=null,satWS=null;
 let clickBPM=140,clickActive=false,clickMuted=true,clickNextTime=0,clickSchedId=null,clickBeat=0,clickRateX2=false,clickAccent=true;
 let delaySync=true,delaySyncDiv='1/8.';
 let evolveOnBeat=true,evolveBars=8,pendingEvolve=-1,timeSig='4/4';
@@ -650,9 +650,8 @@ async function initAudio(){
   // Saturation: tanh soft-clip. Curve is rebuilt dynamically via buildSatCurve().
   // At satAmt=0 the curve is identity so the chain is completely transparent.
   satWS=ctx.createWaveShaper();satWS.curve=buildSatCurve(satAmt);satWS.oversample='4x';
-  satDriveNode=ctx.createGain();satDriveNode.gain.value=1;
   satCompNode=ctx.createGain();satCompNode.gain.value=1+satAmt*0.15;
-  analyser.connect(satDriveNode);satDriveNode.connect(satWS);satWS.connect(satCompNode);satCompNode.connect(limiter);
+  analyser.connect(satWS);satWS.connect(satCompNode);satCompNode.connect(limiter);
   limiter.connect(ctx.destination);
   clickOutBus.connect(ctx.destination);
   // Movement layer: dedicated baked-in reverb so percussion always sits in space
@@ -925,7 +924,7 @@ function fireArpNote(){
 }
 function scheduleArp(){
   if(arpTimer)clearTimeout(arpTimer);
-  if(arpVol<=0||audioPaused)return;
+  if(arpVol<=0||audioPaused||_fadeActive)return;
   if(clickActive)return; // click mode: driven from fireClick
   fireArpNote();
   const noteDur=arpRate*_arpBarSec();
