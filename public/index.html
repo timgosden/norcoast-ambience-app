@@ -205,7 +205,7 @@
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
       <button id="clickX2Btn" class="evolve-pill off" onclick="toggleClickX2()" style="padding:8px 10px;font-size:9px;letter-spacing:1px">x2</button>
     </div>
-    <div class="app-version">v0.86</div>
+    <div class="app-version">v0.87</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -303,7 +303,7 @@ let textureOctUp=true,foundationSubOct=true;
 let widthMod=0.39;
 let arpVol=0.14,arpRate=0.125,arpOct=0,arpVoice='soft',arpStep=0,arpTimer=null;
 let movementVol=0,movementPattern=0,movementStep=0,movementTimer=null,movementReverb=null;
-let limiter=null,clickOutBus=null,arpRevSend=null,satDriveNode=null,satCompNode=null,satWS=null;
+let limiter=null,clickOutBus=null,satDriveNode=null,satCompNode=null,satWS=null;
 let clickBPM=140,clickActive=false,clickMuted=true,clickNextTime=0,clickSchedId=null,clickBeat=0,clickRateX2=false;
 let delaySync=true,delaySyncDiv='1/8.';
 let evolveOnBeat=true,evolveBars=8,pendingEvolve=-1,timeSig='4/4';
@@ -652,11 +652,6 @@ async function initAudio(){
   analyser.connect(satDriveNode);satDriveNode.connect(satWS);satWS.connect(satCompNode);satCompNode.connect(limiter);
   limiter.connect(ctx.destination);
   clickOutBus.connect(ctx.destination);
-  // Arp reverb send — enters the master FX chain at globalHPF so the arp gets
-  // the user's filter, delay, shimmer, AND reverb. (Connecting straight to
-  // reverb.input would bypass the LPF/HPF/delay path.)
-  arpRevSend=ctx.createGain();arpRevSend.gain.value=0.55;
-  arpRevSend.connect(globalHPF);
   // Movement layer: dedicated baked-in reverb so percussion always sits in space
   // regardless of the user's main reverb mix. Output joins the master FX chain.
   movementReverb=createMovementReverb();
@@ -858,7 +853,7 @@ function fireArpNote(){
       osc.frequency.value=freq;
       osc.detune.value=det;
       filt.type='lowpass';filt.frequency.value=Math.min(900+freq*0.25,2000);filt.Q.value=0.7;
-      const pk=arpVol*0.14*velScale;
+      const pk=arpVol*0.20*velScale;
       const t0=ctx.currentTime;
       const decT=Math.min(noteDur*0.4,0.6);
       env.gain.setValueAtTime(0,t0);
@@ -868,7 +863,6 @@ function fireArpNote(){
       pan.pan.value=panV;
       osc.connect(filt);filt.connect(env);env.connect(pan);
       pan.connect(master);
-      if(arpRevSend)pan.connect(arpRevSend);
       osc.start();osc.stop(t0+noteDur+0.5);
       osc.onended=()=>{try{osc.disconnect();filt.disconnect();env.disconnect();pan.disconnect()}catch(e){}};
     });
@@ -880,7 +874,7 @@ function fireArpNote(){
       const env=ctx.createGain();
       const pan=ctx.createStereoPanner();
       osc.type='sine';osc.frequency.value=freq;osc.detune.value=det;
-      const pk=arpVol*0.16*velScale;
+      const pk=arpVol*0.23*velScale;
       const t0=ctx.currentTime;
       env.gain.setValueAtTime(0,t0);
       env.gain.linearRampToValueAtTime(pk,t0+atk);
@@ -889,7 +883,6 @@ function fireArpNote(){
       pan.pan.value=panV;
       osc.connect(env);env.connect(pan);
       pan.connect(master);
-      if(arpRevSend)pan.connect(arpRevSend);
       osc.start();osc.stop(t0+noteDur+0.5);
       osc.onended=()=>{try{osc.disconnect();env.disconnect();pan.disconnect()}catch(e){}};
     });
@@ -912,7 +905,7 @@ function fireArpNote(){
       const t0=ctx.currentTime;
       filt.frequency.setValueAtTime(brightHz,t0);
       filt.frequency.exponentialRampToValueAtTime(darkHz,t0+dec);
-      const pk=arpVol*0.115*velScale;
+      const pk=arpVol*0.165*velScale;
       env.gain.setValueAtTime(0,t0);
       env.gain.linearRampToValueAtTime(pk,t0+atk);
       if(noteDur>atk+rel){env.gain.linearRampToValueAtTime(pk*0.45,t0+dec);}
@@ -920,7 +913,6 @@ function fireArpNote(){
       pan.pan.value=panV;
       osc.connect(filt);filt.connect(env);env.connect(pan);
       pan.connect(master);
-      if(arpRevSend)pan.connect(arpRevSend);
       osc.start();osc.stop(t0+noteDur+0.5);
       osc.onended=()=>{try{osc.disconnect();filt.disconnect();env.disconnect();pan.disconnect()}catch(e){}};
     });
