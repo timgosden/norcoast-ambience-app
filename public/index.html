@@ -166,7 +166,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v0.78</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v0.79</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -204,7 +204,7 @@
       <button class="bpm-tap-main" id="bpmTapMain" onclick="tapTempo()" title="Tap for BPM"><span id="bpmDisplay">70</span><span class="bpm-tap-label">BPM</span></button>
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
     </div>
-    <div class="app-version">v0.78</div>
+    <div class="app-version">v0.79</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -786,11 +786,11 @@ function fireArpNote(){
       osc.onended=()=>{try{osc.disconnect();filt.disconnect();env.disconnect();pan.disconnect()}catch(e){}};
     });
   } else {
-    // Juno voice: sawtooth, instant attack, filter sweep
-    const atk=0.003;
+    // Juno voice: sawtooth, soft-but-present attack, filter sweep, wide stereo
+    const atk=0.022;
     const dec=Math.min(noteDur*0.35,0.9);
     const rel=Math.min(noteDur*0.55,1.8);
-    [[-0.55,-9,1.0],[0,0,0.82],[0.55,+9,1.0]].forEach(([panV,det,velScale])=>{
+    [[-0.75,-13,1.0],[0,0,0.82],[0.75,+13,1.0]].forEach(([panV,det,velScale])=>{
       const osc=ctx.createOscillator();
       const filt=ctx.createBiquadFilter();
       const env=ctx.createGain();
@@ -798,12 +798,12 @@ function fireArpNote(){
       osc.type='sawtooth';
       osc.frequency.value=freq;
       osc.detune.value=det;
-      filt.type='lowpass';filt.Q.value=1.4;
-      const brightHz=Math.min(4000+freq*1.5,10000);
-      const darkHz=Math.max(320+freq*0.15,110);
+      filt.type='lowpass';filt.Q.value=0.9;
+      const brightHz=Math.min(2400+freq*1.1,6500);
+      const darkHz=Math.max(280+freq*0.13,100);
       filt.frequency.setValueAtTime(brightHz,ctx.currentTime);
       filt.frequency.exponentialRampToValueAtTime(darkHz,ctx.currentTime+dec);
-      const pk=arpVol*0.13*velScale;
+      const pk=arpVol*0.115*velScale;
       env.gain.setValueAtTime(0,ctx.currentTime);
       env.gain.linearRampToValueAtTime(pk,ctx.currentTime+atk);
       if(noteDur>atk+rel){env.gain.setValueAtTime(pk*0.45,ctx.currentTime+dec);}
@@ -1011,7 +1011,7 @@ function buildEditSheet(){
   h+='<input type="range" min="0" max="1" step="0.003" value="'+arpVol+'" data-sr="arp" data-color="#9b7fd4" style="background:linear-gradient(to right,#9b7fd455 '+arpVol*100+'%,rgba(255,255,255,0.06) '+arpVol*100+'%);accent-color:#9b7fd4">';
   h+='<span class="slider-val" id="sr_arp">'+Math.round(arpVol*100)+'%</span></div>';
   h+='<div class="slope-row" style="padding:2px 12px 10px"><span class="slope-label">Rate</span>';
-  [[0.125,'1/8'],[0.25,'1/4'],[0.5,'1/2'],[1,'1 bar']].forEach(([r,l])=>{h+='<button class="slope-btn'+(arpRate===r?' active':'')+'" onclick="setArpRate('+r+')" style="padding:6px 10px">'+l+'</button>';});
+  [[0.0625,'1/16'],[0.125,'1/8'],[0.25,'1/4'],[0.5,'1/2'],[1,'1 bar']].forEach(([r,l])=>{h+='<button class="slope-btn'+(arpRate===r?' active':'')+'" onclick="setArpRate('+r+')" style="padding:6px 10px">'+l+'</button>';});
   h+='<button class="slope-btn'+(arpOct===-1?' active':'')+'" onclick="setArpOct(-1)" style="padding:6px 10px;margin-left:6px">−8ve</button>';
   h+='<button class="slope-btn'+(arpOct===0?' active':'')+'" onclick="setArpOct(0)" style="padding:6px 10px">Mid</button>';
   h+='<button class="slope-btn'+(arpOct===1?' active':'')+'" onclick="setArpOct(1)" style="padding:6px 10px">+8ve</button>';
@@ -1464,7 +1464,20 @@ function toggleClick(){
 }
 function setBPM(v){clickBPM=Math.max(50,Math.min(200,parseInt(v)||120));const d=document.getElementById('bpmDisplay');if(d)d.textContent=clickBPM;if(clickActive&&!midiClockIn){stopClick();startClick()}applyDelaySync();}
 function getDelayTime(){const beat=60/clickBPM;const divs={'1/2':beat*2,'q.':beat*1.5,'q':beat,'1/8.':beat*0.75,'1/8':beat*0.5};return Math.min(divs[delaySyncDiv]||beat*1.5,1.9)}
-function applyDelaySync(){if(!delaySync||!delayNode)return;const _dt=getDelayTime();delayNode.delayTime.cancelScheduledValues(ctx.currentTime);delayNode.delayTime.setValueAtTime(delayNode.delayTime.value,ctx.currentTime);delayNode.delayTime.linearRampToValueAtTime(_dt,ctx.currentTime+1.2);}
+function applyDelaySync(){
+  if(!delaySync||!delayNode||!delayGainN)return;
+  const _dt=getDelayTime();
+  const t=ctx.currentTime,fade=0.06;
+  // Mute output, snap delay time, fade back. Avoids the doppler "wobble"
+  // that comes from ramping delayTime while audio is in the buffer.
+  const targetMix=delayMixVal*0.7;
+  delayGainN.gain.cancelScheduledValues(t);
+  delayGainN.gain.setValueAtTime(delayGainN.gain.value,t);
+  delayGainN.gain.linearRampToValueAtTime(0,t+fade);
+  delayNode.delayTime.cancelScheduledValues(t+fade);
+  delayNode.delayTime.setValueAtTime(_dt,t+fade);
+  delayGainN.gain.linearRampToValueAtTime(targetMix,t+fade*2);
+}
 function toggleDelaySync(){delaySync=!delaySync;applyDelaySync();saveSettings();buildEditSheet()}
 function setDelaySyncDiv(d){delaySyncDiv=d;applyDelaySync();saveSettings();buildEditSheet()}
 
