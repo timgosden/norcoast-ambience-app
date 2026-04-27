@@ -89,10 +89,8 @@ final class ViewController: UIViewController {
 
     private func injectCloudPresets() {
         guard let json = NSUbiquitousKeyValueStore.default.string(forKey: Self.iCloudPresetsKey) else { return }
-        let escaped = json
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "'", with: "\\'")
-        webView.evaluateJavaScript("norcoast_setCloudPresets('\(escaped)')", completionHandler: nil)
+        // json is already valid JSON — embed directly as a JS object literal, no escaping needed.
+        webView.evaluateJavaScript("norcoast_setCloudPresets(\(json))", completionHandler: nil)
     }
 
     private func savePresetsToiCloud(_ json: String) {

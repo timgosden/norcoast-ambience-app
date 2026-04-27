@@ -49,7 +49,9 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
             try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
             try AVAudioSession.sharedInstance().setActive(true)
         } catch {
+            #if DEBUG
             print("AVAudioSession setup failed: \(error)")
+            #endif
         }
 
         NotificationCenter.default.addObserver(

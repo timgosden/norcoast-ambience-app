@@ -1319,9 +1319,9 @@ function savePreset(name){
   _savePresets(ps);buildEditSheet();updatePerfSetlist();
 }
 // Called by Swift when iCloud presets arrive (on launch or remote change).
-function norcoast_setCloudPresets(json){
+function norcoast_setCloudPresets(data){
   try{
-    const merged=Object.assign({},getPresets(),JSON.parse(json));
+    const merged=Object.assign({},getPresets(),data);
     localStorage.setItem(STORE_PRESETS,JSON.stringify(merged));
     if(document.getElementById('editSheet').classList.contains('open'))buildEditSheet();
     updatePerfSetlist();
@@ -1432,14 +1432,14 @@ function startClick(){
   if(clickActive)return;clickActive=true;clickBeat=0;
   clickNextTime=ctx.currentTime+0.05;
   midiPulseNext=clickNextTime;
-  if(midiClockOut)midiOutputs.forEach(o=>{try{o.send([0xFA])}catch(e){}});
+  if(midiClockOut)_midiSendNow([0xFA]);
   scheduleClicks();
   const btn=document.getElementById('clickBtn');if(btn){btn.className='evolve-pill '+(clickMuted?'off':'on');}
 }
 function stopClick(){
   clickActive=false;
   if(clickSchedId){clearTimeout(clickSchedId);clickSchedId=null}
-  if(midiClockOut)midiOutputs.forEach(o=>{try{o.send([0xFC])}catch(e){}});
+  if(midiClockOut)_midiSendNow([0xFC]);
 }
 function scheduleClicks(){
   if(!clickActive)return;const now=ctx.currentTime;
@@ -1614,14 +1614,14 @@ function clearLearn(id){delete midiMappings[id];saveMidiMappings();if(document.g
 function setMidiClockIn(v){midiClockIn=v;_midiClkTimes.length=0;if(document.getElementById('editSheet').classList.contains('open'))buildEditSheet()}
 function setMidiClockOut(v){
   midiClockOut=v;
-  if(v&&clickActive){midiPulseNext=ctx.currentTime;midiOutputs.forEach(o=>{try{o.send([0xFA])}catch(e){}})}
-  if(!v&&clickActive){midiOutputs.forEach(o=>{try{o.send([0xFC])}catch(e){}})}
+  if(v&&clickActive){midiPulseNext=ctx.currentTime;_midiSendNow([0xFA]);}
+  if(!v&&clickActive)_midiSendNow([0xFC]);
   if(document.getElementById('editSheet').classList.contains('open'))buildEditSheet();
 }
-function _midiSend(bytes,t){// t = Web Audio time; convert to perf.now ms for scheduled MIDI send
+function _midiSendNow(bytes){midiOutputs.forEach(o=>{try{o.send(bytes)}catch(e){}});}
+function _midiSend(bytes,t){
   if(!midiOutputs.length)return;
-  const ms=performance.now()+(t-ctx.currentTime)*1000;
-  const sendAt=Math.max(ms,performance.now());
+  const sendAt=Math.max(performance.now()+(t-ctx.currentTime)*1000,performance.now());
   midiOutputs.forEach(o=>{try{o.send(bytes,sendAt)}catch(e){}});
 }
 function applyMidiParam(id,val){
