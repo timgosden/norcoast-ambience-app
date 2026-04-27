@@ -166,7 +166,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v0.80</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v0.81</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -203,8 +203,9 @@
     <div class="bpm-click-group">
       <button class="bpm-tap-main" id="bpmTapMain" onclick="tapTempo()" title="Tap for BPM"><span id="bpmDisplay">70</span><span class="bpm-tap-label">BPM</span></button>
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
+      <button id="clickX2Btn" class="evolve-pill off" onclick="toggleClickX2()" style="padding:8px 10px;font-size:9px;letter-spacing:1px">x2</button>
     </div>
-    <div class="app-version">v0.80</div>
+    <div class="app-version">v0.81</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -238,12 +239,15 @@ const CHORD_TYPES=[
   {name:"5th+Maj7", semis:[7,11],     weight:2},
 ];
 
-// 16-step patterns (1/16 grid). '' = silent, lo/md/hh = sound id.
+// 1/16 grid patterns. '' = silent, lo/md/hh = sound id.
+// Pattern length must be a multiple of 4 (= one or more bars). Lengths can vary.
 const MOVEMENT_PATTERNS=[
-  {name:'Backbeat', steps:['','','','','md','','','','','','','','md','','','']},
-  {name:'Hat',      steps:['hh','','hh','','hh','','hh','','hh','','hh','','hh','','hh','']},
-  {name:'Kick+Back',steps:['lo','','','','md','','','','','','','','md','','','']},
-  {name:'Tresillo', steps:['md','','hh','','hh','','md','','hh','','hh','','md','','hh','']},
+  {name:'Pulse',  steps:['','','','','md','','','','','','','','md','','','']},
+  // Mist: 2-bar syncopated shaker — sparse first bar, busier second bar
+  {name:'Mist',   steps:['hh','','','hh','','','hh','','','','','hh','','','','',
+                         'hh','','','hh','','','hh','','','hh','','hh','','','hh','']},
+  {name:'Stride', steps:['lo','','','','md','','','','','','','','md','','','']},
+  {name:'Lilt',   steps:['lo','','md','','md','','lo','','md','','md','','lo','','md','']},
 ];
 
 
@@ -277,7 +281,7 @@ let widthMod=0.39;
 let arpVol=0.14,arpRate=0.125,arpOct=0,arpVoice='soft',arpStep=0,arpTimer=null;
 let movementVol=0,movementPattern=0,movementStep=0,movementTimer=null,movementReverb=null;
 let limiter=null,clickOutBus=null,arpRevSend=null,satDriveNode=null,satCompNode=null;
-let clickBPM=140,clickActive=false,clickMuted=true,clickNextTime=0,clickSchedId=null,clickBeat=0;
+let clickBPM=140,clickActive=false,clickMuted=true,clickNextTime=0,clickSchedId=null,clickBeat=0,clickRateX2=false;
 let delaySync=true,delaySyncDiv='1/8.';
 let evolveOnBeat=true,evolveBars=8,pendingEvolve=-1;
 let multiOutActive=false,_multiOutMerger=null,_multiOutSplitter=null;
@@ -628,10 +632,11 @@ async function initAudio(){
   analyser.connect(satDriveNode);satDriveNode.connect(satWS);satWS.connect(satCompNode);satCompNode.connect(limiter);
   limiter.connect(ctx.destination);
   clickOutBus.connect(ctx.destination);
-  // Arp reverb send — taps directly into the reverb input for a strong wet tail
-  // independent of the user's reverb mix slider.
-  arpRevSend=ctx.createGain();arpRevSend.gain.value=1.1;
-  arpRevSend.connect(reverb.input);
+  // Arp reverb send — enters the master FX chain at globalHPF so the arp gets
+  // the user's filter, delay, shimmer, AND reverb. (Connecting straight to
+  // reverb.input would bypass the LPF/HPF/delay path.)
+  arpRevSend=ctx.createGain();arpRevSend.gain.value=0.55;
+  arpRevSend.connect(globalHPF);
   // Movement layer: dedicated baked-in reverb so percussion always sits in space
   // regardless of the user's main reverb mix. Output joins the master FX chain.
   movementReverb=createMovementReverb();
@@ -822,6 +827,27 @@ function fireArpNote(){
       osc.start();osc.stop(t0+noteDur+0.5);
       osc.onended=()=>{try{osc.disconnect();filt.disconnect();env.disconnect();pan.disconnect()}catch(e){}};
     });
+  } else if(arpVoice==='sine'){
+    // Sine voice: clean fundamental, slow soft attack, gentle stereo spread
+    const atk=0.04;
+    [[-0.3,-3,1.0],[0.3,+3,1.0]].forEach(([panV,det,velScale])=>{
+      const osc=ctx.createOscillator();
+      const env=ctx.createGain();
+      const pan=ctx.createStereoPanner();
+      osc.type='sine';osc.frequency.value=freq;osc.detune.value=det;
+      const pk=arpVol*0.16*velScale;
+      const t0=ctx.currentTime;
+      env.gain.setValueAtTime(0,t0);
+      env.gain.linearRampToValueAtTime(pk,t0+atk);
+      env.gain.linearRampToValueAtTime(pk*0.55,t0+Math.min(noteDur*0.5,0.8));
+      env.gain.linearRampToValueAtTime(0,t0+noteDur);
+      pan.pan.value=panV;
+      osc.connect(env);env.connect(pan);
+      pan.connect(master);
+      if(arpRevSend)pan.connect(arpRevSend);
+      osc.start();osc.stop(t0+noteDur+0.5);
+      osc.onended=()=>{try{osc.disconnect();env.disconnect();pan.disconnect()}catch(e){}};
+    });
   } else {
     // Juno voice: sawtooth, soft-but-present attack, filter sweep, wide stereo
     const atk=0.022;
@@ -872,15 +898,17 @@ function setArpOct(o){arpOct=o;arpStep=0;saveSettings();buildEditSheet();}
 function setArpVoice(v){arpVoice=v;saveSettings();buildEditSheet();}
 
 // ─── MOVEMENT (rhythmic percussion layer) ───
-function fireMovementHit(t,sound){
+function fireMovementHit(t,sound,vel){
   if(!movementReverb||audioPaused||_fadeActive)return;
+  vel=vel||1;
   if(sound==='lo'){
     const osc=ctx.createOscillator(),env=ctx.createGain();
     osc.type='sine';
-    osc.frequency.setValueAtTime(62,t);
-    osc.frequency.exponentialRampToValueAtTime(38,t+0.09);
+    const f0=60+(Math.random()*4-2);
+    osc.frequency.setValueAtTime(f0,t);
+    osc.frequency.exponentialRampToValueAtTime(f0*0.62,t+0.09);
     env.gain.setValueAtTime(0,t);
-    env.gain.linearRampToValueAtTime(movementVol*0.55,t+0.003);
+    env.gain.linearRampToValueAtTime(movementVol*0.55*vel,t+0.003);
     env.gain.exponentialRampToValueAtTime(0.0008,t+0.32);
     osc.connect(env);env.connect(movementReverb.input);
     osc.start(t);osc.stop(t+0.36);
@@ -888,35 +916,49 @@ function fireMovementHit(t,sound){
   } else if(sound==='md'){
     const osc=ctx.createOscillator(),env=ctx.createGain(),pan=ctx.createStereoPanner();
     osc.type='sine';
-    osc.frequency.setValueAtTime(190,t);
-    osc.frequency.exponentialRampToValueAtTime(95,t+0.07);
+    const f0=185+(Math.random()*12-6);
+    osc.frequency.setValueAtTime(f0,t);
+    osc.frequency.exponentialRampToValueAtTime(f0*0.5,t+0.07);
     env.gain.setValueAtTime(0,t);
-    env.gain.linearRampToValueAtTime(movementVol*0.4,t+0.003);
+    env.gain.linearRampToValueAtTime(movementVol*0.4*vel,t+0.003);
     env.gain.exponentialRampToValueAtTime(0.0008,t+0.22);
-    pan.pan.value=-0.12;
+    pan.pan.value=-0.12+(Math.random()*0.1-0.05);
     osc.connect(env);env.connect(pan);pan.connect(movementReverb.input);
     osc.start(t);osc.stop(t+0.26);
     osc.onended=()=>{try{osc.disconnect();env.disconnect();pan.disconnect()}catch(e){}};
   } else if(sound==='hh'){
+    // Darker, fuller "lofi shaker" — HP+LP shape gives body, no brittle top
     const buf=ctx.createBuffer(1,1024,ctx.sampleRate);
     const data=buf.getChannelData(0);
     for(let i=0;i<1024;i++) data[i]=Math.random()*2-1;
     const src=ctx.createBufferSource();src.buffer=buf;src.loop=true;
-    const filt=ctx.createBiquadFilter();filt.type='bandpass';filt.frequency.value=6200;filt.Q.value=1.4;
+    const hp=ctx.createBiquadFilter();hp.type='highpass';hp.frequency.value=1700;hp.Q.value=0.5;
+    const lp=ctx.createBiquadFilter();lp.type='lowpass';lp.frequency.value=4200+(Math.random()*400-200);lp.Q.value=0.7;
     const env=ctx.createGain();
-    const pan=ctx.createStereoPanner();pan.pan.value=0.35;
+    const pan=ctx.createStereoPanner();pan.pan.value=0.3+(Math.random()*0.2-0.1);
     env.gain.setValueAtTime(0,t);
-    env.gain.linearRampToValueAtTime(movementVol*0.18,t+0.001);
-    env.gain.exponentialRampToValueAtTime(0.0008,t+0.05);
-    src.connect(filt);filt.connect(env);env.connect(pan);pan.connect(movementReverb.input);
-    src.start(t);src.stop(t+0.07);
-    src.onended=()=>{try{src.disconnect();filt.disconnect();env.disconnect();pan.disconnect()}catch(e){}};
+    env.gain.linearRampToValueAtTime(movementVol*0.13*vel,t+0.001);
+    env.gain.exponentialRampToValueAtTime(0.0008,t+0.055);
+    src.connect(hp);hp.connect(lp);lp.connect(env);env.connect(pan);pan.connect(movementReverb.input);
+    src.start(t);src.stop(t+0.08);
+    src.onended=()=>{try{src.disconnect();hp.disconnect();lp.disconnect();env.disconnect();pan.disconnect()}catch(e){}};
   }
+}
+function pickMovementSound(stepInPat,bar){
+  const pat=MOVEMENT_PATTERNS[movementPattern];if(!pat)return null;
+  const len=pat.steps.length;
+  let sound=pat.steps[stepInPat%len];
+  // Variation fill every 8 bars: occasional ghost hat in the last beat
+  if(bar%8===7 && (stepInPat%16)>=12 && !sound && Math.random()<0.4) sound='hh';
+  return sound;
 }
 function fireMovementStep(){
   const pat=MOVEMENT_PATTERNS[movementPattern];if(!pat)return;
-  const sound=pat.steps[movementStep%16];
-  if(sound) fireMovementHit(ctx.currentTime,sound);
+  const len=pat.steps.length;
+  const stepInPat=movementStep%len;
+  const bar=Math.floor(movementStep/16);
+  const sound=pickMovementSound(stepInPat,bar);
+  if(sound) fireMovementHit(ctx.currentTime,sound,0.88+Math.random()*0.24);
   movementStep++;
 }
 function scheduleMovement(){
@@ -1042,7 +1084,13 @@ function toggleLayer(id){
   if(st.volume>0){
     st._prevVol=st.volume;st.volume=0;
     if(l.type==="granular"){stopGranular();if(granularGain)granularGain.gain.linearRampToValueAtTime(0,ctx.currentTime+0.5)}
-    else{const t=ctx.currentTime+0.15;if(staticNodes[id])staticNodes[id].gain.gain.linearRampToValueAtTime(0,t);if(evolveNodes[id])evolveNodes[id].gain.gain.linearRampToValueAtTime(0,t)}
+    else{
+      const t=ctx.currentTime+0.15;
+      // Also kill the amplitude LFO — otherwise it keeps modulating around 0
+      // and the layer remains audibly playing at low level.
+      if(staticNodes[id]){staticNodes[id].gain.gain.linearRampToValueAtTime(0,t);if(staticNodes[id].ampMod)staticNodes[id].ampMod.gain.linearRampToValueAtTime(0,t);}
+      if(evolveNodes[id]){evolveNodes[id].gain.gain.linearRampToValueAtTime(0,t);if(evolveNodes[id].ampMod)evolveNodes[id].ampMod.gain.linearRampToValueAtTime(0,t);}
+    }
   }else{
     st.volume=st._prevVol||0.5;
     if(l.type==="granular")startGranular(st.volume);
@@ -1118,6 +1166,7 @@ function buildEditSheet(){
   h+='<div class="slope-row" style="padding:2px 12px 10px"><span class="slope-label">Voice</span>';
   h+='<button class="slope-btn'+(arpVoice==='juno'?' active':'')+'" onclick="setArpVoice(\'juno\')" style="padding:6px 10px">Juno</button>';
   h+='<button class="slope-btn'+(arpVoice==='soft'?' active':'')+'" onclick="setArpVoice(\'soft\')" style="padding:6px 10px">Soft</button>';
+  h+='<button class="slope-btn'+(arpVoice==='sine'?' active':'')+'" onclick="setArpVoice(\'sine\')" style="padding:6px 10px">Sine</button>';
   h+='</div>';
   // Movement — percussion layer with built-in reverb
   const _movOn=movementVol>0;
@@ -1383,8 +1432,8 @@ function toggleSlope(type){
   }
   saveSettings();buildEditSheet();
 }
-function saveSettings(){try{const s={homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,lpfQ,hpfQ,lpfSlope,hpfSlope,eqLowGain,eqLoMidGain,eqHiMidGain,eqHighGain,chorusMix,widthMod,reverbMix,reverbSize,reverbMod,delayMixVal,delayFeedback,delayTone,delaySync,delaySyncDiv,delayTimeVal,shimmerVol,masterVol,satAmt,textureOctUp,foundationSubOct,arpVol,arpRate,arpOct,arpVoice,movementVol,movementPattern,clickBPM,evolveOnBeat,evolveBars,enabledEvolveIdx:[...enabledEvolveIdx],layers:{}};PAD_LAYERS.forEach(l=>{s.layers[l.id]={volume:layerState[l.id].volume}});localStorage.setItem('norcoast_v1',JSON.stringify(s))}catch(e){}}
-function loadSettings(){try{const raw=localStorage.getItem('norcoast_v1');if(!raw)return;const s=JSON.parse(raw);if(s.homeRoot)homeRoot=s.homeRoot;if(s.evolving!=null)evolving=s.evolving;if(s.evolveSpeed!=null)evolveSpeed=s.evolveSpeed;if(s.lpfValue!=null)lpfValue=s.lpfValue;if(s.hpfValue!=null)hpfValue=s.hpfValue;if(s.lpfQ!=null)lpfQ=s.lpfQ;if(s.hpfQ!=null)hpfQ=s.hpfQ;if(s.lpfSlope!=null)lpfSlope=s.lpfSlope;if(s.hpfSlope!=null)hpfSlope=s.hpfSlope;if(s.eqLowGain!=null)eqLowGain=s.eqLowGain;if(s.eqLoMidGain!=null)eqLoMidGain=s.eqLoMidGain;if(s.eqHiMidGain!=null)eqHiMidGain=s.eqHiMidGain;if(s.eqHighGain!=null)eqHighGain=s.eqHighGain;if(s.chorusMix!=null)chorusMix=s.chorusMix;if(s.widthMod!=null)widthMod=s.widthMod;if(s.shimmerVol!=null)shimmerVol=s.shimmerVol;if(s.reverbMix!=null)reverbMix=s.reverbMix;if(s.reverbSize!=null)reverbSize=s.reverbSize;if(s.reverbMod!=null)reverbMod=s.reverbMod;if(s.delayMixVal!=null)delayMixVal=s.delayMixVal;if(s.delayFeedback!=null)delayFeedback=s.delayFeedback;if(s.delayTone!=null)delayTone=s.delayTone;if(s.delaySync!=null)delaySync=s.delaySync;if(s.delaySyncDiv)delaySyncDiv=s.delaySyncDiv;if(s.delayTimeVal!=null)delayTimeVal=s.delayTimeVal;if(s.masterVol!=null)masterVol=s.masterVol;if(s.satAmt!=null){satAmt=s.satAmt;if(satDriveNode)satDriveNode.gain.value=1+satAmt*1.5;if(satCompNode)satCompNode.gain.value=1/(1+satAmt*0.3);}if(s.textureOctUp!=null)textureOctUp=s.textureOctUp;if(s.foundationSubOct!=null)foundationSubOct=s.foundationSubOct;if(s.clickBPM!=null)clickBPM=s.clickBPM;if(s.evolveOnBeat!=null)evolveOnBeat=s.evolveOnBeat;if(s.evolveBars!=null)evolveBars=s.evolveBars;if(s.arpVol!=null)arpVol=s.arpVol;if(s.arpRate!=null)arpRate=s.arpRate;if(s.arpOct!=null)arpOct=s.arpOct;if(s.arpVoice)arpVoice=s.arpVoice;if(s.movementVol!=null)movementVol=s.movementVol;if(s.movementPattern!=null)movementPattern=s.movementPattern;if(Array.isArray(s.enabledEvolveIdx))enabledEvolveIdx=new Set(s.enabledEvolveIdx);if(s.layers)PAD_LAYERS.forEach(l=>{if(s.layers[l.id]!=null)layerState[l.id].volume=s.layers[l.id].volume??0})}catch(e){}}
+function saveSettings(){try{const s={homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,lpfQ,hpfQ,lpfSlope,hpfSlope,eqLowGain,eqLoMidGain,eqHiMidGain,eqHighGain,chorusMix,widthMod,reverbMix,reverbSize,reverbMod,delayMixVal,delayFeedback,delayTone,delaySync,delaySyncDiv,delayTimeVal,shimmerVol,masterVol,satAmt,textureOctUp,foundationSubOct,arpVol,arpRate,arpOct,arpVoice,movementVol,movementPattern,clickBPM,clickRateX2,evolveOnBeat,evolveBars,enabledEvolveIdx:[...enabledEvolveIdx],layers:{}};PAD_LAYERS.forEach(l=>{s.layers[l.id]={volume:layerState[l.id].volume}});localStorage.setItem('norcoast_v1',JSON.stringify(s))}catch(e){}}
+function loadSettings(){try{const raw=localStorage.getItem('norcoast_v1');if(!raw)return;const s=JSON.parse(raw);if(s.homeRoot)homeRoot=s.homeRoot;if(s.evolving!=null)evolving=s.evolving;if(s.evolveSpeed!=null)evolveSpeed=s.evolveSpeed;if(s.lpfValue!=null)lpfValue=s.lpfValue;if(s.hpfValue!=null)hpfValue=s.hpfValue;if(s.lpfQ!=null)lpfQ=s.lpfQ;if(s.hpfQ!=null)hpfQ=s.hpfQ;if(s.lpfSlope!=null)lpfSlope=s.lpfSlope;if(s.hpfSlope!=null)hpfSlope=s.hpfSlope;if(s.eqLowGain!=null)eqLowGain=s.eqLowGain;if(s.eqLoMidGain!=null)eqLoMidGain=s.eqLoMidGain;if(s.eqHiMidGain!=null)eqHiMidGain=s.eqHiMidGain;if(s.eqHighGain!=null)eqHighGain=s.eqHighGain;if(s.chorusMix!=null)chorusMix=s.chorusMix;if(s.widthMod!=null)widthMod=s.widthMod;if(s.shimmerVol!=null)shimmerVol=s.shimmerVol;if(s.reverbMix!=null)reverbMix=s.reverbMix;if(s.reverbSize!=null)reverbSize=s.reverbSize;if(s.reverbMod!=null)reverbMod=s.reverbMod;if(s.delayMixVal!=null)delayMixVal=s.delayMixVal;if(s.delayFeedback!=null)delayFeedback=s.delayFeedback;if(s.delayTone!=null)delayTone=s.delayTone;if(s.delaySync!=null)delaySync=s.delaySync;if(s.delaySyncDiv)delaySyncDiv=s.delaySyncDiv;if(s.delayTimeVal!=null)delayTimeVal=s.delayTimeVal;if(s.masterVol!=null)masterVol=s.masterVol;if(s.satAmt!=null){satAmt=s.satAmt;if(satDriveNode)satDriveNode.gain.value=1+satAmt*1.5;if(satCompNode)satCompNode.gain.value=1/(1+satAmt*0.3);}if(s.textureOctUp!=null)textureOctUp=s.textureOctUp;if(s.foundationSubOct!=null)foundationSubOct=s.foundationSubOct;if(s.clickBPM!=null)clickBPM=s.clickBPM;if(s.evolveOnBeat!=null)evolveOnBeat=s.evolveOnBeat;if(s.evolveBars!=null)evolveBars=s.evolveBars;if(s.arpVol!=null)arpVol=s.arpVol;if(s.arpRate!=null)arpRate=s.arpRate;if(s.arpOct!=null)arpOct=s.arpOct;if(s.arpVoice)arpVoice=s.arpVoice;if(s.movementVol!=null)movementVol=s.movementVol;if(s.movementPattern!=null)movementPattern=s.movementPattern;if(s.clickRateX2!=null)clickRateX2=s.clickRateX2;if(Array.isArray(s.enabledEvolveIdx))enabledEvolveIdx=new Set(s.enabledEvolveIdx);if(s.layers)PAD_LAYERS.forEach(l=>{if(s.layers[l.id]!=null)layerState[l.id].volume=s.layers[l.id].volume??0})}catch(e){}}
 let _saveT=null;function queueSave(){clearTimeout(_saveT);_saveT=setTimeout(saveSettings,500)}
 
 // ─── PRESETS ───
@@ -1530,6 +1579,15 @@ function fireClick(t){
     osc.type='sine';osc.frequency.value=1200;
     env.gain.setValueAtTime(0.32,t);env.gain.exponentialRampToValueAtTime(0.001,t+0.018);
     osc.connect(env);env.connect(clickOutBus||ctx.destination);osc.start(t);osc.stop(t+0.025);osc.onended=()=>{try{osc.disconnect();env.disconnect()}catch(e){}};
+    // x2: extra click on the "and" of each beat (half-tempo subdivision)
+    if(clickRateX2){
+      const t2=t+30/clickBPM;
+      const o2=ctx.createOscillator(),e2=ctx.createGain();
+      o2.type='sine';o2.frequency.value=1200;
+      e2.gain.setValueAtTime(0.16,t2);e2.gain.exponentialRampToValueAtTime(0.001,t2+0.018);
+      o2.connect(e2);e2.connect(clickOutBus||ctx.destination);o2.start(t2);o2.stop(t2+0.025);
+      o2.onended=()=>{try{o2.disconnect();e2.disconnect()}catch(e){}};
+    }
   }
   if(evolveOnBeat&&isDown&&evolving&&!_fadeActive){
     // Apply pending chord at the bar downbeat
@@ -1573,16 +1631,19 @@ function fireClick(t){
       setTimeout(fireArpNote,Math.max(0,(t+30/clickBPM-ctx.currentTime)*1000));
     }
   }
-  // Movement: 16-step pattern, 4 sub-steps per beat
+  // Movement: 16-step pattern, 4 sub-steps per beat. Patterns can span >1 bar.
   if(movementVol>0&&!_fadeActive){
     const pat=MOVEMENT_PATTERNS[movementPattern];
     if(pat){
-      const beatInBar=beat%4;
+      const len=pat.steps.length;
+      const beatsInPat=len/4;
+      const beatInPat=beat%beatsInPat;
+      const bar=Math.floor(beat/4);
       const stepDur=60/clickBPM/4;
       for(let sub=0;sub<4;sub++){
-        const step=beatInBar*4+sub;
-        const sound=pat.steps[step];
-        if(sound) fireMovementHit(t+sub*stepDur,sound);
+        const stepInPat=beatInPat*4+sub;
+        const sound=pickMovementSound(stepInPat,bar);
+        if(sound) fireMovementHit(t+sub*stepDur,sound,0.88+Math.random()*0.24);
       }
     }
   }
@@ -1591,6 +1652,11 @@ function toggleClick(){
   if(!ctx)return;
   clickMuted=!clickMuted;
   const btn=document.getElementById('clickBtn');if(btn){btn.className='evolve-pill '+(clickMuted?'off':'on');}
+}
+function toggleClickX2(){
+  clickRateX2=!clickRateX2;
+  const btn=document.getElementById('clickX2Btn');if(btn){btn.className='evolve-pill '+(clickRateX2?'on':'off');}
+  saveSettings();
 }
 function setBPM(v){clickBPM=Math.max(50,Math.min(200,parseInt(v)||120));const d=document.getElementById('bpmDisplay');if(d)d.textContent=clickBPM;if(clickActive&&!midiClockIn){stopClick();startClick()}applyDelaySync();}
 function getDelayTime(){const beat=60/clickBPM;const divs={'1/2':beat*2,'q.':beat*1.5,'q':beat,'1/8.':beat*0.75,'1/8':beat*0.5};return Math.min(divs[delaySyncDiv]||beat*1.5,1.9)}
@@ -1916,6 +1982,7 @@ async function initAndStart(){
     sheet.addEventListener('touchstart',e=>{if(e.touches.length===1&&e.target.closest('input[type=range]')==null){_sy=e.touches[0].clientY;_sw=true;}},{passive:true});
     sheet.addEventListener('touchend',e=>{if(_sw){const dy=e.changedTouches[0].clientY-_sy;if(dy>70)closeEdit();_sw=false;}},{passive:true});}
     {const eb=document.getElementById('evolveBtn');if(eb){eb.className='evolve-pill '+(evolving?'on':'off');eb.textContent=evolving?'Evolving':'Static'}}
+    {const xb=document.getElementById('clickX2Btn');if(xb)xb.className='evolve-pill '+(clickRateX2?'on':'off');}
     const _bd=document.getElementById('bpmDisplay');if(_bd)_bd.textContent=clickBPM;
     document.getElementById('stateEvolve').textContent=CHORD_TYPES[currentEvolve].name;
   }catch(e){if(ls)ls.textContent='Error: '+e.message;}
