@@ -205,7 +205,7 @@
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
       <button id="clickX2Btn" class="evolve-pill off" onclick="toggleClickX2()" style="padding:8px 10px;font-size:9px;letter-spacing:1px">x2</button>
     </div>
-    <div class="app-version">v0.91</div>
+    <div class="app-version">v0.92</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -288,6 +288,8 @@ const ATTACK=4,RELEASE=5,XFADE=5,ROOT_OCT=3,DELAY_Q=60/70;
 
 // ─── STATE ───
 let ctx,waves,master,reverb,reverbGain,dryGain,delayNode,delayGainN,delayFB,dToneNode,analyser;
+let _sumBus=null;
+let drumFlangWet=null,drumRevSend=null,drumFXAmt=0;
 let widthPanner=null,widthLFOGain=null;
 let reverbModWet=null,reverbModLGain=null,reverbModRGain=null;
 let globalLPF,globalHPF,globalLPF2,globalHPF2,eqLowNode,eqLoMidNode,eqHiMidNode,eqHighNode;
@@ -355,7 +357,7 @@ function initReverb(opts){
   const erTaps=[{t:0.007,g:0.60,p:-0.30},{t:0.013,g:0.48,p:+0.45},
                 {t:0.019,g:0.37,p:-0.55},{t:0.027,g:0.27,p:+0.20},
                 {t:0.035,g:0.19,p:-0.40},{t:0.043,g:0.12,p:+0.65}];
-  const erOut=ctx.createGain();erOut.gain.value=opts.bright?0.16:0.20;
+  const erOut=ctx.createGain();erOut.gain.value=opts.bright?0.10:0.08;
   erTaps.forEach(({t,g,p})=>{
     const d=ctx.createDelay(0.06);d.delayTime.value=t;
     const gn=ctx.createGain();gn.gain.value=g;
@@ -405,8 +407,8 @@ function initReverb(opts){
   }
 
   // Stereo output taps: even → L, odd → R
-  const sumL=ctx.createGain();sumL.gain.value=0.42;
-  const sumR=ctx.createGain();sumR.gain.value=0.42;
+  const sumL=ctx.createGain();sumL.gain.value=0.70;
+  const sumR=ctx.createGain();sumR.gain.value=0.70;
   for(let i=0;i<N;i++){if(i%2===0)delays[i].connect(sumL);else delays[i].connect(sumR);}
 
   // Dual-mono post-diffusion — detuned L/R for stereo decorrelation
@@ -616,7 +618,7 @@ async function initAudio(){
   // Shimmer taps from chorused bus
   shimmerNode=createShimmerReverb();_chorBus.connect(shimmerNode.input);
   // All FX returns collect at _sumBus before EQ
-  const _sumBus=ctx.createGain();_sumBus.gain.value=1;
+  _sumBus=ctx.createGain();_sumBus.gain.value=1;
   shimmerNode.stereoL.connect(_sumBus);shimmerNode.stereoR.connect(_sumBus);
   // Reverb from chorused signal
   _chorBus.connect(reverb.input);reverb.output.connect(reverbGain);reverbGain.connect(_sumBus);
@@ -654,11 +656,24 @@ async function initAudio(){
   analyser.connect(satWS);satWS.connect(satCompNode);satCompNode.connect(limiter);
   limiter.connect(ctx.destination);
   clickOutBus.connect(ctx.destination);
-  // Movement layer: dedicated baked-in reverb so percussion always sits in space
-  // regardless of the user's main reverb mix. Output joins the master FX chain
-  // at master so drums get the same widthPanner + full chain as everything else.
+  // Movement layer: dedicated baked-in reverb. Drums bypass width/chorus/shimmer
+  // and inject directly at _sumBus. An optional flanger + reverb send is
+  // controlled by drumFXAmt (the FX slider under Movement in the menu).
   movementReverb=createMovementReverb();
-  movementReverb.output.connect(master);
+  const drumDry=ctx.createGain();drumDry.gain.value=1;
+  movementReverb.output.connect(drumDry);drumDry.connect(_sumBus);
+  // Flanger: comb filter (3ms delay, 0.55 feedback, 0.22Hz LFO)
+  const flD=ctx.createDelay(0.012);flD.delayTime.value=0.003;
+  const flLFO=ctx.createOscillator();flLFO.type='sine';flLFO.frequency.value=0.22;
+  const flLFOG=ctx.createGain();flLFOG.gain.value=0.0028;
+  flLFO.connect(flLFOG);flLFOG.connect(flD.delayTime);flLFO.start();
+  const flFB=ctx.createGain();flFB.gain.value=0.55;
+  flD.connect(flFB);flFB.connect(flD);
+  drumFlangWet=ctx.createGain();drumFlangWet.gain.value=0;
+  movementReverb.output.connect(flD);flD.connect(drumFlangWet);drumFlangWet.connect(_sumBus);
+  // Reverb send — uses the main reverb so it matches the room the pads are in
+  drumRevSend=ctx.createGain();drumRevSend.gain.value=0;
+  movementReverb.output.connect(drumRevSend);drumRevSend.connect(reverb.input);
 }
 
 function createMovementReverb(){
@@ -673,8 +688,8 @@ function createMovementReverb(){
   conv.buffer=ir;
   const inp=ctx.createGain();
   const out=ctx.createGain();
-  const wet=ctx.createGain();wet.gain.value=0.85;
-  const dry=ctx.createGain();dry.gain.value=0.55;
+  const wet=ctx.createGain();wet.gain.value=0.35;
+  const dry=ctx.createGain();dry.gain.value=0.70;
   // Tame the high end so the reverb sits behind the dry hits
   const damp=ctx.createBiquadFilter();damp.type='lowpass';damp.frequency.value=4200;damp.Q.value=0.5;
   inp.connect(dry);dry.connect(out);
@@ -950,8 +965,8 @@ function fireMovementHit(t,sound,vel){
     osc.frequency.exponentialRampToValueAtTime(48,t+0.05);    // snappy click
     osc.frequency.exponentialRampToValueAtTime(40,t+0.5);     // settled boom
     env.gain.setValueAtTime(0,t);
-    env.gain.linearRampToValueAtTime(movementVol*0.7*vel,t+0.001);   // punch
-    env.gain.exponentialRampToValueAtTime(movementVol*0.32*vel,t+0.08);
+    env.gain.linearRampToValueAtTime(movementVol*1.2*vel,t+0.001);   // punch
+    env.gain.exponentialRampToValueAtTime(movementVol*0.55*vel,t+0.08);
     env.gain.exponentialRampToValueAtTime(0.0008,t+0.55);
     osc.connect(env);env.connect(movementReverb.input);
     osc.start(t);osc.stop(t+0.6);
@@ -965,8 +980,8 @@ function fireMovementHit(t,sound,vel){
     osc.frequency.exponentialRampToValueAtTime(110,t+0.05);
     osc.frequency.exponentialRampToValueAtTime(95,t+0.35);
     env.gain.setValueAtTime(0,t);
-    env.gain.linearRampToValueAtTime(movementVol*0.5*vel,t+0.001);
-    env.gain.exponentialRampToValueAtTime(movementVol*0.22*vel,t+0.06);
+    env.gain.linearRampToValueAtTime(movementVol*0.85*vel,t+0.001);
+    env.gain.exponentialRampToValueAtTime(movementVol*0.38*vel,t+0.06);
     env.gain.exponentialRampToValueAtTime(0.0008,t+0.4);
     pan.pan.value=-0.12+(Math.random()*0.1-0.05);
     osc.connect(env);env.connect(pan);pan.connect(movementReverb.input);
@@ -983,7 +998,7 @@ function fireMovementHit(t,sound,vel){
     const env=ctx.createGain();
     const pan=ctx.createStereoPanner();pan.pan.value=0.3+(Math.random()*0.2-0.1);
     env.gain.setValueAtTime(0,t);
-    env.gain.linearRampToValueAtTime(movementVol*0.13*vel,t+0.001);
+    env.gain.linearRampToValueAtTime(movementVol*0.22*vel,t+0.001);
     env.gain.exponentialRampToValueAtTime(0.0008,t+0.055);
     src.connect(hp);hp.connect(lp);lp.connect(env);env.connect(pan);pan.connect(movementReverb.input);
     src.start(t);src.stop(t+0.08);
@@ -1242,6 +1257,7 @@ function buildEditSheet(){
   h+='<div class="slope-row" style="padding:2px 12px 10px;flex-wrap:wrap"><span class="slope-label">Pattern</span>';
   MOVEMENT_PATTERNS.forEach((p,i)=>{h+='<button class="slope-btn'+(movementPattern===i?' active':'')+'" onclick="setMovementPattern('+i+')" style="padding:6px 10px">'+p.name+'</button>';});
   h+='</div>';
+  h+=sliderRowHTML('drmFX','FX','#e8a45e',drumFXAmt,Math.round(drumFXAmt*100)+'%');
 
   h+='</div><div class="edit-divider"></div>';
   // ── Effects ──
@@ -1408,6 +1424,7 @@ function buildEditSheet(){
   wireSR(c,'sat',r=>{satAmt=r;if(satWS)satWS.curve=buildSatCurve(r);if(satCompNode)satCompNode.gain.linearRampToValueAtTime(1+r*0.15,ctx.currentTime+0.05);queueSave();return Math.round(r*100)+'%'});
   // Wire other sliders
   wireSR(c,'arp',r=>{const wasOff=arpVol<=0;arpVol=r;if(r>0&&wasOff)startArp();else if(r<=0)stopArp();const arpRow=c.querySelector('.edit-layer[data-lid="arp"]');if(arpRow){const on=r>0;const db=arpRow.querySelector('.layer-dot-btn');if(db){db.style.borderColor=on?'#9b7fd455':'rgba(255,255,255,0.1)';db.style.background=on?'#9b7fd415':'transparent';}const dot=arpRow.querySelector('.layer-dot');if(dot){dot.style.background=on?'#9b7fd4':'rgba(255,255,255,0.15)';dot.style.boxShadow=on?'0 0 10px #9b7fd450':'none';}const nm=arpRow.querySelector('.edit-layer-name');if(nm)nm.style.color=on?'rgba(255,255,255,0.8)':'rgba(255,255,255,0.35)';}return Math.round(r*100)+'%'});
+  wireSR(c,'drmFX',r=>{drumFXAmt=r;if(drumFlangWet)drumFlangWet.gain.linearRampToValueAtTime(r*0.8,ctx.currentTime+0.05);if(drumRevSend)drumRevSend.gain.linearRampToValueAtTime(r*1.2,ctx.currentTime+0.05);queueSave();return Math.round(r*100)+'%'});
   wireSR(c,'mov',r=>{const wasOff=movementVol<=0;movementVol=r;if(r>0&&wasOff)startMovement();else if(r<=0)stopMovement();const mRow=c.querySelector('.edit-layer[data-lid="movement"]');if(mRow){const on=r>0;const db=mRow.querySelector('.layer-dot-btn');if(db){db.style.borderColor=on?'#e8a45e55':'rgba(255,255,255,0.1)';db.style.background=on?'#e8a45e15':'transparent';}const dot=mRow.querySelector('.layer-dot');if(dot){dot.style.background=on?'#e8a45e':'rgba(255,255,255,0.15)';dot.style.boxShadow=on?'0 0 10px #e8a45e50':'none';}const nm=mRow.querySelector('.edit-layer-name');if(nm)nm.style.color=on?'rgba(255,255,255,0.8)':'rgba(255,255,255,0.35)';}return Math.round(r*100)+'%'});
   wireSR(c,'spd',r=>{evolveSpeed=faderToVol(r);return Math.round(evolveSpeed*100)+'%'});
   wireSR(c,'mst',r=>{masterVol=faderToVol(r);master.gain.linearRampToValueAtTime(masterVol,ctx.currentTime+0.1);return Math.round(masterVol*100)+'%'});
@@ -1506,8 +1523,8 @@ function toggleSlope(type){
   }
   saveSettings();buildEditSheet();
 }
-function saveSettings(){try{const s={homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,lpfQ,hpfQ,lpfSlope,hpfSlope,eqLowGain,eqLoMidGain,eqHiMidGain,eqHighGain,chorusMix,widthMod,reverbMix,reverbSize,reverbMod,delayMixVal,delayFeedback,delayTone,delaySync,delaySyncDiv,delayTimeVal,shimmerVol,masterVol,satAmt,textureOctUp,foundationSubOct,arpVol,arpRate,arpOct,arpVoice,movementVol,movementPattern,clickBPM,clickRateX2,clickAccent,timeSig,evolveOnBeat,evolveBars,enabledEvolveIdx:[...enabledEvolveIdx],layers:{}};PAD_LAYERS.forEach(l=>{s.layers[l.id]={volume:layerState[l.id].volume}});localStorage.setItem('norcoast_v1',JSON.stringify(s))}catch(e){}}
-function loadSettings(){try{const raw=localStorage.getItem('norcoast_v1');if(!raw)return;const s=JSON.parse(raw);if(s.homeRoot)homeRoot=s.homeRoot;if(s.evolving!=null)evolving=s.evolving;if(s.evolveSpeed!=null)evolveSpeed=s.evolveSpeed;if(s.lpfValue!=null)lpfValue=s.lpfValue;if(s.hpfValue!=null)hpfValue=s.hpfValue;if(s.lpfQ!=null)lpfQ=s.lpfQ;if(s.hpfQ!=null)hpfQ=s.hpfQ;if(s.lpfSlope!=null)lpfSlope=s.lpfSlope;if(s.hpfSlope!=null)hpfSlope=s.hpfSlope;if(s.eqLowGain!=null)eqLowGain=s.eqLowGain;if(s.eqLoMidGain!=null)eqLoMidGain=s.eqLoMidGain;if(s.eqHiMidGain!=null)eqHiMidGain=s.eqHiMidGain;if(s.eqHighGain!=null)eqHighGain=s.eqHighGain;if(s.chorusMix!=null)chorusMix=s.chorusMix;if(s.widthMod!=null)widthMod=s.widthMod;if(s.shimmerVol!=null)shimmerVol=s.shimmerVol;if(s.reverbMix!=null)reverbMix=s.reverbMix;if(s.reverbSize!=null)reverbSize=s.reverbSize;if(s.reverbMod!=null)reverbMod=s.reverbMod;if(s.delayMixVal!=null)delayMixVal=s.delayMixVal;if(s.delayFeedback!=null)delayFeedback=s.delayFeedback;if(s.delayTone!=null)delayTone=s.delayTone;if(s.delaySync!=null)delaySync=s.delaySync;if(s.delaySyncDiv)delaySyncDiv=s.delaySyncDiv;if(s.delayTimeVal!=null)delayTimeVal=s.delayTimeVal;if(s.masterVol!=null)masterVol=s.masterVol;if(s.satAmt!=null){satAmt=s.satAmt;if(satWS)satWS.curve=buildSatCurve(satAmt);if(satCompNode)satCompNode.gain.value=1+satAmt*0.15;}if(s.textureOctUp!=null)textureOctUp=s.textureOctUp;if(s.foundationSubOct!=null)foundationSubOct=s.foundationSubOct;if(s.clickBPM!=null)clickBPM=s.clickBPM;if(s.evolveOnBeat!=null)evolveOnBeat=s.evolveOnBeat;if(s.evolveBars!=null)evolveBars=s.evolveBars;if(s.arpVol!=null)arpVol=s.arpVol;if(s.arpRate!=null)arpRate=s.arpRate;if(s.arpOct!=null)arpOct=s.arpOct;if(s.arpVoice)arpVoice=s.arpVoice;if(s.movementVol!=null)movementVol=s.movementVol;if(s.movementPattern!=null)movementPattern=s.movementPattern;if(s.clickRateX2!=null)clickRateX2=s.clickRateX2;if(s.clickAccent!=null)clickAccent=s.clickAccent;if(s.timeSig)timeSig=s.timeSig;if(Array.isArray(s.enabledEvolveIdx))enabledEvolveIdx=new Set(s.enabledEvolveIdx);if(s.layers)PAD_LAYERS.forEach(l=>{if(s.layers[l.id]!=null)layerState[l.id].volume=s.layers[l.id].volume??0})}catch(e){}}
+function saveSettings(){try{const s={homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,lpfQ,hpfQ,lpfSlope,hpfSlope,eqLowGain,eqLoMidGain,eqHiMidGain,eqHighGain,chorusMix,widthMod,reverbMix,reverbSize,reverbMod,delayMixVal,delayFeedback,delayTone,delaySync,delaySyncDiv,delayTimeVal,shimmerVol,masterVol,satAmt,textureOctUp,foundationSubOct,arpVol,arpRate,arpOct,arpVoice,movementVol,movementPattern,drumFXAmt,clickBPM,clickRateX2,clickAccent,timeSig,evolveOnBeat,evolveBars,enabledEvolveIdx:[...enabledEvolveIdx],layers:{}};PAD_LAYERS.forEach(l=>{s.layers[l.id]={volume:layerState[l.id].volume}});localStorage.setItem('norcoast_v1',JSON.stringify(s))}catch(e){}}
+function loadSettings(){try{const raw=localStorage.getItem('norcoast_v1');if(!raw)return;const s=JSON.parse(raw);if(s.homeRoot)homeRoot=s.homeRoot;if(s.evolving!=null)evolving=s.evolving;if(s.evolveSpeed!=null)evolveSpeed=s.evolveSpeed;if(s.lpfValue!=null)lpfValue=s.lpfValue;if(s.hpfValue!=null)hpfValue=s.hpfValue;if(s.lpfQ!=null)lpfQ=s.lpfQ;if(s.hpfQ!=null)hpfQ=s.hpfQ;if(s.lpfSlope!=null)lpfSlope=s.lpfSlope;if(s.hpfSlope!=null)hpfSlope=s.hpfSlope;if(s.eqLowGain!=null)eqLowGain=s.eqLowGain;if(s.eqLoMidGain!=null)eqLoMidGain=s.eqLoMidGain;if(s.eqHiMidGain!=null)eqHiMidGain=s.eqHiMidGain;if(s.eqHighGain!=null)eqHighGain=s.eqHighGain;if(s.chorusMix!=null)chorusMix=s.chorusMix;if(s.widthMod!=null)widthMod=s.widthMod;if(s.shimmerVol!=null)shimmerVol=s.shimmerVol;if(s.reverbMix!=null)reverbMix=s.reverbMix;if(s.reverbSize!=null)reverbSize=s.reverbSize;if(s.reverbMod!=null)reverbMod=s.reverbMod;if(s.delayMixVal!=null)delayMixVal=s.delayMixVal;if(s.delayFeedback!=null)delayFeedback=s.delayFeedback;if(s.delayTone!=null)delayTone=s.delayTone;if(s.delaySync!=null)delaySync=s.delaySync;if(s.delaySyncDiv)delaySyncDiv=s.delaySyncDiv;if(s.delayTimeVal!=null)delayTimeVal=s.delayTimeVal;if(s.masterVol!=null)masterVol=s.masterVol;if(s.satAmt!=null){satAmt=s.satAmt;if(satWS)satWS.curve=buildSatCurve(satAmt);if(satCompNode)satCompNode.gain.value=1+satAmt*0.15;}if(s.textureOctUp!=null)textureOctUp=s.textureOctUp;if(s.foundationSubOct!=null)foundationSubOct=s.foundationSubOct;if(s.clickBPM!=null)clickBPM=s.clickBPM;if(s.evolveOnBeat!=null)evolveOnBeat=s.evolveOnBeat;if(s.evolveBars!=null)evolveBars=s.evolveBars;if(s.arpVol!=null)arpVol=s.arpVol;if(s.arpRate!=null)arpRate=s.arpRate;if(s.arpOct!=null)arpOct=s.arpOct;if(s.arpVoice)arpVoice=s.arpVoice;if(s.movementVol!=null)movementVol=s.movementVol;if(s.movementPattern!=null)movementPattern=s.movementPattern;if(s.drumFXAmt!=null){drumFXAmt=s.drumFXAmt;if(drumFlangWet)drumFlangWet.gain.value=drumFXAmt*0.8;if(drumRevSend)drumRevSend.gain.value=drumFXAmt*1.2;}if(s.clickRateX2!=null)clickRateX2=s.clickRateX2;if(s.clickAccent!=null)clickAccent=s.clickAccent;if(s.timeSig)timeSig=s.timeSig;if(Array.isArray(s.enabledEvolveIdx))enabledEvolveIdx=new Set(s.enabledEvolveIdx);if(s.layers)PAD_LAYERS.forEach(l=>{if(s.layers[l.id]!=null)layerState[l.id].volume=s.layers[l.id].volume??0})}catch(e){}}
 let _saveT=null;function queueSave(){clearTimeout(_saveT);_saveT=setTimeout(saveSettings,500)}
 
 // ─── PRESETS ───
