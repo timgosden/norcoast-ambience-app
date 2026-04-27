@@ -23,7 +23,7 @@
     .key-btn.sharp{font-size:12px}
     .perf-vis-wrap{height:44px;padding:4px 20px}
     .perf-bottom{padding:6px 20px 12px}
-    #editSheet{left:0;right:0;max-width:none}
+    #editSheet{left:0;right:0;transform:none;max-width:none}
   }
   @media(min-width:1100px){
     .perf-keys{grid-template-columns:repeat(12,1fr);gap:8px;padding:0 28px 4px}
@@ -69,13 +69,6 @@
   .perf-vol-pct{font-size:10px;color:rgba(255,255,255,0.25);flex-shrink:0;width:30px;text-align:right;font-variant-numeric:tabular-nums}
   .perf-bottom{display:flex;align-items:center;justify-content:space-evenly;padding:8px 12px 14px;flex-shrink:0;gap:8px;position:relative}
   .app-version{position:absolute;bottom:6px;right:10px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none;font-variant-numeric:tabular-nums}
-  .perf-nav{display:flex;align-items:center;gap:0;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.09);border-radius:20px;overflow:hidden;flex-shrink:0}
-  .nav-arr{background:none;border:none;color:rgba(255,255,255,0.4);font-size:11px;padding:6px 10px;cursor:pointer;transition:color 0.15s}
-  .nav-arr:active{color:rgba(196,145,94,0.9)}
-  .nav-name{font-size:10px;color:rgba(255,255,255,0.45);letter-spacing:0.4px;padding:0 6px;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center}
-  .nav-name.active{color:rgba(196,145,94,0.8)}
-  .nav-clock{background:none;border:none;border-left:1px solid rgba(255,255,255,0.09);color:rgba(255,255,255,0.35);font-size:10px;padding:6px 10px;cursor:pointer;letter-spacing:0.5px;transition:color 0.15s;white-space:nowrap}
-  .nav-clock.running{color:rgba(94,184,138,0.8)}
   .bpm-click-group{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:14px;padding:4px 8px}
   .evolve-pill{padding:8px 22px;border-radius:20px;font-size:10px;letter-spacing:2.5px;text-transform:uppercase;font-weight:500;cursor:pointer;transition:all 0.3s;border:1px solid transparent}
   .fade-btn{padding:8px 14px;border-radius:20px;font-size:10px;letter-spacing:2px;text-transform:uppercase;font-weight:500;cursor:pointer;transition:border-color 0.3s,color 0.3s,box-shadow 0.3s;border:1px solid rgba(212,107,138,0.35);background:rgba(212,107,138,0.08);color:rgba(212,107,138,0.7);touch-action:manipulation;min-width:52px;text-align:center;position:relative;overflow:hidden}
@@ -89,7 +82,7 @@
   #editBackdrop{position:fixed;inset:0;background:rgba(0,0,0,0);pointer-events:none;z-index:40;transition:background 0.3s}
   #editBackdrop.visible{background:rgba(0,0,0,0.52);pointer-events:all}
   /* ── Edit sheet ── */
-  #editSheet{position:fixed;left:0;right:0;bottom:0;background:linear-gradient(180deg,#07090e 0%,#030508 100%);border-radius:24px 24px 0 0;border-top:1px solid rgba(255,255,255,0.1);box-shadow:0 -8px 40px rgba(0,0,0,0.5);transform:translateY(100%);transition:transform 0.4s cubic-bezier(0.32,0.72,0,1);max-height:84vh;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;z-index:50;padding-bottom:env(safe-area-inset-bottom);padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
+  #editSheet{position:fixed;left:0;right:0;bottom:0;background:linear-gradient(180deg,#0e1120 0%,#090c16 100%);border-radius:24px 24px 0 0;border-top:1px solid rgba(255,255,255,0.15);box-shadow:0 -8px 40px rgba(0,0,0,0.5);transform:translateY(100%);transition:transform 0.4s cubic-bezier(0.32,0.72,0,1);max-height:84vh;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;z-index:50;padding-bottom:env(safe-area-inset-bottom);padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
   #editSheet.open{transform:translateY(0)}
   .sheet-handle{width:36px;height:4px;background:rgba(255,255,255,0.15);border-radius:2px;margin:12px auto 2px;cursor:pointer}
   /* ── Edit content ── */
@@ -173,7 +166,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v0.75</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v0.76</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -211,12 +204,7 @@
       <button class="bpm-tap-main" id="bpmTapMain" onclick="tapTempo()" title="Tap for BPM"><span id="bpmDisplay">70</span><span class="bpm-tap-label">BPM</span></button>
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
     </div>
-    <div class="perf-nav">
-      <button class="nav-arr" onclick="prevPreset()" title="Previous preset">◀</button>
-      <span class="nav-name" id="navPresetName">—</span>
-      <button class="nav-arr" onclick="nextPreset()" title="Next preset">▶</button>
-      <button class="nav-clock" id="navClockBtn" onclick="toggleClockRun()" title="Clock start/stop">■ CLK</button>
-    </div>
+    <div class="app-version">v0.76</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -262,7 +250,6 @@ const PAD_LAYERS=[
 ];
 
 const ATTACK=4,RELEASE=5,XFADE=5,ROOT_OCT=3,DELAY_Q=60/70;
-const STORE_SETTINGS=STORE_SETTINGS,STORE_PRESETS=STORE_PRESETS,STORE_MIDI=STORE_MIDI;
 
 // ─── STATE ───
 let ctx,waves,master,reverb,reverbGain,dryGain,delayNode,delayGainN,delayFB,dToneNode,analyser;
@@ -707,12 +694,12 @@ function stopShimmer(){
   shimmerGainNode=null;
 }
 
-function startPad(def,vol,root,ei,atk=ATTACK){
+function startPad(def,vol,root,ei){
   if(def.type==="granular"){startGranular(vol);return}
   if(vol<=0){stopPad(def.id);return;}
   fadeOut(staticNodes[def.id],XFADE);fadeOut(evolveNodes[def.id],XFADE);
-  staticNodes[def.id]=buildGroup(def,getStaticFreqs(root,def),vol,atk);
-  if(!def.rootOnly)evolveNodes[def.id]=buildGroup(def,getEvolveFreq(root,ei),vol,atk);
+  staticNodes[def.id]=buildGroup(def,getStaticFreqs(root,def),vol,ATTACK);
+  if(!def.rootOnly)evolveNodes[def.id]=buildGroup(def,getEvolveFreq(root,ei),vol,ATTACK);
 }
 function stopPad(id){
   const def=PAD_LAYERS.find(l=>l.id===id);
@@ -922,18 +909,15 @@ function buildKeys(){
         return;
       }
       homeRoot=n;currentPresetName=null;document.getElementById('stateRoot').textContent=n;
-      const nn=document.getElementById('navPresetName');if(nn){nn.textContent='—';nn.className='nav-name';}
       if(audioPaused){audioPaused=false;ctx.resume();master.gain.cancelScheduledValues(ctx.currentTime);master.gain.setValueAtTime(master.gain.value,ctx.currentTime);master.gain.linearRampToValueAtTime(masterVol,ctx.currentTime+0.3);}
       arpStep=0;
       const firstChord=[...enabledEvolveIdx][0]??0;
       currentEvolve=firstChord;pendingEvolve=-1;
       clearPendingChord();
       document.getElementById('stateEvolve').textContent=CHORD_TYPES[firstChord].name;
-      try{window.webkit.messageHandlers.bridge.postMessage('haptic')}catch(_){}
       PAD_LAYERS.forEach(l=>{
-        if(l.type==="granular")return;
         if(layerState[l.id].volume<=0)return;
-        startPad(l,layerState[l.id].volume,homeRoot,currentEvolve,1.5);
+        startPad(l,layerState[l.id].volume,homeRoot,currentEvolve);
       });
       scheduleEvolve();
       buildKeys();saveSettings();
@@ -1095,17 +1079,8 @@ function buildEditSheet(){
     h+='<button class="slope-btn'+(midiClockOut?' active':'')+'" onclick="setMidiClockOut(true)">On</button>';
     if(midiOutputs.length)h+='<span style="font-size:10px;color:rgba(255,255,255,0.3);margin-left:4px">'+midiOutputs.length+' port'+(midiOutputs.length>1?'s':'')+'</span>';
     h+='</div>';
-    // Action mappings (buttons — trigger on CC > 0 or note-on)
-    h+='<div style="font-size:9px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,0.18);margin:10px 0 6px">Actions</div>';
-    [['prevPreset','◀ Prev preset'],['nextPreset','▶ Next preset'],['clockRun','▶/■ Clock'],['clickMute','Click mute']].forEach(([id,lbl])=>{
-      const mapped=midiMappings[id];const pend=midiLearnMode&&midiLearnPending===id;
-      h+='<div class="slope-row" style="margin:2px 0"><span class="slope-label" style="min-width:100px">'+lbl+'</span>';
-      if(midiLearnMode){h+='<button class="cc-learn-btn'+(pend?' pending':'')+'" onclick="startLearnForParam(\''+id+'\')">'+(pend?'Waiting…':'Map CC')+'</button>';}
-      if(mapped!=null)h+='<span class="cc-badge" onclick="clearLearn(\''+id+'\')" title="Remove">CC'+mapped+'</span>';
-      h+='</div>';
-    });
-    // CC Learn mode toggle
-    h+='<div class="slope-row" style="margin-top:8px"><span class="slope-label">Map CCs</span>';
+    // CC Learn mode
+    h+='<div class="slope-row"><span class="slope-label">Map CCs</span>';
     h+='<button class="slope-btn'+(midiLearnMode?' active':'')+'" onclick="toggleMIDILearn()">'+(midiLearnMode?'Done ✓':'Learn')+'</button>';
     if(midiLearnMode)h+='<span style="font-size:10px;color:rgba(196,145,94,0.9);margin-left:6px">Tap a control, then move a knob</span>';
     h+='</div>';
@@ -1298,34 +1273,20 @@ function toggleSlope(type){
   }
   saveSettings();buildEditSheet();
 }
-function saveSettings(){try{const s={homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,lpfQ,hpfQ,lpfSlope,hpfSlope,eqLowGain,eqLoMidGain,eqHiMidGain,eqHighGain,chorusMix,widthMod,reverbMix,reverbSize,reverbMod,delayMixVal,delayFeedback,delayTone,delaySync,delaySyncDiv,delayTimeVal,shimmerVol,masterVol,satAmt,textureOctUp,foundationSubOct,arpVol,arpRate,arpOct,arpVoice,clickBPM,evolveOnBeat,evolveBars,enabledEvolveIdx:[...enabledEvolveIdx],layers:{}};PAD_LAYERS.forEach(l=>{s.layers[l.id]={volume:layerState[l.id].volume}});localStorage.setItem(STORE_SETTINGS,JSON.stringify(s))}catch(e){}}
-function loadSettings(){try{const raw=localStorage.getItem(STORE_SETTINGS);if(!raw)return;const s=JSON.parse(raw);if(s.homeRoot)homeRoot=s.homeRoot;if(s.evolving!=null)evolving=s.evolving;if(s.evolveSpeed!=null)evolveSpeed=s.evolveSpeed;if(s.lpfValue!=null)lpfValue=s.lpfValue;if(s.hpfValue!=null)hpfValue=s.hpfValue;if(s.lpfQ!=null)lpfQ=s.lpfQ;if(s.hpfQ!=null)hpfQ=s.hpfQ;if(s.lpfSlope!=null)lpfSlope=s.lpfSlope;if(s.hpfSlope!=null)hpfSlope=s.hpfSlope;if(s.eqLowGain!=null)eqLowGain=s.eqLowGain;if(s.eqLoMidGain!=null)eqLoMidGain=s.eqLoMidGain;if(s.eqHiMidGain!=null)eqHiMidGain=s.eqHiMidGain;if(s.eqHighGain!=null)eqHighGain=s.eqHighGain;if(s.chorusMix!=null)chorusMix=s.chorusMix;if(s.widthMod!=null)widthMod=s.widthMod;if(s.shimmerVol!=null)shimmerVol=s.shimmerVol;if(s.reverbMix!=null)reverbMix=s.reverbMix;if(s.reverbSize!=null)reverbSize=s.reverbSize;if(s.reverbMod!=null)reverbMod=s.reverbMod;if(s.delayMixVal!=null)delayMixVal=s.delayMixVal;if(s.delayFeedback!=null)delayFeedback=s.delayFeedback;if(s.delayTone!=null)delayTone=s.delayTone;if(s.delaySync!=null)delaySync=s.delaySync;if(s.delaySyncDiv)delaySyncDiv=s.delaySyncDiv;if(s.delayTimeVal!=null)delayTimeVal=s.delayTimeVal;if(s.masterVol!=null)masterVol=s.masterVol;if(s.satAmt!=null){satAmt=s.satAmt;if(satDriveNode)satDriveNode.gain.value=1+satAmt*1.5;if(satCompNode)satCompNode.gain.value=1/(1+satAmt*0.3);}if(s.textureOctUp!=null)textureOctUp=s.textureOctUp;if(s.foundationSubOct!=null)foundationSubOct=s.foundationSubOct;if(s.clickBPM!=null)clickBPM=s.clickBPM;if(s.evolveOnBeat!=null)evolveOnBeat=s.evolveOnBeat;if(s.evolveBars!=null)evolveBars=s.evolveBars;if(s.arpVol!=null)arpVol=s.arpVol;if(s.arpRate!=null)arpRate=s.arpRate;if(s.arpOct!=null)arpOct=s.arpOct;if(s.arpVoice)arpVoice=s.arpVoice;if(Array.isArray(s.enabledEvolveIdx))enabledEvolveIdx=new Set(s.enabledEvolveIdx);if(s.layers)PAD_LAYERS.forEach(l=>{if(s.layers[l.id]!=null)layerState[l.id].volume=s.layers[l.id].volume??0})}catch(e){}}
+function saveSettings(){try{const s={homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,lpfQ,hpfQ,lpfSlope,hpfSlope,eqLowGain,eqLoMidGain,eqHiMidGain,eqHighGain,chorusMix,widthMod,reverbMix,reverbSize,reverbMod,delayMixVal,delayFeedback,delayTone,delaySync,delaySyncDiv,delayTimeVal,shimmerVol,masterVol,satAmt,textureOctUp,foundationSubOct,arpVol,arpRate,arpOct,arpVoice,clickBPM,evolveOnBeat,evolveBars,enabledEvolveIdx:[...enabledEvolveIdx],layers:{}};PAD_LAYERS.forEach(l=>{s.layers[l.id]={volume:layerState[l.id].volume}});localStorage.setItem('norcoast_v1',JSON.stringify(s))}catch(e){}}
+function loadSettings(){try{const raw=localStorage.getItem('norcoast_v1');if(!raw)return;const s=JSON.parse(raw);if(s.homeRoot)homeRoot=s.homeRoot;if(s.evolving!=null)evolving=s.evolving;if(s.evolveSpeed!=null)evolveSpeed=s.evolveSpeed;if(s.lpfValue!=null)lpfValue=s.lpfValue;if(s.hpfValue!=null)hpfValue=s.hpfValue;if(s.lpfQ!=null)lpfQ=s.lpfQ;if(s.hpfQ!=null)hpfQ=s.hpfQ;if(s.lpfSlope!=null)lpfSlope=s.lpfSlope;if(s.hpfSlope!=null)hpfSlope=s.hpfSlope;if(s.eqLowGain!=null)eqLowGain=s.eqLowGain;if(s.eqLoMidGain!=null)eqLoMidGain=s.eqLoMidGain;if(s.eqHiMidGain!=null)eqHiMidGain=s.eqHiMidGain;if(s.eqHighGain!=null)eqHighGain=s.eqHighGain;if(s.chorusMix!=null)chorusMix=s.chorusMix;if(s.widthMod!=null)widthMod=s.widthMod;if(s.shimmerVol!=null)shimmerVol=s.shimmerVol;if(s.reverbMix!=null)reverbMix=s.reverbMix;if(s.reverbSize!=null)reverbSize=s.reverbSize;if(s.reverbMod!=null)reverbMod=s.reverbMod;if(s.delayMixVal!=null)delayMixVal=s.delayMixVal;if(s.delayFeedback!=null)delayFeedback=s.delayFeedback;if(s.delayTone!=null)delayTone=s.delayTone;if(s.delaySync!=null)delaySync=s.delaySync;if(s.delaySyncDiv)delaySyncDiv=s.delaySyncDiv;if(s.delayTimeVal!=null)delayTimeVal=s.delayTimeVal;if(s.masterVol!=null)masterVol=s.masterVol;if(s.satAmt!=null){satAmt=s.satAmt;if(satDriveNode)satDriveNode.gain.value=1+satAmt*1.5;if(satCompNode)satCompNode.gain.value=1/(1+satAmt*0.3);}if(s.textureOctUp!=null)textureOctUp=s.textureOctUp;if(s.foundationSubOct!=null)foundationSubOct=s.foundationSubOct;if(s.clickBPM!=null)clickBPM=s.clickBPM;if(s.evolveOnBeat!=null)evolveOnBeat=s.evolveOnBeat;if(s.evolveBars!=null)evolveBars=s.evolveBars;if(s.arpVol!=null)arpVol=s.arpVol;if(s.arpRate!=null)arpRate=s.arpRate;if(s.arpOct!=null)arpOct=s.arpOct;if(s.arpVoice)arpVoice=s.arpVoice;if(Array.isArray(s.enabledEvolveIdx))enabledEvolveIdx=new Set(s.enabledEvolveIdx);if(s.layers)PAD_LAYERS.forEach(l=>{if(s.layers[l.id]!=null)layerState[l.id].volume=s.layers[l.id].volume??0})}catch(e){}}
 let _saveT=null;function queueSave(){clearTimeout(_saveT);_saveT=setTimeout(saveSettings,500)}
 
 // ─── PRESETS ───
 function escapeHTML(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
-function getPresets(){try{return JSON.parse(localStorage.getItem(STORE_PRESETS)||'{}')}catch(e){return{}}}
-function _savePresets(ps){localStorage.setItem(STORE_PRESETS,JSON.stringify(ps));try{window.webkit.messageHandlers.bridge.postMessage('presets:'+JSON.stringify(ps))}catch(_){}}
-function cyclePreset(dir){const names=Object.keys(getPresets());if(!names.length)return;loadPreset(names[(names.indexOf(currentPresetName??'')+dir+names.length)%names.length]);}
-function prevPreset(){cyclePreset(-1);}
-function nextPreset(){cyclePreset(1);}
-function toggleClockRun(){if(!ctx)return;if(clickActive)stopClick();else startClick();const b=document.getElementById('navClockBtn');if(b){b.className='nav-clock'+(clickActive?' running':'');b.textContent=clickActive?'▶ CLK':'■ CLK';}}
+function getPresets(){try{return JSON.parse(localStorage.getItem('norcoast_presets')||'{}')}catch(e){return{}}}
 function captureState(){
   const s={homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,lpfQ,hpfQ,lpfSlope,hpfSlope,eqLowGain,eqLoMidGain,eqHiMidGain,eqHighGain,chorusMix,widthMod,reverbMix,reverbSize,reverbMod,delayMixVal,delayFeedback,delayTone,delaySync,delaySyncDiv,delayTimeVal,shimmerVol,masterVol,satAmt,textureOctUp,foundationSubOct,arpVol,arpRate,arpOct,arpVoice,clickBPM,evolveOnBeat,evolveBars,enabledEvolveIdx:[...enabledEvolveIdx],layers:{}};
   PAD_LAYERS.forEach(l=>{s.layers[l.id]={volume:layerState[l.id].volume}});return s;
 }
 function savePreset(name){
   if(!name.trim())return;const ps=getPresets();ps[name.trim()]=captureState();
-  _savePresets(ps);buildEditSheet();updatePerfSetlist();
-}
-// Called by Swift when iCloud presets arrive (on launch or remote change).
-function norcoast_setCloudPresets(data){
-  try{
-    const merged=Object.assign({},getPresets(),data);
-    localStorage.setItem(STORE_PRESETS,JSON.stringify(merged));
-    if(document.getElementById('editSheet').classList.contains('open'))buildEditSheet();
-    updatePerfSetlist();
-  }catch(e){}
+  localStorage.setItem('norcoast_presets',JSON.stringify(ps));buildEditSheet();updatePerfSetlist();
 }
 function loadPreset(name){try{
   const ps=getPresets();const s=ps[name];if(!s)return;
@@ -1374,12 +1335,11 @@ function loadPreset(name){try{
   document.getElementById('stateEvolve').textContent=CHORD_TYPES[currentEvolve].name;
   const eb=document.getElementById('evolveBtn');if(eb){eb.className='evolve-pill '+(evolving?'on':'off');eb.textContent=evolving?'Evolving':'Static'}
   currentPresetName=name;
-  const _nn=document.getElementById('navPresetName');if(_nn){_nn.textContent=name;_nn.className='nav-name active';}
   buildKeys();saveSettings();buildEditSheet();updatePerfSetlist();
 }catch(e){console.error('loadPreset:',e);}}
 
 function deletePreset(name){
-  const ps=getPresets();delete ps[name];_savePresets(ps);buildEditSheet();updatePerfSetlist();
+  const ps=getPresets();delete ps[name];localStorage.setItem('norcoast_presets',JSON.stringify(ps));buildEditSheet();updatePerfSetlist();
 }
 function exportPresets(btn){
   const json=JSON.stringify(getPresets(),null,2);
@@ -1432,14 +1392,14 @@ function startClick(){
   if(clickActive)return;clickActive=true;clickBeat=0;
   clickNextTime=ctx.currentTime+0.05;
   midiPulseNext=clickNextTime;
-  if(midiClockOut)_midiSendNow([0xFA]);
+  if(midiClockOut)midiOutputs.forEach(o=>{try{o.send([0xFA])}catch(e){}});
   scheduleClicks();
   const btn=document.getElementById('clickBtn');if(btn){btn.className='evolve-pill '+(clickMuted?'off':'on');}
 }
 function stopClick(){
   clickActive=false;
   if(clickSchedId){clearTimeout(clickSchedId);clickSchedId=null}
-  if(midiClockOut)_midiSendNow([0xFC]);
+  if(midiClockOut)midiOutputs.forEach(o=>{try{o.send([0xFC])}catch(e){}});
 }
 function scheduleClicks(){
   if(!clickActive)return;const now=ctx.currentTime;
@@ -1530,14 +1490,16 @@ function movePreset(name,dir){
   const j=i+dir;if(j<0||j>=keys.length)return;
   [keys[i],keys[j]]=[keys[j],keys[i]];
   const newPs={};keys.forEach(k=>{newPs[k]=ps[k]});
-  _savePresets(newPs);buildEditSheet();updatePerfSetlist();
+  localStorage.setItem('norcoast_presets',JSON.stringify(newPs));
+  buildEditSheet();updatePerfSetlist();
 }
 function movePresetTo(name,targetIdx){
   const ps=getPresets();const keys=Object.keys(ps);
   const fromIdx=keys.indexOf(name);if(fromIdx<0||targetIdx<0||targetIdx>=keys.length)return;
   keys.splice(fromIdx,1);keys.splice(targetIdx,0,name);
   const newPs={};keys.forEach(k=>{newPs[k]=ps[k]});
-  _savePresets(newPs);buildEditSheet();updatePerfSetlist();
+  localStorage.setItem('norcoast_presets',JSON.stringify(newPs));
+  buildEditSheet();updatePerfSetlist();
 }
 function initPresetDrag(container){
   if(_dragCleanup){_dragCleanup();_dragCleanup=null;}
@@ -1606,22 +1568,22 @@ let midiOutputs=[],midiClockOut=false,midiClockIn=false;
 const _midiClkTimes=[];
 let midiPulseNext=0;
 const MIDI_NOTE_NAMES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
-function loadMidiMappings(){try{midiMappings=JSON.parse(localStorage.getItem(STORE_MIDI)||'{}')}catch(e){midiMappings={}}}
-function saveMidiMappings(){localStorage.setItem(STORE_MIDI,JSON.stringify(midiMappings))}
+function loadMidiMappings(){try{midiMappings=JSON.parse(localStorage.getItem('norcoast_midi')||'{}')}catch(e){midiMappings={}}}
+function saveMidiMappings(){localStorage.setItem('norcoast_midi',JSON.stringify(midiMappings))}
 function toggleMIDILearn(){midiLearnMode=!midiLearnMode;midiLearnPending=null;if(document.getElementById('editSheet').classList.contains('open'))buildEditSheet()}
 function startLearnForParam(id){midiLearnPending=id;if(document.getElementById('editSheet').classList.contains('open'))buildEditSheet()}
 function clearLearn(id){delete midiMappings[id];saveMidiMappings();if(document.getElementById('editSheet').classList.contains('open'))buildEditSheet()}
 function setMidiClockIn(v){midiClockIn=v;_midiClkTimes.length=0;if(document.getElementById('editSheet').classList.contains('open'))buildEditSheet()}
 function setMidiClockOut(v){
   midiClockOut=v;
-  if(v&&clickActive){midiPulseNext=ctx.currentTime;_midiSendNow([0xFA]);}
-  if(!v&&clickActive)_midiSendNow([0xFC]);
+  if(v&&clickActive){midiPulseNext=ctx.currentTime;midiOutputs.forEach(o=>{try{o.send([0xFA])}catch(e){}})}
+  if(!v&&clickActive){midiOutputs.forEach(o=>{try{o.send([0xFC])}catch(e){}})}
   if(document.getElementById('editSheet').classList.contains('open'))buildEditSheet();
 }
-function _midiSendNow(bytes){midiOutputs.forEach(o=>{try{o.send(bytes)}catch(e){}});}
-function _midiSend(bytes,t){
+function _midiSend(bytes,t){// t = Web Audio time; convert to perf.now ms for scheduled MIDI send
   if(!midiOutputs.length)return;
-  const sendAt=Math.max(performance.now()+(t-ctx.currentTime)*1000,performance.now());
+  const ms=performance.now()+(t-ctx.currentTime)*1000;
+  const sendAt=Math.max(ms,performance.now());
   midiOutputs.forEach(o=>{try{o.send(bytes,sendAt)}catch(e){}});
 }
 function applyMidiParam(id,val){
@@ -1641,11 +1603,6 @@ function applyMidiParam(id,val){
     case'spd':evolveSpeed=faderToVol(val);break;
     case'mst':masterVol=faderToVol(val);if(master)master.gain.linearRampToValueAtTime(masterVol,ctx.currentTime+0.1);break;
     case'sat':satAmt=val;if(satDriveNode)satDriveNode.gain.linearRampToValueAtTime(1+val*1.5,ctx.currentTime+0.05);if(satCompNode)satCompNode.gain.linearRampToValueAtTime(1/(1+val*0.3),ctx.currentTime+0.05);break;
-    // Action buttons — trigger on value > 0 (note-on or CC push)
-    case'prevPreset':if(val>0)prevPreset();return;
-    case'nextPreset':if(val>0)nextPreset();return;
-    case'clockRun':if(val>0)toggleClockRun();return;
-    case'clickMute':if(val>0)toggleClick();return;
   }
   queueSave();
 }
@@ -1714,7 +1671,7 @@ function handleMIDI(msg){
     currentEvolve=_fc;pendingEvolve=-1;
     clearPendingChord();
     document.getElementById('stateEvolve').textContent=CHORD_TYPES[_fc].name;
-    PAD_LAYERS.forEach(l=>{if(l.type!=="granular"&&layerState[l.id].volume>0)startPad(l,layerState[l.id].volume,homeRoot,currentEvolve,1.5)});
+    PAD_LAYERS.forEach(l=>{if(l.type!=="granular"&&layerState[l.id].volume>0)startPad(l,layerState[l.id].volume,homeRoot,currentEvolve)});
     scheduleEvolve();
     buildKeys();saveSettings();
   }
