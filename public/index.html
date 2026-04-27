@@ -166,7 +166,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v0.84</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v0.85</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -205,7 +205,7 @@
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
       <button id="clickX2Btn" class="evolve-pill off" onclick="toggleClickX2()" style="padding:8px 10px;font-size:9px;letter-spacing:1px">x2</button>
     </div>
-    <div class="app-version">v0.84</div>
+    <div class="app-version">v0.85</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -239,22 +239,39 @@ const CHORD_TYPES=[
   {name:"5th+Maj7", semis:[7,11],     weight:2},
 ];
 
-// 1/16 grid patterns. Each step: '' (silent), a sound id ('lo'/'md'/'hh'),
-// or an array of sound ids for layered hits. Pattern length must be a
-// multiple of 4 (= one or more bars).
+// 1/16 grid patterns per time signature. 4/4 patterns use 16 or 32 steps
+// (1 or 2 bars). 6/8 patterns use 12 steps (1 bar = 6 eighths = 12 sixteenths).
+// Each step: '' (silent), a sound id ('lo'/'md'/'hh'), or an array for
+// layered hits. The engine picks the right array based on the current timeSig
+// — the user just sees the pattern name, never thinks about it.
 const MOVEMENT_PATTERNS=[
-  {name:'Pulse',  steps:['','','','','md','','','','','','','','md','','','']},
-  // Mist: 2-bar syncopated shaker — sparse first bar, busier second bar
-  {name:'Mist',   steps:['hh','','','hh','','','hh','','','','','hh','','','','',
-                         'hh','','','hh','','','hh','','','hh','','hh','','','hh','']},
-  {name:'Stride', steps:['lo','','','','md','','','','','','','','md','','','']},
-  // Lilt: half-time tresillo (a-b-b-a-b-b-a-b on quarters across 2 bars)
-  {name:'Lilt',   steps:['lo','','','','md','','','','md','','','','lo','','','',
-                         'md','','','','md','','','','lo','','','','md','','','']},
-  // Roam: Stride bones + Mist's syncopated shaker layered on top (2-bar)
-  {name:'Roam',   steps:[['lo','hh'],'','','hh','md','','hh','','','','','hh','md','','','',
-                         ['lo','hh'],'','','hh','md','','hh','','','hh','','hh','md','','hh','']},
+  {name:'Pulse',  steps:{
+    '4/4':['','','','','md','','','','','','','','md','','',''],
+    '6/8':['','','','','','','md','','','','','']
+  }},
+  {name:'Mist',   steps:{
+    '4/4':['hh','','','hh','','','hh','','','','','hh','','','','',
+           'hh','','','hh','','','hh','','','hh','','hh','','','hh',''],
+    '6/8':['hh','','','hh','','hh','','hh','','','hh','']
+  }},
+  {name:'Stride', steps:{
+    '4/4':['lo','','','','md','','','','','','','','md','','',''],
+    '6/8':['lo','','','','','','md','','','','','']
+  }},
+  {name:'Lilt',   steps:{
+    // 4/4: half-time tresillo across 2 bars; 6/8: a-b-b-a-b-b on eighths
+    '4/4':['lo','','','','md','','','','md','','','','lo','','','',
+           'md','','','','md','','','','lo','','','','md','','',''],
+    '6/8':['lo','','md','','md','','lo','','md','','md','']
+  }},
+  {name:'Roam',   steps:{
+    // Stride bones + Mist on top, in each time signature
+    '4/4':[['lo','hh'],'','','hh','md','','hh','','','','','hh','md','','','',
+           ['lo','hh'],'','','hh','md','','hh','','','hh','','hh','md','','hh',''],
+    '6/8':[['lo','hh'],'','','hh','','hh',['md','hh'],'','','','hh','']
+  }},
 ];
+function _movSteps(pat){return pat&&pat.steps&&(pat.steps[timeSig]||pat.steps['4/4']);}
 
 
 const PAD_LAYERS=[
@@ -983,10 +1000,13 @@ function fireMovementHit(t,sound,vel){
 }
 function pickMovementSound(stepInPat,bar){
   const pat=MOVEMENT_PATTERNS[movementPattern];if(!pat)return null;
-  const len=pat.steps.length;
-  let sound=pat.steps[stepInPat%len];
-  // Variation fill every 8 bars: occasional ghost hat in the last beat
-  if(bar%8===7 && (stepInPat%16)>=12 && !sound && Math.random()<0.4) sound='hh';
+  const steps=_movSteps(pat);if(!steps)return null;
+  const len=steps.length;
+  let sound=steps[stepInPat%len];
+  // Variation fill every 8 bars: occasional ghost hat near end of bar
+  const stepsPerBar=timeSig==='6/8'?12:16;
+  const lastQtr=stepsPerBar-4;
+  if(bar%8===7 && (stepInPat%stepsPerBar)>=lastQtr && !sound && Math.random()<0.4) sound='hh';
   return sound;
 }
 function _firePickedMovement(t,sound){
@@ -997,9 +1017,11 @@ function _firePickedMovement(t,sound){
 }
 function fireMovementStep(){
   const pat=MOVEMENT_PATTERNS[movementPattern];if(!pat)return;
-  const len=pat.steps.length;
+  const steps=_movSteps(pat);if(!steps)return;
+  const len=steps.length;
   const stepInPat=movementStep%len;
-  const bar=Math.floor(movementStep/16);
+  const stepsPerBar=timeSig==='6/8'?12:16;
+  const bar=Math.floor(movementStep/stepsPerBar);
   _firePickedMovement(ctx.currentTime,pickMovementSound(stepInPat,bar));
   movementStep++;
 }
@@ -1682,18 +1704,24 @@ function fireClick(t){
       setTimeout(fireArpNote,Math.max(0,(t+30/clickBPM-ctx.currentTime)*1000));
     }
   }
-  // Movement: 16-step pattern, 4 sub-steps per beat. Patterns can span >1 bar.
+  // Movement: 1/16 grid, 4 sub-steps per beat. Pattern length determines
+  // bar length (16 in 4/4, 12 in 6/8). Bar-cycle counter follows timeSig.
   if(movementVol>0&&!_fadeActive){
     const pat=MOVEMENT_PATTERNS[movementPattern];
     if(pat){
-      const len=pat.steps.length;
-      const beatsInPat=len/4;
-      const beatInPat=beat%beatsInPat;
-      const bar=Math.floor(beat/4);
-      const stepDur=60/clickBPM/4;
-      for(let sub=0;sub<4;sub++){
-        const stepInPat=beatInPat*4+sub;
-        _firePickedMovement(t+sub*stepDur,pickMovementSound(stepInPat,bar));
+      const steps=_movSteps(pat);
+      if(steps){
+        const len=steps.length;
+        const beatsInPat=len/4;
+        const beatInPat=beat%beatsInPat;
+        const stepsPerBar=timeSig==='6/8'?12:16;
+        const beatsPerBar=stepsPerBar/4;
+        const bar=Math.floor(beat/beatsPerBar);
+        const stepDur=60/clickBPM/4;
+        for(let sub=0;sub<4;sub++){
+          const stepInPat=beatInPat*4+sub;
+          _firePickedMovement(t+sub*stepDur,pickMovementSound(stepInPat,bar));
+        }
       }
     }
   }
@@ -1708,7 +1736,7 @@ function toggleClickX2(){
   const btn=document.getElementById('clickX2Btn');if(btn){btn.className='evolve-pill '+(clickRateX2?'on':'off');}
   saveSettings();
 }
-function setTimeSig(t){timeSig=t;saveSettings();buildEditSheet();}
+function setTimeSig(t){timeSig=t;movementStep=0;saveSettings();buildEditSheet();}
 function setBPM(v){clickBPM=Math.max(50,Math.min(200,parseInt(v)||120));const d=document.getElementById('bpmDisplay');if(d)d.textContent=clickBPM;if(clickActive&&!midiClockIn){stopClick();startClick()}applyDelaySync();}
 function getDelayTime(){const beat=60/clickBPM;const divs={'1/2':beat*2,'q.':beat*1.5,'q':beat,'1/8.':beat*0.75,'1/8':beat*0.5};return Math.min(divs[delaySyncDiv]||beat*1.5,1.9)}
 function applyDelaySync(){
