@@ -1,4 +1,4 @@
-const CACHE = 'norcoast-v71';
+const CACHE = 'norcoast-v72';
 const PRECACHE = ['./', './manifest.json', './icons/icon.svg', './icons/icon-maskable.svg', './pitch-shifter-worklet.js'];
 
 self.addEventListener('install', e => {
@@ -15,15 +15,17 @@ self.addEventListener('activate', e => {
   self.clients.claim();
 });
 
+// Network-first: always try network, fall back to cache if offline.
+// This ensures updates deploy immediately without manual cache clearing.
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET' || !e.request.url.startsWith(self.location.origin)) return;
   e.respondWith(
-    caches.match(e.request).then(cached => cached || fetch(e.request).then(res => {
+    fetch(e.request).then(res => {
       if (res.ok) {
         const clone = res.clone();
         caches.open(CACHE).then(c => c.put(e.request, clone));
       }
       return res;
-    }))
+    }).catch(() => caches.match(e.request))
   );
 });
