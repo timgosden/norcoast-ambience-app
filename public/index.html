@@ -166,7 +166,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v0.81</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v0.82</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -205,7 +205,7 @@
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
       <button id="clickX2Btn" class="evolve-pill off" onclick="toggleClickX2()" style="padding:8px 10px;font-size:9px;letter-spacing:1px">x2</button>
     </div>
-    <div class="app-version">v0.81</div>
+    <div class="app-version">v0.82</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -671,14 +671,25 @@ function buildGroup(def,freqs,vol,atk){
   const fL=ctx.createOscillator();fL.type="sine";fL.frequency.value=def.fRate;
   const fG=ctx.createGain();fG.gain.value=def.fMod;
   fL.connect(fG);fG.connect(flt.frequency);fL.start();
+  // Second slow filter LFO at an incommensurate rate — beats with fL so the
+  // motion never repeats. Random phase per layer so layers don't lock together.
+  const fL2=ctx.createOscillator();fL2.type='sine';
+  fL2.frequency.value=def.fRate*(0.27+Math.random()*0.13); // ~30% of fRate
+  const fG2=ctx.createGain();fG2.gain.value=def.fMod*0.45;
+  fL2.connect(fG2);fG2.connect(flt.frequency);fL2.start(ctx.currentTime+Math.random()*4);
   const aL=ctx.createOscillator();aL.type="sine";aL.frequency.value=def.aRate;
   const aG=ctx.createGain();aG.gain.value=def.aMod*vol;
   aL.connect(aG);aG.connect(gG.gain);aL.start();
-  const oscs=[],lfos=[fL,aL];
+  // Slow breathing on the group gain — very subtle (±3%), ~80s period
+  const bL=ctx.createOscillator();bL.type='sine';
+  bL.frequency.value=0.011+Math.random()*0.006;
+  const bG=ctx.createGain();bG.gain.value=vol*0.03;
+  bL.connect(bG);bG.connect(gG.gain);bL.start(ctx.currentTime+Math.random()*8);
+  const oscs=[],lfos=[fL,fL2,aL,bL];
   const spread=0.5;
   freqs.forEach((bf,ni)=>{def.octaves.forEach(oo=>{const f=bf*Math.pow(2,oo);def.timbres.forEach(tb=>{const w=waves[tb.wave];for(let vi=0;vi<tb.count;vi++){const t=tb.count>1?(vi/(tb.count-1))*2-1:0;const o=ctx.createOscillator();o.setPeriodicWave(w);o.frequency.value=f;o.detune.value=t*tb.ds*spread*2.5;const vg=ctx.createGain();vg.gain.value=tb.gain;const pn=ctx.createStereoPanner();pn.pan.value=t*tb.pan*(ni%2===0?1:-1)*(0.3+spread*0.7);const lfo=ctx.createOscillator();lfo.type="sine";lfo.frequency.value=0.01+Math.random()*0.05;const lg=ctx.createGain();lg.gain.value=(0.2+Math.random()*1.5)*(0.1+spread*0.9);lfo.connect(lg);lg.connect(o.detune);lfo.start();lfos.push(lfo);const h=ctx.createDelay(0.01);h.delayTime.value=Math.random()*0.004*spread;o.connect(vg);vg.connect(pn);pn.connect(h);h.connect(flt);o.start();oscs.push(o)}})})});
   flt.connect(gG);gG.connect(master);
-  return{oscs,lfos,gain:gG,filter:flt,filterLG:fG,ampMod:aG};
+  return{oscs,lfos,gain:gG,filter:flt,filterLG:fG,ampMod:aG,breathMod:bG};
 }
 
 function fadeOut(nodes,time){
@@ -1086,10 +1097,10 @@ function toggleLayer(id){
     if(l.type==="granular"){stopGranular();if(granularGain)granularGain.gain.linearRampToValueAtTime(0,ctx.currentTime+0.5)}
     else{
       const t=ctx.currentTime+0.15;
-      // Also kill the amplitude LFO — otherwise it keeps modulating around 0
-      // and the layer remains audibly playing at low level.
-      if(staticNodes[id]){staticNodes[id].gain.gain.linearRampToValueAtTime(0,t);if(staticNodes[id].ampMod)staticNodes[id].ampMod.gain.linearRampToValueAtTime(0,t);}
-      if(evolveNodes[id]){evolveNodes[id].gain.gain.linearRampToValueAtTime(0,t);if(evolveNodes[id].ampMod)evolveNodes[id].ampMod.gain.linearRampToValueAtTime(0,t);}
+      // Also kill the amplitude + breathing LFOs — otherwise they keep
+      // modulating around 0 and the layer remains audibly playing.
+      if(staticNodes[id]){staticNodes[id].gain.gain.linearRampToValueAtTime(0,t);if(staticNodes[id].ampMod)staticNodes[id].ampMod.gain.linearRampToValueAtTime(0,t);if(staticNodes[id].breathMod)staticNodes[id].breathMod.gain.linearRampToValueAtTime(0,t);}
+      if(evolveNodes[id]){evolveNodes[id].gain.gain.linearRampToValueAtTime(0,t);if(evolveNodes[id].ampMod)evolveNodes[id].ampMod.gain.linearRampToValueAtTime(0,t);if(evolveNodes[id].breathMod)evolveNodes[id].breathMod.gain.linearRampToValueAtTime(0,t);}
     }
   }else{
     st.volume=st._prevVol||0.5;
@@ -1164,9 +1175,9 @@ function buildEditSheet(){
   h+='<button class="slope-btn'+(arpOct===1?' active':'')+'" onclick="setArpOct(1)" style="padding:6px 10px">+8ve</button>';
   h+='</div>';
   h+='<div class="slope-row" style="padding:2px 12px 10px"><span class="slope-label">Voice</span>';
-  h+='<button class="slope-btn'+(arpVoice==='juno'?' active':'')+'" onclick="setArpVoice(\'juno\')" style="padding:6px 10px">Juno</button>';
-  h+='<button class="slope-btn'+(arpVoice==='soft'?' active':'')+'" onclick="setArpVoice(\'soft\')" style="padding:6px 10px">Soft</button>';
-  h+='<button class="slope-btn'+(arpVoice==='sine'?' active':'')+'" onclick="setArpVoice(\'sine\')" style="padding:6px 10px">Sine</button>';
+  h+='<button class="slope-btn'+(arpVoice==='juno'?' active':'')+'" onclick="setArpVoice(\'juno\')" style="padding:6px 10px">Bloom</button>';
+  h+='<button class="slope-btn'+(arpVoice==='soft'?' active':'')+'" onclick="setArpVoice(\'soft\')" style="padding:6px 10px">Hush</button>';
+  h+='<button class="slope-btn'+(arpVoice==='sine'?' active':'')+'" onclick="setArpVoice(\'sine\')" style="padding:6px 10px">Glow</button>';
   h+='</div>';
   // Movement — percussion layer with built-in reverb
   const _movOn=movementVol>0;
@@ -1303,7 +1314,7 @@ function buildEditSheet(){
       layerState[l.id].volume=vol;queueSave();
       inp.style.background='linear-gradient(to right,'+l.color+'55 '+raw*100+'%,rgba(255,255,255,0.06) '+raw*100+'%)';
       if(l.type==="granular"){if(vol>0&&wasZero)startGranular(vol);else if(vol<=0)stopGranular();else if(granularGain)granularGain.gain.linearRampToValueAtTime(vol*0.8,ctx.currentTime+0.1)}
-      else{if(vol>0&&wasZero&&!staticNodes[l.id])startPad(l,vol,homeRoot,currentEvolve);else{const t=ctx.currentTime+0.08;if(staticNodes[l.id]){staticNodes[l.id].gain.gain.linearRampToValueAtTime(vol,t);if(staticNodes[l.id].ampMod)staticNodes[l.id].ampMod.gain.linearRampToValueAtTime(l.aMod*vol,t);}if(evolveNodes[l.id]){evolveNodes[l.id].gain.gain.linearRampToValueAtTime(vol,t);if(evolveNodes[l.id].ampMod)evolveNodes[l.id].ampMod.gain.linearRampToValueAtTime(l.aMod*vol,t);}}}
+      else{if(vol>0&&wasZero&&!staticNodes[l.id])startPad(l,vol,homeRoot,currentEvolve);else{const t=ctx.currentTime+0.08;if(staticNodes[l.id]){staticNodes[l.id].gain.gain.linearRampToValueAtTime(vol,t);if(staticNodes[l.id].ampMod)staticNodes[l.id].ampMod.gain.linearRampToValueAtTime(l.aMod*vol,t);if(staticNodes[l.id].breathMod)staticNodes[l.id].breathMod.gain.linearRampToValueAtTime(vol*0.03,t);}if(evolveNodes[l.id]){evolveNodes[l.id].gain.gain.linearRampToValueAtTime(vol,t);if(evolveNodes[l.id].ampMod)evolveNodes[l.id].ampMod.gain.linearRampToValueAtTime(l.aMod*vol,t);if(evolveNodes[l.id].breathMod)evolveNodes[l.id].breathMod.gain.linearRampToValueAtTime(vol*0.03,t);}}}
       const row=inp.closest('.edit-layer'),on=vol>0;
       const db=row.querySelector('.layer-dot-btn');db.style.borderColor=on?l.color+'55':'rgba(255,255,255,0.1)';db.style.background=on?l.color+'15':'transparent';
       const dot=row.querySelector('.layer-dot');dot.style.background=on?l.color:'rgba(255,255,255,0.15)';dot.style.boxShadow=on?'0 0 10px '+l.color+'50':'none';
