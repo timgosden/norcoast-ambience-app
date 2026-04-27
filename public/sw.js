@@ -1,4 +1,4 @@
-const CACHE = 'norcoast-v70';
+const CACHE = 'norcoast-v71';
 const PRECACHE = ['./', './manifest.json', './icons/icon.svg', './icons/icon-maskable.svg', './pitch-shifter-worklet.js'];
 
 self.addEventListener('install', e => {

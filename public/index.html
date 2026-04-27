@@ -1809,7 +1809,7 @@ async function initAndStart(){
       window.addEventListener('focus',()=>{if(ctx&&ctx.state==='suspended'&&!audioPaused)ctx.resume()});
       window.addEventListener('pagehide',()=>{if(ctx)ctx.close();});
     }
-    loadMidiMappings();buildKeys();startVis();scheduleEvolve();initMIDI();updatePerfSetlist();
+    scheduleEvolve();initMIDI();
     // Swipe down to close edit sheet
     {const sheet=document.getElementById('editSheet');let _sy=0,_sw=false;
     sheet.addEventListener('touchstart',e=>{if(e.touches.length===1&&e.target.closest('input[type=range]')==null){_sy=e.touches[0].clientY;_sw=true;}},{passive:true});
@@ -1817,8 +1817,9 @@ async function initAndStart(){
     {const eb=document.getElementById('evolveBtn');if(eb){eb.className='evolve-pill '+(evolving?'on':'off');eb.textContent=evolving?'Evolving':'Static'}}
     const _bd=document.getElementById('bpmDisplay');if(_bd)_bd.textContent=clickBPM;
     document.getElementById('stateEvolve').textContent=CHORD_TYPES[currentEvolve].name;
-  }catch(e){if(ls)ls.textContent='Error: '+e.message;}
+  }catch(e){console.error('initAndStart error:',e);if(ls)ls.textContent='Error: '+e.message;}
   finally{
+    loadMidiMappings();buildKeys();startVis();updatePerfSetlist();
     prompt.style.opacity='0';
     setTimeout(()=>{try{prompt.remove()}catch(_){}},700);
   }
