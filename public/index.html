@@ -205,7 +205,7 @@
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
       <button id="clickX2Btn" class="evolve-pill off" onclick="toggleClickX2()" style="padding:8px 10px;font-size:9px;letter-spacing:1px">x2</button>
     </div>
-    <div class="app-version">v0.88</div>
+    <div class="app-version">v0.89</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -405,8 +405,8 @@ function initReverb(opts){
   }
 
   // Stereo output taps: even → L, odd → R
-  const sumL=ctx.createGain();sumL.gain.value=0.25;
-  const sumR=ctx.createGain();sumR.gain.value=0.25;
+  const sumL=ctx.createGain();sumL.gain.value=0.42;
+  const sumR=ctx.createGain();sumR.gain.value=0.42;
   for(let i=0;i<N;i++){if(i%2===0)delays[i].connect(sumL);else delays[i].connect(sumR);}
 
   // Dual-mono post-diffusion — detuned L/R for stereo decorrelation
@@ -592,8 +592,11 @@ async function initAudio(){
   const pL=ctx.createStereoPanner();pL.pan.value=-0.65;
   const pR=ctx.createStereoPanner();pR.pan.value=0.65;
   reverb=initReverb();reverb.fbGain.gain.value=reverbSizeToFB(reverbSize);
-  reverbGain=ctx.createGain();reverbGain.gain.value=reverbMix;
-  dryGain=ctx.createGain();dryGain.gain.value=1-reverbMix*0.35;
+  // True wet/dry crossfade: at mix=1.0, dry drops fully so 100% wet means 100% wet.
+  // Boost wet by 1.6x so the reverb output (which is naturally quieter than the
+  // direct signal) sits at a comparable level to the dry path.
+  reverbGain=ctx.createGain();reverbGain.gain.value=reverbMix*1.6;
+  dryGain=ctx.createGain();dryGain.gain.value=1-reverbMix;
   delayNode=ctx.createDelay(2);delayNode.delayTime.value=delayTimeVal;
   delayGainN=ctx.createGain();delayGainN.gain.value=delayMixVal*0.7;
   delayFB=ctx.createGain();delayFB.gain.value=delayFeedback;
@@ -1382,7 +1385,7 @@ function buildEditSheet(){
     });
   });
   // Wire Effects sliders
-  wireSR(c,'rev',r=>{reverbMix=r;reverbGain.gain.linearRampToValueAtTime(r,ctx.currentTime+0.05);dryGain.gain.linearRampToValueAtTime(1-r*0.35,ctx.currentTime+0.05);return Math.round(r*100)+'%'});
+  wireSR(c,'rev',r=>{reverbMix=r;reverbGain.gain.linearRampToValueAtTime(r*1.6,ctx.currentTime+0.05);dryGain.gain.linearRampToValueAtTime(1-r,ctx.currentTime+0.05);return Math.round(r*100)+'%'});
   wireSR(c,'rvSz',r=>{reverbSize=r;if(reverb&&reverb.fbGain)reverb.fbGain.gain.linearRampToValueAtTime(reverbSizeToFB(r),ctx.currentTime+0.1);const secs=(r*11.5+0.5).toFixed(1);return secs+'s'});
   wireSR(c,'rvMod',r=>{reverbMod=r;if(reverb&&reverb.apMods)reverb.apMods.forEach((lg,i)=>{lg.gain.linearRampToValueAtTime((0.0003+i*0.00015)*r,ctx.currentTime+0.1)});if(reverbModWet)reverbModWet.gain.linearRampToValueAtTime(r*0.5,ctx.currentTime+0.1);if(reverbModLGain)reverbModLGain.gain.linearRampToValueAtTime(0.001*r,ctx.currentTime+0.1);if(reverbModRGain)reverbModRGain.gain.linearRampToValueAtTime(0.001*r,ctx.currentTime+0.1);return Math.round(r*100)+'%'});
   wireSR(c,'dly',r=>{delayMixVal=r;delayGainN.gain.linearRampToValueAtTime(r*0.7,ctx.currentTime+0.05);return Math.round(r*100)+'%'});
@@ -1549,7 +1552,7 @@ function loadPreset(name){try{
   if(globalHPF){globalHPF.frequency.value=hpfFaderToHz(hpfValue);globalHPF.Q.value=hpfQ}
   if(globalHPF2)globalHPF2.frequency.value=hpfSlope===24?hpfFaderToHz(hpfValue):20;
   if(eqLowNode)eqLowNode.gain.value=eqLowGain;if(eqLoMidNode)eqLoMidNode.gain.value=eqLoMidGain;if(eqHiMidNode)eqHiMidNode.gain.value=eqHiMidGain;if(eqHighNode)eqHighNode.gain.value=eqHighGain;if(chorusGainNode)chorusGainNode.gain.value=chorusMix*0.5;
-  if(reverbGain){reverbGain.gain.value=reverbMix;dryGain.gain.value=1-reverbMix*0.35}
+  if(reverbGain){reverbGain.gain.value=reverbMix*1.6;dryGain.gain.value=1-reverbMix}
   if(reverb&&reverb.fbGain)reverb.fbGain.gain.value=reverbSizeToFB(reverbSize);
   if(reverb&&reverb.apMods)reverb.apMods.forEach((lg,i)=>{lg.gain.value=(0.0003+i*0.00015)*reverbMod});
   if(reverbModWet)reverbModWet.gain.value=reverbMod*0.5;
@@ -1880,7 +1883,7 @@ function _midiSend(bytes,t){// t = Web Audio time; convert to perf.now ms for sc
 }
 function applyMidiParam(id,val){
   switch(id){
-    case'rev':reverbMix=val;if(reverbGain){reverbGain.gain.value=val;dryGain.gain.value=1-val*0.35}break;
+    case'rev':reverbMix=val;if(reverbGain){reverbGain.gain.value=val*1.6;dryGain.gain.value=1-val}break;
     case'rvSz':reverbSize=val;if(reverb&&reverb.fbGain)reverb.fbGain.gain.linearRampToValueAtTime(reverbSizeToFB(val),ctx.currentTime+0.1);break;
     case'rvMod':reverbMod=val;if(reverb&&reverb.apMods)reverb.apMods.forEach((lg,i)=>{lg.gain.linearRampToValueAtTime((0.0003+i*0.00015)*val,ctx.currentTime+0.1)});if(reverbModWet)reverbModWet.gain.linearRampToValueAtTime(val*0.5,ctx.currentTime+0.1);if(reverbModLGain)reverbModLGain.gain.linearRampToValueAtTime(0.001*val,ctx.currentTime+0.1);if(reverbModRGain)reverbModRGain.gain.linearRampToValueAtTime(0.001*val,ctx.currentTime+0.1);break;
     case'dly':delayMixVal=val;if(delayGainN)delayGainN.gain.value=val*0.7;break;
@@ -1941,7 +1944,7 @@ function handleMIDI(msg){
     const userParam=Object.keys(midiMappings).find(p=>midiMappings[p]===d1);
     if(userParam){applyMidiParam(userParam,val);return;}
     // Hardcoded fallbacks
-    ({1:r=>{reverbMix=r;if(reverbGain){reverbGain.gain.value=r;dryGain.gain.value=1-r*0.35}},
+    ({1:r=>{reverbMix=r;if(reverbGain){reverbGain.gain.value=r*1.6;dryGain.gain.value=1-r}},
       7:r=>{masterVol=r;if(master)master.gain.linearRampToValueAtTime(r,ctx.currentTime+0.05)},
       11:r=>{masterVol=r;if(master)master.gain.linearRampToValueAtTime(r,ctx.currentTime+0.05)},
       21:r=>{lpfValue=r;if(globalLPF){globalLPF.frequency.linearRampToValueAtTime(lpfFaderToHz(r),ctx.currentTime+0.05);if(globalLPF2&&lpfSlope===24)globalLPF2.frequency.linearRampToValueAtTime(lpfFaderToHz(r),ctx.currentTime+0.05)}},
