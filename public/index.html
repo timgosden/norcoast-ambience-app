@@ -166,7 +166,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v0.83</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v0.84</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -205,7 +205,7 @@
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
       <button id="clickX2Btn" class="evolve-pill off" onclick="toggleClickX2()" style="padding:8px 10px;font-size:9px;letter-spacing:1px">x2</button>
     </div>
-    <div class="app-version">v0.83</div>
+    <div class="app-version">v0.84</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -239,15 +239,21 @@ const CHORD_TYPES=[
   {name:"5th+Maj7", semis:[7,11],     weight:2},
 ];
 
-// 1/16 grid patterns. '' = silent, lo/md/hh = sound id.
-// Pattern length must be a multiple of 4 (= one or more bars). Lengths can vary.
+// 1/16 grid patterns. Each step: '' (silent), a sound id ('lo'/'md'/'hh'),
+// or an array of sound ids for layered hits. Pattern length must be a
+// multiple of 4 (= one or more bars).
 const MOVEMENT_PATTERNS=[
   {name:'Pulse',  steps:['','','','','md','','','','','','','','md','','','']},
   // Mist: 2-bar syncopated shaker — sparse first bar, busier second bar
   {name:'Mist',   steps:['hh','','','hh','','','hh','','','','','hh','','','','',
                          'hh','','','hh','','','hh','','','hh','','hh','','','hh','']},
   {name:'Stride', steps:['lo','','','','md','','','','','','','','md','','','']},
-  {name:'Lilt',   steps:['lo','','md','','md','','lo','','md','','md','','lo','','md','']},
+  // Lilt: half-time tresillo (a-b-b-a-b-b-a-b on quarters across 2 bars)
+  {name:'Lilt',   steps:['lo','','','','md','','','','md','','','','lo','','','',
+                         'md','','','','md','','','','lo','','','','md','','','']},
+  // Roam: Stride bones + Mist's syncopated shaker layered on top (2-bar)
+  {name:'Roam',   steps:[['lo','hh'],'','','hh','md','','hh','','','','','hh','md','','','',
+                         ['lo','hh'],'','','hh','md','','hh','','','hh','','hh','md','','hh','']},
 ];
 
 
@@ -283,7 +289,7 @@ let movementVol=0,movementPattern=0,movementStep=0,movementTimer=null,movementRe
 let limiter=null,clickOutBus=null,arpRevSend=null,satDriveNode=null,satCompNode=null;
 let clickBPM=140,clickActive=false,clickMuted=true,clickNextTime=0,clickSchedId=null,clickBeat=0,clickRateX2=false;
 let delaySync=true,delaySyncDiv='1/8.';
-let evolveOnBeat=true,evolveBars=8,pendingEvolve=-1;
+let evolveOnBeat=true,evolveBars=8,pendingEvolve=-1,timeSig='4/4';
 let multiOutActive=false,_multiOutMerger=null,_multiOutSplitter=null;
 let staticNodes={},evolveNodes={},layerState={};
 let shimmerGainNode=null,shimmerVol=0.07;
@@ -696,6 +702,11 @@ function fadeOut(nodes,time){
   if(!nodes)return;const now=ctx.currentTime;
   nodes.gain.gain.cancelScheduledValues(now);nodes.gain.gain.setValueAtTime(nodes.gain.gain.value,now);
   nodes.gain.gain.linearRampToValueAtTime(0,now+time);
+  // Critical: also collapse the amplitude + breathing LFOs to 0 in lock-step.
+  // Otherwise they keep modulating gG.gain around 0 even after the ramp ends,
+  // producing audible signal long after a "fade out" is supposed to be silent.
+  if(nodes.ampMod){nodes.ampMod.gain.cancelScheduledValues(now);nodes.ampMod.gain.setValueAtTime(nodes.ampMod.gain.value,now);nodes.ampMod.gain.linearRampToValueAtTime(0,now+time);}
+  if(nodes.breathMod){nodes.breathMod.gain.cancelScheduledValues(now);nodes.breathMod.gain.setValueAtTime(nodes.breathMod.gain.value,now);nodes.breathMod.gain.linearRampToValueAtTime(0,now+time);}
   setTimeout(()=>{nodes.oscs.forEach(o=>{try{o.stop()}catch(e){}});nodes.lfos.forEach(o=>{try{o.stop()}catch(e){}});try{nodes.gain.disconnect()}catch(e){};try{nodes.filter.disconnect()}catch(e){}},time*1000+500);
 }
 
@@ -805,12 +816,21 @@ function clearPendingChord(){
 
 // ─── ARPEGGIATOR ───
 function _arpBarSec(){return 60/clickBPM*4;}
+function _arpExtraOct(){
+  // Subtle 16-bar variation: on the last bar of every 16-bar cycle, drift the
+  // arp ±1 octave (alternating direction each cycle). Returns -1, 0, or +1.
+  const beat=clickActive?clickBeat:Math.floor(arpStep*arpRate*4);
+  const bar=Math.floor(beat/4);
+  if(bar%16!==15) return 0;
+  return (Math.floor(bar/16)%2===0) ? 1 : -1;
+}
 function fireArpNote(){
   if(!ctx||!waves||arpVol<=0)return;
   const ARP_PAT=[0,7,12,7]; // 1-5-8-5
   const semitone=ARP_PAT[arpStep%4];
   const octShift=Math.floor(arpStep/4)%2;
-  const freq=semiFreq(noteFreq(homeRoot,ROOT_OCT+1+octShift+arpOct),semitone);
+  const extraOct=_arpExtraOct();
+  const freq=semiFreq(noteFreq(homeRoot,ROOT_OCT+1+octShift+arpOct+extraOct),semitone);
   const noteDur=arpRate*_arpBarSec();
   if(arpVoice==='soft'){
     // Soft voice: triangle, 40ms attack, warm fixed filter, gentle detune
@@ -913,29 +933,35 @@ function fireMovementHit(t,sound,vel){
   if(!movementReverb||audioPaused||_fadeActive)return;
   vel=vel||1;
   if(sound==='lo'){
+    // 808-style kick: fast transient pitch sweep + long sub tail
     const osc=ctx.createOscillator(),env=ctx.createGain();
     osc.type='sine';
-    const f0=60+(Math.random()*4-2);
+    const f0=145+(Math.random()*10-5);
     osc.frequency.setValueAtTime(f0,t);
-    osc.frequency.exponentialRampToValueAtTime(f0*0.62,t+0.09);
+    osc.frequency.exponentialRampToValueAtTime(48,t+0.05);    // snappy click
+    osc.frequency.exponentialRampToValueAtTime(40,t+0.5);     // settled boom
     env.gain.setValueAtTime(0,t);
-    env.gain.linearRampToValueAtTime(movementVol*0.55*vel,t+0.003);
-    env.gain.exponentialRampToValueAtTime(0.0008,t+0.32);
+    env.gain.linearRampToValueAtTime(movementVol*0.7*vel,t+0.001);   // punch
+    env.gain.exponentialRampToValueAtTime(movementVol*0.32*vel,t+0.08);
+    env.gain.exponentialRampToValueAtTime(0.0008,t+0.55);
     osc.connect(env);env.connect(movementReverb.input);
-    osc.start(t);osc.stop(t+0.36);
+    osc.start(t);osc.stop(t+0.6);
     osc.onended=()=>{try{osc.disconnect();env.disconnect()}catch(e){}};
   } else if(sound==='md'){
+    // 808-style tom: smaller pitch drop, mid-tier sustain
     const osc=ctx.createOscillator(),env=ctx.createGain(),pan=ctx.createStereoPanner();
     osc.type='sine';
-    const f0=185+(Math.random()*12-6);
+    const f0=260+(Math.random()*16-8);
     osc.frequency.setValueAtTime(f0,t);
-    osc.frequency.exponentialRampToValueAtTime(f0*0.5,t+0.07);
+    osc.frequency.exponentialRampToValueAtTime(110,t+0.05);
+    osc.frequency.exponentialRampToValueAtTime(95,t+0.35);
     env.gain.setValueAtTime(0,t);
-    env.gain.linearRampToValueAtTime(movementVol*0.4*vel,t+0.003);
-    env.gain.exponentialRampToValueAtTime(0.0008,t+0.22);
+    env.gain.linearRampToValueAtTime(movementVol*0.5*vel,t+0.001);
+    env.gain.exponentialRampToValueAtTime(movementVol*0.22*vel,t+0.06);
+    env.gain.exponentialRampToValueAtTime(0.0008,t+0.4);
     pan.pan.value=-0.12+(Math.random()*0.1-0.05);
     osc.connect(env);env.connect(pan);pan.connect(movementReverb.input);
-    osc.start(t);osc.stop(t+0.26);
+    osc.start(t);osc.stop(t+0.45);
     osc.onended=()=>{try{osc.disconnect();env.disconnect();pan.disconnect()}catch(e){}};
   } else if(sound==='hh'){
     // Darker, fuller "lofi shaker" — HP+LP shape gives body, no brittle top
@@ -963,13 +989,18 @@ function pickMovementSound(stepInPat,bar){
   if(bar%8===7 && (stepInPat%16)>=12 && !sound && Math.random()<0.4) sound='hh';
   return sound;
 }
+function _firePickedMovement(t,sound){
+  if(!sound)return;
+  const vel=0.88+Math.random()*0.24;
+  if(Array.isArray(sound)) sound.forEach(s=>fireMovementHit(t,s,vel));
+  else fireMovementHit(t,sound,vel);
+}
 function fireMovementStep(){
   const pat=MOVEMENT_PATTERNS[movementPattern];if(!pat)return;
   const len=pat.steps.length;
   const stepInPat=movementStep%len;
   const bar=Math.floor(movementStep/16);
-  const sound=pickMovementSound(stepInPat,bar);
-  if(sound) fireMovementHit(ctx.currentTime,sound,0.88+Math.random()*0.24);
+  _firePickedMovement(ctx.currentTime,pickMovementSound(stepInPat,bar));
   movementStep++;
 }
 function scheduleMovement(){
@@ -1238,6 +1269,13 @@ function buildEditSheet(){
   h+='<div class="slope-row"><span class="slope-label">Beat Sync</span><button class="slope-btn'+(evolveOnBeat?' active':'')+'" onclick="toggleEvolveOnBeat()">'+(evolveOnBeat?'On':'Off')+'</button>';
   if(evolveOnBeat){[1,2,4,8].forEach(b=>{h+='<button class="slope-btn'+(evolveBars===b?' active':'')+'" onclick="setEvolveBars('+b+')" style="padding:6px 10px">'+b+'bar</button>'})}
   h+='</div>';
+  h+='<div class="slope-row"><span class="slope-label">Time</span>';
+  h+='<button class="slope-btn'+(timeSig==='4/4'?' active':'')+'" onclick="setTimeSig(\'4/4\')" style="padding:6px 10px">4/4</button>';
+  h+='<button class="slope-btn'+(timeSig==='6/8'?' active':'')+'" onclick="setTimeSig(\'6/8\')" style="padding:6px 10px">6/8</button>';
+  h+='<span style="flex:1"></span>';
+  h+='<span class="slope-label" style="margin-left:8px">Click</span>';
+  h+='<button class="slope-btn'+(clickRateX2?' active':'')+'" onclick="toggleClickX2();buildEditSheet()" style="padding:6px 10px">x2</button>';
+  h+='</div>';
   h+='<div class="bpm-row"><span class="bpm-label">BPM</span><button class="bpm-nudge" onclick="setBPM(clickBPM-1);document.getElementById(\'bpmInput\').value=clickBPM">−</button><input id="bpmInput" class="bpm-input" type="number" min="50" max="200" value="'+clickBPM+'" onchange="setBPM(this.value)" /><button class="bpm-nudge" onclick="setBPM(clickBPM+1);document.getElementById(\'bpmInput\').value=clickBPM">+</button><button class="bpm-tap" onclick="tapTempo()">TAP</button></div>';
   h+='</div><div class="edit-divider"></div>';
   // ── Setlist ──
@@ -1444,8 +1482,8 @@ function toggleSlope(type){
   }
   saveSettings();buildEditSheet();
 }
-function saveSettings(){try{const s={homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,lpfQ,hpfQ,lpfSlope,hpfSlope,eqLowGain,eqLoMidGain,eqHiMidGain,eqHighGain,chorusMix,widthMod,reverbMix,reverbSize,reverbMod,delayMixVal,delayFeedback,delayTone,delaySync,delaySyncDiv,delayTimeVal,shimmerVol,masterVol,satAmt,textureOctUp,foundationSubOct,arpVol,arpRate,arpOct,arpVoice,movementVol,movementPattern,clickBPM,clickRateX2,evolveOnBeat,evolveBars,enabledEvolveIdx:[...enabledEvolveIdx],layers:{}};PAD_LAYERS.forEach(l=>{s.layers[l.id]={volume:layerState[l.id].volume}});localStorage.setItem('norcoast_v1',JSON.stringify(s))}catch(e){}}
-function loadSettings(){try{const raw=localStorage.getItem('norcoast_v1');if(!raw)return;const s=JSON.parse(raw);if(s.homeRoot)homeRoot=s.homeRoot;if(s.evolving!=null)evolving=s.evolving;if(s.evolveSpeed!=null)evolveSpeed=s.evolveSpeed;if(s.lpfValue!=null)lpfValue=s.lpfValue;if(s.hpfValue!=null)hpfValue=s.hpfValue;if(s.lpfQ!=null)lpfQ=s.lpfQ;if(s.hpfQ!=null)hpfQ=s.hpfQ;if(s.lpfSlope!=null)lpfSlope=s.lpfSlope;if(s.hpfSlope!=null)hpfSlope=s.hpfSlope;if(s.eqLowGain!=null)eqLowGain=s.eqLowGain;if(s.eqLoMidGain!=null)eqLoMidGain=s.eqLoMidGain;if(s.eqHiMidGain!=null)eqHiMidGain=s.eqHiMidGain;if(s.eqHighGain!=null)eqHighGain=s.eqHighGain;if(s.chorusMix!=null)chorusMix=s.chorusMix;if(s.widthMod!=null)widthMod=s.widthMod;if(s.shimmerVol!=null)shimmerVol=s.shimmerVol;if(s.reverbMix!=null)reverbMix=s.reverbMix;if(s.reverbSize!=null)reverbSize=s.reverbSize;if(s.reverbMod!=null)reverbMod=s.reverbMod;if(s.delayMixVal!=null)delayMixVal=s.delayMixVal;if(s.delayFeedback!=null)delayFeedback=s.delayFeedback;if(s.delayTone!=null)delayTone=s.delayTone;if(s.delaySync!=null)delaySync=s.delaySync;if(s.delaySyncDiv)delaySyncDiv=s.delaySyncDiv;if(s.delayTimeVal!=null)delayTimeVal=s.delayTimeVal;if(s.masterVol!=null)masterVol=s.masterVol;if(s.satAmt!=null){satAmt=s.satAmt;if(satDriveNode)satDriveNode.gain.value=1+satAmt*1.5;if(satCompNode)satCompNode.gain.value=1/(1+satAmt*0.3);}if(s.textureOctUp!=null)textureOctUp=s.textureOctUp;if(s.foundationSubOct!=null)foundationSubOct=s.foundationSubOct;if(s.clickBPM!=null)clickBPM=s.clickBPM;if(s.evolveOnBeat!=null)evolveOnBeat=s.evolveOnBeat;if(s.evolveBars!=null)evolveBars=s.evolveBars;if(s.arpVol!=null)arpVol=s.arpVol;if(s.arpRate!=null)arpRate=s.arpRate;if(s.arpOct!=null)arpOct=s.arpOct;if(s.arpVoice)arpVoice=s.arpVoice;if(s.movementVol!=null)movementVol=s.movementVol;if(s.movementPattern!=null)movementPattern=s.movementPattern;if(s.clickRateX2!=null)clickRateX2=s.clickRateX2;if(Array.isArray(s.enabledEvolveIdx))enabledEvolveIdx=new Set(s.enabledEvolveIdx);if(s.layers)PAD_LAYERS.forEach(l=>{if(s.layers[l.id]!=null)layerState[l.id].volume=s.layers[l.id].volume??0})}catch(e){}}
+function saveSettings(){try{const s={homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,lpfQ,hpfQ,lpfSlope,hpfSlope,eqLowGain,eqLoMidGain,eqHiMidGain,eqHighGain,chorusMix,widthMod,reverbMix,reverbSize,reverbMod,delayMixVal,delayFeedback,delayTone,delaySync,delaySyncDiv,delayTimeVal,shimmerVol,masterVol,satAmt,textureOctUp,foundationSubOct,arpVol,arpRate,arpOct,arpVoice,movementVol,movementPattern,clickBPM,clickRateX2,timeSig,evolveOnBeat,evolveBars,enabledEvolveIdx:[...enabledEvolveIdx],layers:{}};PAD_LAYERS.forEach(l=>{s.layers[l.id]={volume:layerState[l.id].volume}});localStorage.setItem('norcoast_v1',JSON.stringify(s))}catch(e){}}
+function loadSettings(){try{const raw=localStorage.getItem('norcoast_v1');if(!raw)return;const s=JSON.parse(raw);if(s.homeRoot)homeRoot=s.homeRoot;if(s.evolving!=null)evolving=s.evolving;if(s.evolveSpeed!=null)evolveSpeed=s.evolveSpeed;if(s.lpfValue!=null)lpfValue=s.lpfValue;if(s.hpfValue!=null)hpfValue=s.hpfValue;if(s.lpfQ!=null)lpfQ=s.lpfQ;if(s.hpfQ!=null)hpfQ=s.hpfQ;if(s.lpfSlope!=null)lpfSlope=s.lpfSlope;if(s.hpfSlope!=null)hpfSlope=s.hpfSlope;if(s.eqLowGain!=null)eqLowGain=s.eqLowGain;if(s.eqLoMidGain!=null)eqLoMidGain=s.eqLoMidGain;if(s.eqHiMidGain!=null)eqHiMidGain=s.eqHiMidGain;if(s.eqHighGain!=null)eqHighGain=s.eqHighGain;if(s.chorusMix!=null)chorusMix=s.chorusMix;if(s.widthMod!=null)widthMod=s.widthMod;if(s.shimmerVol!=null)shimmerVol=s.shimmerVol;if(s.reverbMix!=null)reverbMix=s.reverbMix;if(s.reverbSize!=null)reverbSize=s.reverbSize;if(s.reverbMod!=null)reverbMod=s.reverbMod;if(s.delayMixVal!=null)delayMixVal=s.delayMixVal;if(s.delayFeedback!=null)delayFeedback=s.delayFeedback;if(s.delayTone!=null)delayTone=s.delayTone;if(s.delaySync!=null)delaySync=s.delaySync;if(s.delaySyncDiv)delaySyncDiv=s.delaySyncDiv;if(s.delayTimeVal!=null)delayTimeVal=s.delayTimeVal;if(s.masterVol!=null)masterVol=s.masterVol;if(s.satAmt!=null){satAmt=s.satAmt;if(satDriveNode)satDriveNode.gain.value=1+satAmt*1.5;if(satCompNode)satCompNode.gain.value=1/(1+satAmt*0.3);}if(s.textureOctUp!=null)textureOctUp=s.textureOctUp;if(s.foundationSubOct!=null)foundationSubOct=s.foundationSubOct;if(s.clickBPM!=null)clickBPM=s.clickBPM;if(s.evolveOnBeat!=null)evolveOnBeat=s.evolveOnBeat;if(s.evolveBars!=null)evolveBars=s.evolveBars;if(s.arpVol!=null)arpVol=s.arpVol;if(s.arpRate!=null)arpRate=s.arpRate;if(s.arpOct!=null)arpOct=s.arpOct;if(s.arpVoice)arpVoice=s.arpVoice;if(s.movementVol!=null)movementVol=s.movementVol;if(s.movementPattern!=null)movementPattern=s.movementPattern;if(s.clickRateX2!=null)clickRateX2=s.clickRateX2;if(s.timeSig)timeSig=s.timeSig;if(Array.isArray(s.enabledEvolveIdx))enabledEvolveIdx=new Set(s.enabledEvolveIdx);if(s.layers)PAD_LAYERS.forEach(l=>{if(s.layers[l.id]!=null)layerState[l.id].volume=s.layers[l.id].volume??0})}catch(e){}}
 let _saveT=null;function queueSave(){clearTimeout(_saveT);_saveT=setTimeout(saveSettings,500)}
 
 // ─── PRESETS ───
@@ -1585,7 +1623,8 @@ function scheduleClicks(){
 }
 function fireClick(t){
   const beat=clickBeat++;
-  const isDown=(beat%(evolveBars*4))===0;
+  const beatsPerBar=timeSig==='6/8'?3:4;
+  const isDown=(beat%(evolveBars*beatsPerBar))===0;
   if(!clickMuted&&!_fadeActive&&!audioPaused){
     const osc=ctx.createOscillator();const env=ctx.createGain();
     osc.type='sine';osc.frequency.value=1200;
@@ -1654,8 +1693,7 @@ function fireClick(t){
       const stepDur=60/clickBPM/4;
       for(let sub=0;sub<4;sub++){
         const stepInPat=beatInPat*4+sub;
-        const sound=pickMovementSound(stepInPat,bar);
-        if(sound) fireMovementHit(t+sub*stepDur,sound,0.88+Math.random()*0.24);
+        _firePickedMovement(t+sub*stepDur,pickMovementSound(stepInPat,bar));
       }
     }
   }
@@ -1670,6 +1708,7 @@ function toggleClickX2(){
   const btn=document.getElementById('clickX2Btn');if(btn){btn.className='evolve-pill '+(clickRateX2?'on':'off');}
   saveSettings();
 }
+function setTimeSig(t){timeSig=t;saveSettings();buildEditSheet();}
 function setBPM(v){clickBPM=Math.max(50,Math.min(200,parseInt(v)||120));const d=document.getElementById('bpmDisplay');if(d)d.textContent=clickBPM;if(clickActive&&!midiClockIn){stopClick();startClick()}applyDelaySync();}
 function getDelayTime(){const beat=60/clickBPM;const divs={'1/2':beat*2,'q.':beat*1.5,'q':beat,'1/8.':beat*0.75,'1/8':beat*0.5};return Math.min(divs[delaySyncDiv]||beat*1.5,1.9)}
 function applyDelaySync(){
@@ -1980,10 +2019,12 @@ async function initAndStart(){
         if(ctx&&ctx.state==='suspended'&&!audioPaused&&document.visibilityState==='visible')ctx.resume();
       });
     } else {
+      // Ambient app: keep playing in background tabs. Browser may still throttle
+      // timers, but the AudioContext keeps running. Resume on return in case
+      // the browser auto-suspended.
       document.addEventListener('visibilitychange',()=>{
         if(!ctx)return;
-        if(document.visibilityState==='visible'){if(ctx.state==='suspended'&&!audioPaused)ctx.resume();}
-        else ctx.suspend();
+        if(document.visibilityState==='visible'&&ctx.state==='suspended'&&!audioPaused)ctx.resume();
       });
       window.addEventListener('focus',()=>{if(ctx&&ctx.state==='suspended'&&!audioPaused)ctx.resume()});
       window.addEventListener('pagehide',()=>{if(ctx)ctx.close();});
