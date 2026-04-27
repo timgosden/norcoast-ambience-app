@@ -173,7 +173,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v0.74</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v0.75</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -1809,7 +1809,7 @@ async function initAndStart(){
       window.addEventListener('focus',()=>{if(ctx&&ctx.state==='suspended'&&!audioPaused)ctx.resume()});
       window.addEventListener('pagehide',()=>{if(ctx)ctx.close();});
     }
-    scheduleEvolve();initMIDI();
+    loadMidiMappings();buildKeys();startVis();scheduleEvolve();initMIDI();updatePerfSetlist();
     // Swipe down to close edit sheet
     {const sheet=document.getElementById('editSheet');let _sy=0,_sw=false;
     sheet.addEventListener('touchstart',e=>{if(e.touches.length===1&&e.target.closest('input[type=range]')==null){_sy=e.touches[0].clientY;_sw=true;}},{passive:true});
@@ -1817,14 +1817,9 @@ async function initAndStart(){
     {const eb=document.getElementById('evolveBtn');if(eb){eb.className='evolve-pill '+(evolving?'on':'off');eb.textContent=evolving?'Evolving':'Static'}}
     const _bd=document.getElementById('bpmDisplay');if(_bd)_bd.textContent=clickBPM;
     document.getElementById('stateEvolve').textContent=CHORD_TYPES[currentEvolve].name;
-  }catch(e){console.error('initAndStart error:',e);if(ls)ls.textContent='Error: '+e.message;}
+  }catch(e){if(ls)ls.textContent='Error: '+e.message;}
   finally{
-    try{loadMidiMappings();}catch(_){}
-    try{buildKeys();}catch(_){}
-    try{if(analyser&&ctx)startVis();}catch(_){}
-    try{updatePerfSetlist();}catch(_){}
     prompt.style.opacity='0';
-    prompt.style.pointerEvents='none';
     setTimeout(()=>{try{prompt.remove()}catch(_){}},700);
   }
 }
