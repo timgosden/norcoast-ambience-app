@@ -1,6 +1,5 @@
 import UIKit
 import AVFoundation
-import Sentry
 
 protocol NorcoastAudioControllable: AnyObject {
     func pauseForInterruption()
@@ -20,25 +19,12 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     ) {
         guard let windowScene = scene as? UIWindowScene else { return }
 
-        configureSentry()
         configureAudioSession()
 
         let window = UIWindow(windowScene: windowScene)
         window.rootViewController = ViewController()
         window.makeKeyAndVisible()
         self.window = window
-    }
-
-    // MARK: - Crash Reporting
-
-    private func configureSentry() {
-        // Replace YOUR_SENTRY_DSN with the DSN from sentry.io → Project Settings → Client Keys.
-        let dsn = "YOUR_SENTRY_DSN"
-        guard dsn != "YOUR_SENTRY_DSN" else { return }
-        SentrySDK.start { options in
-            options.dsn = dsn
-            options.tracesSampleRate = 0.2
-        }
     }
 
     // MARK: - Audio Session
