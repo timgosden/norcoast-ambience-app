@@ -205,7 +205,7 @@
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
       <button id="clickX2Btn" class="evolve-pill off" onclick="toggleClickX2()" style="padding:8px 10px;font-size:9px;letter-spacing:1px">x2</button>
     </div>
-    <div class="app-version">v0.85</div>
+    <div class="app-version">v0.86</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -303,7 +303,7 @@ let textureOctUp=true,foundationSubOct=true;
 let widthMod=0.39;
 let arpVol=0.14,arpRate=0.125,arpOct=0,arpVoice='soft',arpStep=0,arpTimer=null;
 let movementVol=0,movementPattern=0,movementStep=0,movementTimer=null,movementReverb=null;
-let limiter=null,clickOutBus=null,arpRevSend=null,satDriveNode=null,satCompNode=null;
+let limiter=null,clickOutBus=null,arpRevSend=null,satDriveNode=null,satCompNode=null,satWS=null;
 let clickBPM=140,clickActive=false,clickMuted=true,clickNextTime=0,clickSchedId=null,clickBeat=0,clickRateX2=false;
 let delaySync=true,delaySyncDiv='1/8.';
 let evolveOnBeat=true,evolveBars=8,pendingEvolve=-1,timeSig='4/4';
@@ -355,7 +355,7 @@ function initReverb(opts){
   const erTaps=[{t:0.007,g:0.60,p:-0.30},{t:0.013,g:0.48,p:+0.45},
                 {t:0.019,g:0.37,p:-0.55},{t:0.027,g:0.27,p:+0.20},
                 {t:0.035,g:0.19,p:-0.40},{t:0.043,g:0.12,p:+0.65}];
-  const erOut=ctx.createGain();erOut.gain.value=opts.bright?0.22:0.28;
+  const erOut=ctx.createGain();erOut.gain.value=opts.bright?0.16:0.20;
   erTaps.forEach(({t,g,p})=>{
     const d=ctx.createDelay(0.06);d.delayTime.value=t;
     const gn=ctx.createGain();gn.gain.value=g;
@@ -644,14 +644,11 @@ async function initAudio(){
   limiter.threshold.value=-3;limiter.knee.value=3;limiter.ratio.value=20;
   limiter.attack.value=0.001;limiter.release.value=0.12;
   clickOutBus=ctx.createGain();clickOutBus.gain.value=1;
-  // Saturation: tanh soft-clip, drive controlled via satDriveNode pre-gain
-  // At satAmt=0 the signal stays in the linear region of tanh (clean)
-  // At satAmt=1 the pre-gain of 2.5 pushes into the shoulder (warm, thick)
-  const satCurve=new Float32Array(512);
-  for(let i=0;i<512;i++){const x=(i*2/511)-1;satCurve[i]=Math.tanh(x*2.5)/Math.tanh(2.5);}
-  const satWS=ctx.createWaveShaper();satWS.curve=satCurve;satWS.oversample='4x';
+  // Saturation: tanh soft-clip. Curve is rebuilt dynamically via buildSatCurve().
+  // At satAmt=0 the curve is identity so the chain is completely transparent.
+  satWS=ctx.createWaveShaper();satWS.curve=buildSatCurve(satAmt);satWS.oversample='4x';
   satDriveNode=ctx.createGain();satDriveNode.gain.value=1;
-  satCompNode=ctx.createGain();satCompNode.gain.value=1;
+  satCompNode=ctx.createGain();satCompNode.gain.value=1+satAmt*0.15;
   analyser.connect(satDriveNode);satDriveNode.connect(satWS);satWS.connect(satCompNode);satCompNode.connect(limiter);
   limiter.connect(ctx.destination);
   clickOutBus.connect(ctx.destination);
@@ -1040,7 +1037,15 @@ function setMovementPattern(p){movementPattern=p;movementStep=0;saveSettings();b
 
 // ─── FILTER MATH ───
 function dampFaderToHz(v){return Math.exp(Math.log(800)+v*(Math.log(8000)-Math.log(800)))}
-function reverbSizeToFB(v){return 0.62+v*0.24}
+function reverbSizeToFB(v){return 0.62+v*0.35}
+// Rebuild the WaveShaper curve for the given saturation amount.
+// At amt=0 the curve is identity (no coloration). At amt=1 it's tanh(x*2.5)/tanh(2.5).
+function buildSatCurve(amt){
+  const c=new Float32Array(512);
+  if(amt<0.005){for(let i=0;i<512;i++)c[i]=(i*2/511)-1;}
+  else{const k=amt*2.5;const n=Math.tanh(k);for(let i=0;i<512;i++){const x=(i*2/511)-1;c[i]=Math.tanh(x*k)/n;}}
+  return c;
+}
 function lpfFaderToHz(v){return Math.exp(Math.log(100)+v*v*(Math.log(20000)-Math.log(100)))}
 function hpfFaderToHz(v){if(v<0.01)return 20;return Math.exp(Math.log(20)+v*(Math.log(500)-Math.log(20)))}
 function formatHz(hz){return hz>=1000?(hz/1000).toFixed(1)+'kHz':Math.round(hz)+'Hz'}
@@ -1298,7 +1303,7 @@ function buildEditSheet(){
   h+='<span class="slope-label" style="margin-left:8px">Click</span>';
   h+='<button class="slope-btn'+(clickRateX2?' active':'')+'" onclick="toggleClickX2();buildEditSheet()" style="padding:6px 10px">x2</button>';
   h+='</div>';
-  h+='<div class="bpm-row"><span class="bpm-label">BPM</span><button class="bpm-nudge" onclick="setBPM(clickBPM-1);document.getElementById(\'bpmInput\').value=clickBPM">−</button><input id="bpmInput" class="bpm-input" type="number" min="50" max="200" value="'+clickBPM+'" onchange="setBPM(this.value)" /><button class="bpm-nudge" onclick="setBPM(clickBPM+1);document.getElementById(\'bpmInput\').value=clickBPM">+</button><button class="bpm-tap" onclick="tapTempo()">TAP</button></div>';
+  h+='<div class="bpm-row" style="justify-content:center;margin:12px 0 4px"><button class="bpm-nudge" onclick="setBPM(clickBPM-1)">−</button><button class="bpm-tap-main" onclick="tapTempo()" style="flex:1;max-width:120px;margin:0 8px"><span id="bpmMenuDisplay">'+clickBPM+'</span><span class="bpm-tap-label">BPM · TAP</span></button><button class="bpm-nudge" onclick="setBPM(clickBPM+1)">+</button></div>';
   h+='</div><div class="edit-divider"></div>';
   // ── Setlist ──
   const presets=getPresets();const presetNames=Object.keys(presets);
@@ -1403,7 +1408,7 @@ function buildEditSheet(){
   wireEQSlider(c,'eqLM',db=>{eqLoMidGain=db;eqLoMidNode.gain.linearRampToValueAtTime(db,ctx.currentTime+0.05);});
   wireEQSlider(c,'eqHM',db=>{eqHiMidGain=db;eqHiMidNode.gain.linearRampToValueAtTime(db,ctx.currentTime+0.05);});
   wireEQSlider(c,'eqH',db=>{eqHighGain=db;eqHighNode.gain.linearRampToValueAtTime(db,ctx.currentTime+0.05);});
-  wireSR(c,'sat',r=>{satAmt=r;if(satDriveNode)satDriveNode.gain.linearRampToValueAtTime(1+r*1.5,ctx.currentTime+0.05);if(satCompNode)satCompNode.gain.linearRampToValueAtTime(1/(1+r*0.3),ctx.currentTime+0.05);queueSave();return Math.round(r*100)+'%'});
+  wireSR(c,'sat',r=>{satAmt=r;if(satWS)satWS.curve=buildSatCurve(r);if(satCompNode)satCompNode.gain.linearRampToValueAtTime(1+r*0.15,ctx.currentTime+0.05);queueSave();return Math.round(r*100)+'%'});
   // Wire other sliders
   wireSR(c,'arp',r=>{const wasOff=arpVol<=0;arpVol=r;if(r>0&&wasOff)startArp();else if(r<=0)stopArp();const arpRow=c.querySelector('.edit-layer[data-lid="arp"]');if(arpRow){const on=r>0;const db=arpRow.querySelector('.layer-dot-btn');if(db){db.style.borderColor=on?'#9b7fd455':'rgba(255,255,255,0.1)';db.style.background=on?'#9b7fd415':'transparent';}const dot=arpRow.querySelector('.layer-dot');if(dot){dot.style.background=on?'#9b7fd4':'rgba(255,255,255,0.15)';dot.style.boxShadow=on?'0 0 10px #9b7fd450':'none';}const nm=arpRow.querySelector('.edit-layer-name');if(nm)nm.style.color=on?'rgba(255,255,255,0.8)':'rgba(255,255,255,0.35)';}return Math.round(r*100)+'%'});
   wireSR(c,'mov',r=>{const wasOff=movementVol<=0;movementVol=r;if(r>0&&wasOff)startMovement();else if(r<=0)stopMovement();const mRow=c.querySelector('.edit-layer[data-lid="movement"]');if(mRow){const on=r>0;const db=mRow.querySelector('.layer-dot-btn');if(db){db.style.borderColor=on?'#e8a45e55':'rgba(255,255,255,0.1)';db.style.background=on?'#e8a45e15':'transparent';}const dot=mRow.querySelector('.layer-dot');if(dot){dot.style.background=on?'#e8a45e':'rgba(255,255,255,0.15)';dot.style.boxShadow=on?'0 0 10px #e8a45e50':'none';}const nm=mRow.querySelector('.edit-layer-name');if(nm)nm.style.color=on?'rgba(255,255,255,0.8)':'rgba(255,255,255,0.35)';}return Math.round(r*100)+'%'});
@@ -1505,7 +1510,7 @@ function toggleSlope(type){
   saveSettings();buildEditSheet();
 }
 function saveSettings(){try{const s={homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,lpfQ,hpfQ,lpfSlope,hpfSlope,eqLowGain,eqLoMidGain,eqHiMidGain,eqHighGain,chorusMix,widthMod,reverbMix,reverbSize,reverbMod,delayMixVal,delayFeedback,delayTone,delaySync,delaySyncDiv,delayTimeVal,shimmerVol,masterVol,satAmt,textureOctUp,foundationSubOct,arpVol,arpRate,arpOct,arpVoice,movementVol,movementPattern,clickBPM,clickRateX2,timeSig,evolveOnBeat,evolveBars,enabledEvolveIdx:[...enabledEvolveIdx],layers:{}};PAD_LAYERS.forEach(l=>{s.layers[l.id]={volume:layerState[l.id].volume}});localStorage.setItem('norcoast_v1',JSON.stringify(s))}catch(e){}}
-function loadSettings(){try{const raw=localStorage.getItem('norcoast_v1');if(!raw)return;const s=JSON.parse(raw);if(s.homeRoot)homeRoot=s.homeRoot;if(s.evolving!=null)evolving=s.evolving;if(s.evolveSpeed!=null)evolveSpeed=s.evolveSpeed;if(s.lpfValue!=null)lpfValue=s.lpfValue;if(s.hpfValue!=null)hpfValue=s.hpfValue;if(s.lpfQ!=null)lpfQ=s.lpfQ;if(s.hpfQ!=null)hpfQ=s.hpfQ;if(s.lpfSlope!=null)lpfSlope=s.lpfSlope;if(s.hpfSlope!=null)hpfSlope=s.hpfSlope;if(s.eqLowGain!=null)eqLowGain=s.eqLowGain;if(s.eqLoMidGain!=null)eqLoMidGain=s.eqLoMidGain;if(s.eqHiMidGain!=null)eqHiMidGain=s.eqHiMidGain;if(s.eqHighGain!=null)eqHighGain=s.eqHighGain;if(s.chorusMix!=null)chorusMix=s.chorusMix;if(s.widthMod!=null)widthMod=s.widthMod;if(s.shimmerVol!=null)shimmerVol=s.shimmerVol;if(s.reverbMix!=null)reverbMix=s.reverbMix;if(s.reverbSize!=null)reverbSize=s.reverbSize;if(s.reverbMod!=null)reverbMod=s.reverbMod;if(s.delayMixVal!=null)delayMixVal=s.delayMixVal;if(s.delayFeedback!=null)delayFeedback=s.delayFeedback;if(s.delayTone!=null)delayTone=s.delayTone;if(s.delaySync!=null)delaySync=s.delaySync;if(s.delaySyncDiv)delaySyncDiv=s.delaySyncDiv;if(s.delayTimeVal!=null)delayTimeVal=s.delayTimeVal;if(s.masterVol!=null)masterVol=s.masterVol;if(s.satAmt!=null){satAmt=s.satAmt;if(satDriveNode)satDriveNode.gain.value=1+satAmt*1.5;if(satCompNode)satCompNode.gain.value=1/(1+satAmt*0.3);}if(s.textureOctUp!=null)textureOctUp=s.textureOctUp;if(s.foundationSubOct!=null)foundationSubOct=s.foundationSubOct;if(s.clickBPM!=null)clickBPM=s.clickBPM;if(s.evolveOnBeat!=null)evolveOnBeat=s.evolveOnBeat;if(s.evolveBars!=null)evolveBars=s.evolveBars;if(s.arpVol!=null)arpVol=s.arpVol;if(s.arpRate!=null)arpRate=s.arpRate;if(s.arpOct!=null)arpOct=s.arpOct;if(s.arpVoice)arpVoice=s.arpVoice;if(s.movementVol!=null)movementVol=s.movementVol;if(s.movementPattern!=null)movementPattern=s.movementPattern;if(s.clickRateX2!=null)clickRateX2=s.clickRateX2;if(s.timeSig)timeSig=s.timeSig;if(Array.isArray(s.enabledEvolveIdx))enabledEvolveIdx=new Set(s.enabledEvolveIdx);if(s.layers)PAD_LAYERS.forEach(l=>{if(s.layers[l.id]!=null)layerState[l.id].volume=s.layers[l.id].volume??0})}catch(e){}}
+function loadSettings(){try{const raw=localStorage.getItem('norcoast_v1');if(!raw)return;const s=JSON.parse(raw);if(s.homeRoot)homeRoot=s.homeRoot;if(s.evolving!=null)evolving=s.evolving;if(s.evolveSpeed!=null)evolveSpeed=s.evolveSpeed;if(s.lpfValue!=null)lpfValue=s.lpfValue;if(s.hpfValue!=null)hpfValue=s.hpfValue;if(s.lpfQ!=null)lpfQ=s.lpfQ;if(s.hpfQ!=null)hpfQ=s.hpfQ;if(s.lpfSlope!=null)lpfSlope=s.lpfSlope;if(s.hpfSlope!=null)hpfSlope=s.hpfSlope;if(s.eqLowGain!=null)eqLowGain=s.eqLowGain;if(s.eqLoMidGain!=null)eqLoMidGain=s.eqLoMidGain;if(s.eqHiMidGain!=null)eqHiMidGain=s.eqHiMidGain;if(s.eqHighGain!=null)eqHighGain=s.eqHighGain;if(s.chorusMix!=null)chorusMix=s.chorusMix;if(s.widthMod!=null)widthMod=s.widthMod;if(s.shimmerVol!=null)shimmerVol=s.shimmerVol;if(s.reverbMix!=null)reverbMix=s.reverbMix;if(s.reverbSize!=null)reverbSize=s.reverbSize;if(s.reverbMod!=null)reverbMod=s.reverbMod;if(s.delayMixVal!=null)delayMixVal=s.delayMixVal;if(s.delayFeedback!=null)delayFeedback=s.delayFeedback;if(s.delayTone!=null)delayTone=s.delayTone;if(s.delaySync!=null)delaySync=s.delaySync;if(s.delaySyncDiv)delaySyncDiv=s.delaySyncDiv;if(s.delayTimeVal!=null)delayTimeVal=s.delayTimeVal;if(s.masterVol!=null)masterVol=s.masterVol;if(s.satAmt!=null){satAmt=s.satAmt;if(satWS)satWS.curve=buildSatCurve(satAmt);if(satCompNode)satCompNode.gain.value=1+satAmt*0.15;}if(s.textureOctUp!=null)textureOctUp=s.textureOctUp;if(s.foundationSubOct!=null)foundationSubOct=s.foundationSubOct;if(s.clickBPM!=null)clickBPM=s.clickBPM;if(s.evolveOnBeat!=null)evolveOnBeat=s.evolveOnBeat;if(s.evolveBars!=null)evolveBars=s.evolveBars;if(s.arpVol!=null)arpVol=s.arpVol;if(s.arpRate!=null)arpRate=s.arpRate;if(s.arpOct!=null)arpOct=s.arpOct;if(s.arpVoice)arpVoice=s.arpVoice;if(s.movementVol!=null)movementVol=s.movementVol;if(s.movementPattern!=null)movementPattern=s.movementPattern;if(s.clickRateX2!=null)clickRateX2=s.clickRateX2;if(s.timeSig)timeSig=s.timeSig;if(Array.isArray(s.enabledEvolveIdx))enabledEvolveIdx=new Set(s.enabledEvolveIdx);if(s.layers)PAD_LAYERS.forEach(l=>{if(s.layers[l.id]!=null)layerState[l.id].volume=s.layers[l.id].volume??0})}catch(e){}}
 let _saveT=null;function queueSave(){clearTimeout(_saveT);_saveT=setTimeout(saveSettings,500)}
 
 // ─── PRESETS ───
@@ -1535,7 +1540,7 @@ function loadPreset(name){try{
   if(s.arpOct!=null)arpOct=s.arpOct;
   if(s.arpVoice)arpVoice=s.arpVoice;
   if(s.masterVol!=null){masterVol=s.masterVol;if(master)master.gain.linearRampToValueAtTime(masterVol,ctx.currentTime+0.1);}
-  if(s.satAmt!=null){satAmt=s.satAmt;if(satDriveNode)satDriveNode.gain.linearRampToValueAtTime(1+satAmt*1.5,ctx.currentTime+0.05);if(satCompNode)satCompNode.gain.linearRampToValueAtTime(1/(1+satAmt*0.3),ctx.currentTime+0.05);}
+  if(s.satAmt!=null){satAmt=s.satAmt;if(satWS)satWS.curve=buildSatCurve(satAmt);if(satCompNode)satCompNode.gain.linearRampToValueAtTime(1+satAmt*0.15,ctx.currentTime+0.05);}
   if(s.arpVol!=null){arpVol=s.arpVol;arpStep=0;if(ctx&&arpVol>0)startArp();else stopArp();}
   if(s.movementPattern!=null)movementPattern=s.movementPattern;
   if(s.movementVol!=null){movementVol=s.movementVol;movementStep=0;if(ctx&&movementVol>0)startMovement();else stopMovement();}
@@ -1737,7 +1742,7 @@ function toggleClickX2(){
   saveSettings();
 }
 function setTimeSig(t){timeSig=t;movementStep=0;saveSettings();buildEditSheet();}
-function setBPM(v){clickBPM=Math.max(50,Math.min(200,parseInt(v)||120));const d=document.getElementById('bpmDisplay');if(d)d.textContent=clickBPM;if(clickActive&&!midiClockIn){stopClick();startClick()}applyDelaySync();}
+function setBPM(v){clickBPM=Math.max(50,Math.min(200,parseInt(v)||120));const d=document.getElementById('bpmDisplay');if(d)d.textContent=clickBPM;const m=document.getElementById('bpmMenuDisplay');if(m)m.textContent=clickBPM;if(clickActive&&!midiClockIn){stopClick();startClick()}applyDelaySync();}
 function getDelayTime(){const beat=60/clickBPM;const divs={'1/2':beat*2,'q.':beat*1.5,'q':beat,'1/8.':beat*0.75,'1/8':beat*0.5};return Math.min(divs[delaySyncDiv]||beat*1.5,1.9)}
 function applyDelaySync(){
   if(!delaySync||!delayNode||!delayGainN)return;
@@ -1764,8 +1769,7 @@ function tapTempo(){
   if(_tapTimes.length>6)_tapTimes.shift();
   if(_tapTimes.length>1){
     const avg=_tapTimes.slice(1).reduce((s,t,i)=>s+(t-_tapTimes[i]),0)/(_tapTimes.length-1);
-    setBPM(Math.round(60000/avg));const _d2=document.getElementById('bpmDisplay');if(_d2)_d2.textContent=clickBPM;
-    const inp=document.getElementById('bpmInput');if(inp)inp.value=clickBPM;
+    setBPM(Math.round(60000/avg));
   }
 }
 
@@ -1890,7 +1894,7 @@ function applyMidiParam(id,val){
     case'hpf':hpfValue=val;{const hz=hpfFaderToHz(val);if(globalHPF){globalHPF.frequency.linearRampToValueAtTime(hz,ctx.currentTime+0.1);if(globalHPF2&&hpfSlope===24)globalHPF2.frequency.linearRampToValueAtTime(hz,ctx.currentTime+0.1)}}break;
     case'spd':evolveSpeed=faderToVol(val);break;
     case'mst':masterVol=faderToVol(val);if(master)master.gain.linearRampToValueAtTime(masterVol,ctx.currentTime+0.1);break;
-    case'sat':satAmt=val;if(satDriveNode)satDriveNode.gain.linearRampToValueAtTime(1+val*1.5,ctx.currentTime+0.05);if(satCompNode)satCompNode.gain.linearRampToValueAtTime(1/(1+val*0.3),ctx.currentTime+0.05);break;
+    case'sat':satAmt=val;if(satWS)satWS.curve=buildSatCurve(val);if(satCompNode)satCompNode.gain.linearRampToValueAtTime(1+val*0.15,ctx.currentTime+0.05);break;
   }
   queueSave();
 }
@@ -1908,7 +1912,7 @@ function handleMIDI(msg){
         if(bpm>=40&&bpm<=300&&bpm!==clickBPM){
           clickBPM=bpm;
           const d=document.getElementById('bpmDisplay');if(d)d.textContent=bpm;
-          const inp=document.getElementById('bpmInput');if(inp)inp.value=bpm;
+          const m=document.getElementById('bpmMenuDisplay');if(m)m.textContent=bpm;
           applyDelaySync();
         }
       }
