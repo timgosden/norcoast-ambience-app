@@ -205,7 +205,7 @@
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
       <button id="clickX2Btn" class="evolve-pill off" onclick="toggleClickX2()" style="padding:8px 10px;font-size:9px;letter-spacing:1px">x2</button>
     </div>
-    <div class="app-version">v0.87</div>
+    <div class="app-version">v0.88</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -653,9 +653,10 @@ async function initAudio(){
   limiter.connect(ctx.destination);
   clickOutBus.connect(ctx.destination);
   // Movement layer: dedicated baked-in reverb so percussion always sits in space
-  // regardless of the user's main reverb mix. Output joins the master FX chain.
+  // regardless of the user's main reverb mix. Output joins the master FX chain
+  // at master so drums get the same widthPanner + full chain as everything else.
   movementReverb=createMovementReverb();
-  movementReverb.output.connect(globalHPF);
+  movementReverb.output.connect(master);
 }
 
 function createMovementReverb(){
@@ -1291,9 +1292,10 @@ function buildEditSheet(){
   h+='<div class="slope-row"><span class="slope-label">Time</span>';
   h+='<button class="slope-btn'+(timeSig==='4/4'?' active':'')+'" onclick="setTimeSig(\'4/4\')" style="padding:6px 10px">4/4</button>';
   h+='<button class="slope-btn'+(timeSig==='6/8'?' active':'')+'" onclick="setTimeSig(\'6/8\')" style="padding:6px 10px">6/8</button>';
-  h+='<span style="flex:1"></span>';
-  h+='<span class="slope-label" style="margin-left:8px">Click</span>';
-  h+='<button class="slope-btn'+(clickRateX2?' active':'')+'" onclick="toggleClickX2();buildEditSheet()" style="padding:6px 10px">x2</button>';
+  h+='</div>';
+  h+='<div class="slope-row" style="justify-content:center;gap:8px;margin-top:8px">';
+  h+='<button id="clickBtnMenu" class="evolve-pill '+(clickMuted?'off':'on')+'" onclick="toggleClick()">Click</button>';
+  h+='<button id="clickX2BtnMenu" class="evolve-pill '+(clickRateX2?'on':'off')+'" onclick="toggleClickX2()" style="padding:8px 14px;letter-spacing:1.5px">x2</button>';
   h+='</div>';
   h+='<div class="bpm-row" style="justify-content:center;margin:12px 0 4px"><button class="bpm-nudge" onclick="setBPM(clickBPM-1)">−</button><button class="bpm-tap-main" onclick="tapTempo()" style="flex:1;max-width:120px;margin:0 8px"><span id="bpmMenuDisplay">'+clickBPM+'</span><span class="bpm-tap-label">BPM · TAP</span></button><button class="bpm-nudge" onclick="setBPM(clickBPM+1)">+</button></div>';
   h+='</div><div class="edit-divider"></div>';
@@ -1644,11 +1646,13 @@ function fireClick(t){
   const beat=clickBeat++;
   const beatsPerBar=timeSig==='6/8'?3:4;
   const isDown=(beat%(evolveBars*beatsPerBar))===0;
+  const isBarStart=(beat%beatsPerBar)===0;
   if(!clickMuted&&!_fadeActive&&!audioPaused){
     const osc=ctx.createOscillator();const env=ctx.createGain();
-    osc.type='sine';osc.frequency.value=1200;
-    env.gain.setValueAtTime(0.32,t);env.gain.exponentialRampToValueAtTime(0.001,t+0.018);
-    osc.connect(env);env.connect(clickOutBus||ctx.destination);osc.start(t);osc.stop(t+0.025);osc.onended=()=>{try{osc.disconnect();env.disconnect()}catch(e){}};
+    osc.type='sine';osc.frequency.value=isBarStart?1700:1200;
+    const pk=isBarStart?0.46:0.30;const dec=isBarStart?0.028:0.018;
+    env.gain.setValueAtTime(pk,t);env.gain.exponentialRampToValueAtTime(0.001,t+dec);
+    osc.connect(env);env.connect(clickOutBus||ctx.destination);osc.start(t);osc.stop(t+dec+0.01);osc.onended=()=>{try{osc.disconnect();env.disconnect()}catch(e){}};
     // x2: extra click on the "and" of each beat (half-tempo subdivision)
     if(clickRateX2){
       const t2=t+30/clickBPM;
@@ -1726,11 +1730,15 @@ function fireClick(t){
 function toggleClick(){
   if(!ctx)return;
   clickMuted=!clickMuted;
-  const btn=document.getElementById('clickBtn');if(btn){btn.className='evolve-pill '+(clickMuted?'off':'on');}
+  const cls='evolve-pill '+(clickMuted?'off':'on');
+  const btn=document.getElementById('clickBtn');if(btn)btn.className=cls;
+  const btnM=document.getElementById('clickBtnMenu');if(btnM)btnM.className=cls;
 }
 function toggleClickX2(){
   clickRateX2=!clickRateX2;
-  const btn=document.getElementById('clickX2Btn');if(btn){btn.className='evolve-pill '+(clickRateX2?'on':'off');}
+  const cls='evolve-pill '+(clickRateX2?'on':'off');
+  const btn=document.getElementById('clickX2Btn');if(btn)btn.className=cls;
+  const btnM=document.getElementById('clickX2BtnMenu');if(btnM)btnM.className=cls;
   saveSettings();
 }
 function setTimeSig(t){timeSig=t;movementStep=0;saveSettings();buildEditSheet();}
