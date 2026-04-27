@@ -166,7 +166,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v0.76</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v0.77</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -204,7 +204,7 @@
       <button class="bpm-tap-main" id="bpmTapMain" onclick="tapTempo()" title="Tap for BPM"><span id="bpmDisplay">70</span><span class="bpm-tap-label">BPM</span></button>
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
     </div>
-    <div class="app-version">v0.76</div>
+    <div class="app-version">v0.77</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -257,30 +257,30 @@ let widthPanner=null,widthLFOGain=null;
 let reverbModWet=null,reverbModLGain=null,reverbModRGain=null;
 let globalLPF,globalHPF,globalLPF2,globalHPF2,eqLowNode,eqLoMidNode,eqHiMidNode,eqHighNode;
 let lpfQ=0.7,hpfQ=0.7,lpfSlope=12,hpfSlope=12;
-let eqLowGain=0,eqLoMidGain=0,eqHiMidGain=0,eqHighGain=0;
-let chorusGainNode=null,chorusMix=0;
+let eqLowGain=0,eqLoMidGain=-0.6,eqHiMidGain=-2.0,eqHighGain=1.4;
+let chorusGainNode=null,chorusMix=0.35;
 let dulcimerBuf=null; // decoded audio buffer
-let homeRoot="C",evolving=true,evolveSpeed=0.5,currentEvolve=0;
+let homeRoot="C",evolving=true,evolveSpeed=0.5,currentEvolve=6;
 let delayTimeVal=DELAY_Q;
-let lpfValue=0.7,hpfValue=0;
-let reverbMix=0.6,reverbSize=0.78,reverbMod=0.5,delayMixVal=0.1,delayFeedback=0.4,delayTone=0.5,masterVol=0.5,satAmt=0;
-let textureOctUp=true,foundationSubOct=false;
-let widthMod=0;
-let arpVol=0,arpRate=0.5,arpOct=0,arpVoice='juno',arpStep=0,arpTimer=null;
+let lpfValue=0.897,hpfValue=0;
+let reverbMix=0.71,reverbSize=0.87,reverbMod=0.74,delayMixVal=0.46,delayFeedback=0.57,delayTone=1.0,masterVol=0.5,satAmt=0;
+let textureOctUp=true,foundationSubOct=true;
+let widthMod=0.39;
+let arpVol=0.14,arpRate=0.125,arpOct=0,arpVoice='soft',arpStep=0,arpTimer=null;
 let limiter=null,clickOutBus=null,arpRevSend=null,satDriveNode=null,satCompNode=null;
-let clickBPM=70,clickActive=false,clickMuted=true,clickNextTime=0,clickSchedId=null,clickBeat=0;
-let delaySync=true,delaySyncDiv='q';
-let evolveOnBeat=true,evolveBars=4,pendingEvolve=-1;
+let clickBPM=140,clickActive=false,clickMuted=true,clickNextTime=0,clickSchedId=null,clickBeat=0;
+let delaySync=true,delaySyncDiv='1/8.';
+let evolveOnBeat=true,evolveBars=8,pendingEvolve=-1;
 let multiOutActive=false,_multiOutMerger=null,_multiOutSplitter=null;
 let staticNodes={},evolveNodes={},layerState={};
-let shimmerGainNode=null,shimmerVol=0;
+let shimmerGainNode=null,shimmerVol=0.07;
 let granularTimers={},granularGain=null,reversedBuf=null;
 let evolveTimer=null,animFrame=null;
 let currentPresetName=null;
 let audioPaused=false;
 let enabledEvolveIdx=new Set([0,1,2,3,4,5,6,7,8,9]);
 
-const DEFAULT_VOLUMES={foundation:0.55,pads:0.45,texture:0.3};
+const DEFAULT_VOLUMES={foundation:0.55,pads:0.5,texture:0.85};
 PAD_LAYERS.forEach(l=>{layerState[l.id]={active:true,volume:DEFAULT_VOLUMES[l.id]??0}});
 loadSettings();
 
@@ -1153,10 +1153,10 @@ function buildEditSheet(){
     });
   });
   // Wire Effects sliders
-  wireSR(c,'rev',r=>{reverbMix=r;reverbGain.gain.value=r;dryGain.gain.value=1-r*0.35;return Math.round(r*100)+'%'});
+  wireSR(c,'rev',r=>{reverbMix=r;reverbGain.gain.linearRampToValueAtTime(r,ctx.currentTime+0.05);dryGain.gain.linearRampToValueAtTime(1-r*0.35,ctx.currentTime+0.05);return Math.round(r*100)+'%'});
   wireSR(c,'rvSz',r=>{reverbSize=r;if(reverb&&reverb.fbGain)reverb.fbGain.gain.linearRampToValueAtTime(reverbSizeToFB(r),ctx.currentTime+0.1);const secs=(r*11.5+0.5).toFixed(1);return secs+'s'});
   wireSR(c,'rvMod',r=>{reverbMod=r;if(reverb&&reverb.apMods)reverb.apMods.forEach((lg,i)=>{lg.gain.linearRampToValueAtTime((0.0003+i*0.00015)*r,ctx.currentTime+0.1)});if(reverbModWet)reverbModWet.gain.linearRampToValueAtTime(r*0.5,ctx.currentTime+0.1);if(reverbModLGain)reverbModLGain.gain.linearRampToValueAtTime(0.001*r,ctx.currentTime+0.1);if(reverbModRGain)reverbModRGain.gain.linearRampToValueAtTime(0.001*r,ctx.currentTime+0.1);return Math.round(r*100)+'%'});
-  wireSR(c,'dly',r=>{delayMixVal=r;delayGainN.gain.value=r*0.7;return Math.round(r*100)+'%'});
+  wireSR(c,'dly',r=>{delayMixVal=r;delayGainN.gain.linearRampToValueAtTime(r*0.7,ctx.currentTime+0.05);return Math.round(r*100)+'%'});
   wireSR(c,'dlyFB',r=>{delayFeedback=r*0.85;if(delayFB)delayFB.gain.linearRampToValueAtTime(delayFeedback,ctx.currentTime+0.1);return Math.round(r*100)+'%'});
   wireSR(c,'dlyT',r=>{delayTimeVal=0.05*Math.pow(2.0/0.05,r);if(delayNode&&!delaySync)delayNode.delayTime.linearRampToValueAtTime(delayTimeVal,ctx.currentTime+0.1);return Math.round(delayTimeVal*1000)+'ms'});
   wireSR(c,'dlyTone',r=>{delayTone=r;if(dToneNode)dToneNode.gain.linearRampToValueAtTime((r-0.5)*24,ctx.currentTime+0.05);return r<0.42?'Dark':r>0.58?'Bright':'Neutral'});
