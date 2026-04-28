@@ -166,7 +166,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v0.98</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v0.99</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -205,7 +205,7 @@
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
       <button id="clickX2Btn" class="evolve-pill off" onclick="toggleClickX2()" style="padding:8px 10px;font-size:9px;letter-spacing:1px">x2</button>
     </div>
-    <div class="app-version">v0.98</div>
+    <div class="app-version">v0.99</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -1066,7 +1066,7 @@ function setMovementPattern(p){movementPattern=p;movementStep=0;saveSettings();b
 
 // ─── FILTER MATH ───
 function dampFaderToHz(v){return Math.exp(Math.log(800)+v*(Math.log(8000)-Math.log(800)))}
-function reverbSizeToFB(v){return 0.5+v*0.45}
+function reverbSizeToFB(v){return Math.pow(10,-1.5/(1+v*19))}
 // Rebuild the WaveShaper curve for the given saturation amount.
 // At amt=0 the curve is identity (no coloration). At amt=1 it's tanh(x*2.5)/tanh(2.5).
 function buildSatCurve(amt){
@@ -1279,7 +1279,7 @@ function buildEditSheet(){
   h+='</div><div class="edit-divider"></div>';
   // ── Effects ──
   const rvSz=reverbSize;
-  const rvSzSecs=Math.round(-3*0.5/Math.log10(reverbSizeToFB(rvSz)))+'s';
+  const rvSzSecs=Math.round(1+rvSz*19)+'s';
   h+='<div class="edit-section">';
   h+='<div class="fx-section-header" style="background:rgba(106,159,216,0.08);border-left:3px solid #6a9fd8">Reverb</div>';
   h+=sliderRowHTML('rev','Mix','#6a9fd8',reverbMix,Math.round(reverbMix*100)+'%');
@@ -1419,7 +1419,7 @@ function buildEditSheet(){
   });
   // Wire Effects sliders
   wireSR(c,'rev',r=>{reverbMix=r;reverbGain.gain.linearRampToValueAtTime(r,ctx.currentTime+0.05);dryGain.gain.linearRampToValueAtTime(1-r,ctx.currentTime+0.05);if(reverbModWet)reverbModWet.gain.linearRampToValueAtTime(reverbMod*0.7*r,ctx.currentTime+0.05);return Math.round(r*100)+'%'});
-  wireSR(c,'rvSz',r=>{reverbSize=r;if(reverb&&reverb.fbGain)reverb.fbGain.gain.linearRampToValueAtTime(reverbSizeToFB(r),ctx.currentTime+0.1);const rt60=Math.round(-3*0.5/Math.log10(reverbSizeToFB(r)));return rt60+'s'});
+  wireSR(c,'rvSz',r=>{reverbSize=r;if(reverb&&reverb.fbGain)reverb.fbGain.gain.linearRampToValueAtTime(reverbSizeToFB(r),ctx.currentTime+0.1);return Math.round(1+r*19)+'s'});
   wireSR(c,'rvMod',r=>{reverbMod=r;if(reverb&&reverb.excDepth){reverb.excDepth.linearRampToValueAtTime(r*1.5,ctx.currentTime+0.1);reverb.excRate.linearRampToValueAtTime(0.3+r*1.7,ctx.currentTime+0.1);}if(reverbModWet)reverbModWet.gain.linearRampToValueAtTime(r*0.7*reverbMix,ctx.currentTime+0.1);if(reverbModLGain)reverbModLGain.gain.linearRampToValueAtTime(0.0025*r,ctx.currentTime+0.1);if(reverbModRGain)reverbModRGain.gain.linearRampToValueAtTime(0.0025*r,ctx.currentTime+0.1);return Math.round(r*100)+'%'});
   wireSR(c,'dly',r=>{delayMixVal=r;delayGainN.gain.linearRampToValueAtTime(r*0.7,ctx.currentTime+0.05);if(_drumDelaySend)_drumDelaySend.gain.linearRampToValueAtTime(r*1.5,ctx.currentTime+0.05);return Math.round(r*100)+'%'});
   wireSR(c,'dlyFB',r=>{delayFeedback=r*0.85;if(delayFB)delayFB.gain.linearRampToValueAtTime(delayFeedback,ctx.currentTime+0.1);return Math.round(r*100)+'%'});
