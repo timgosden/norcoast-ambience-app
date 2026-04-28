@@ -833,11 +833,18 @@ function _arpExtraOct(){
   if(bar%16!==15) return 0;
   return (Math.floor(bar/16)%2===0) ? 1 : -1;
 }
+function getArpVoicing(semis){
+  // Always returns exactly 3 semitones regardless of chord type.
+  // Single-interval chords get root → interval → octave.
+  // Multi-interval chords get low → high → low+octave.
+  if(semis.length===1)return[0,semis[0],12];
+  return[semis[0],semis[semis.length-1],semis[0]+12];
+}
 function fireArpNote(){
   if(!ctx||!waves||arpVol<=0)return;
-  const chordSemis=CHORD_TYPES[currentEvolve].semis;
-  const semitone=chordSemis[arpStep%chordSemis.length];
-  const octShift=Math.floor(arpStep/chordSemis.length)%2;
+  const voicing=getArpVoicing(CHORD_TYPES[currentEvolve].semis);
+  const semitone=voicing[arpStep%3];
+  const octShift=Math.floor(arpStep/3)%2;
   const extraOct=_arpExtraOct();
   const freq=semiFreq(noteFreq(homeRoot,ROOT_OCT+1+octShift+arpOct+extraOct),semitone);
   const noteDur=arpRate*_arpBarSec();
