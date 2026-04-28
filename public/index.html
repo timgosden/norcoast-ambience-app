@@ -166,7 +166,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.07</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.08</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -205,7 +205,7 @@
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
       <button id="clickX2Btn" class="evolve-pill off" onclick="toggleClickX2()" style="padding:8px 10px;font-size:9px;letter-spacing:1px">x2</button>
     </div>
-    <div class="app-version">v1.07</div>
+    <div class="app-version">v1.08</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -1173,37 +1173,55 @@ function toggleChord(i){
 function setMode(easy){easyMode=easy;saveSettings();buildEditSheet();}
 function randomise(){
   if(!ctx)return;
-  // Swap 1-3 chords — remove some, add some back from disabled pool
+  // ── Chords: swap 2-4, always evolve to a fresh chord ──
   const enabled=[...enabledEvolveIdx];
   const disabled=CHORD_TYPES.map((_,i)=>i).filter(i=>!enabledEvolveIdx.has(i));
   if(enabled.length>1&&disabled.length>0){
     for(let i=enabled.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[enabled[i],enabled[j]]=[enabled[j],enabled[i]];}
     for(let i=disabled.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[disabled[i],disabled[j]]=[disabled[j],disabled[i]];}
-    const swapCount=Math.min(1+Math.floor(Math.random()*3),enabled.length-1,disabled.length);
+    const swapCount=Math.min(2+Math.floor(Math.random()*3),enabled.length-1,disabled.length);
     for(let i=0;i<swapCount;i++)enabledEvolveIdx.delete(enabled[i]);
     for(let i=0;i<swapCount;i++)enabledEvolveIdx.add(disabled[i]);
-    if(!enabledEvolveIdx.has(currentEvolve)){const a=[...enabledEvolveIdx];currentEvolve=a[Math.floor(Math.random()*a.length)];evolveVoice(currentEvolve);document.getElementById('stateEvolve').textContent=CHORD_TYPES[currentEvolve].name;}
   }
-  // Randomise all FX within musical ranges
-  const t=ctx.currentTime+0.4;
-  reverbMix=0.55+Math.random()*0.4;
-  reverbGain.gain.linearRampToValueAtTime(reverbMix,t);
-  dryGain.gain.linearRampToValueAtTime(1-reverbMix,t);
+  const avail=[...enabledEvolveIdx];
+  currentEvolve=avail[Math.floor(Math.random()*avail.length)];
+  evolveVoice(currentEvolve);
+  document.getElementById('stateEvolve').textContent=CHORD_TYPES[currentEvolve].name;
+  // ── FX: wider, more extreme ranges ──
+  const t=ctx.currentTime+0.5;
+  reverbMix=0.35+Math.random()*0.65;
+  reverbGain.gain.linearRampToValueAtTime(reverbMix,t);dryGain.gain.linearRampToValueAtTime(1-reverbMix,t);
   if(reverbModWet)reverbModWet.gain.linearRampToValueAtTime(reverbMod*0.7*reverbMix,t);
-  reverbSize=0.4+Math.random()*0.6;
+  reverbSize=0.25+Math.random()*0.75;
   if(reverb&&reverb.fbGain)reverb.fbGain.gain.linearRampToValueAtTime(reverbSizeToFB(reverbSize),t);
-  const newShim=Math.random()*0.22;const wasShim=shimmerVol;shimmerVol=newShim;
+  const newShim=Math.random()*0.4;const wasShim=shimmerVol;shimmerVol=newShim;
   if(newShim>0&&wasShim===0)startShimmer(newShim);else if(newShim<=0)stopShimmer();else if(shimmerNode)shimmerNode.output.gain.linearRampToValueAtTime(newShim*1.5,t);
-  delayMixVal=0.1+Math.random()*0.5;
+  delayMixVal=Math.random()*0.75;
   if(delayGainN)delayGainN.gain.linearRampToValueAtTime(delayMixVal*0.7,t);
   if(_drumDelaySend)_drumDelaySend.gain.linearRampToValueAtTime(delayMixVal*1.5,t);
-  chorusMix=0.1+Math.random()*0.7;
+  chorusMix=Math.random()*0.9;
   if(chorusGainNode)chorusGainNode.gain.linearRampToValueAtTime(chorusMix*0.5,t);
-  lpfValue=0.6+Math.random()*0.4;
+  lpfValue=0.35+Math.random()*0.65;
   const hz=lpfFaderToHz(lpfValue);
   if(globalLPF)globalLPF.frequency.linearRampToValueAtTime(hz,t);
   if(globalLPF2&&lpfSlope===24)globalLPF2.frequency.linearRampToValueAtTime(hz,t);
   if(_drumLPF)_drumLPF.frequency.linearRampToValueAtTime(hz,t);
+  // ── Layers: random volumes, guarantee foundation or pads is audible ──
+  const rV=(a,b)=>a+Math.random()*(b-a);
+  const applyL=(l,v)=>{
+    const wasZ=layerState[l.id].volume<=0;layerState[l.id].volume=v;
+    if(l.type==='granular'){if(v>0&&wasZ)startGranular(v);else if(v<=0)stopGranular();else if(granularGain)granularGain.gain.linearRampToValueAtTime(v*0.8,ctx.currentTime+ATTACK);}
+    else{if(v>0&&wasZ)startPad(l,v,homeRoot,currentEvolve);else if(v<=0)stopPad(l.id);else{const rt=ctx.currentTime+ATTACK;if(staticNodes[l.id]){staticNodes[l.id].gain.gain.linearRampToValueAtTime(v,rt);if(staticNodes[l.id].ampMod)staticNodes[l.id].ampMod.gain.linearRampToValueAtTime(l.aMod*v,rt);}if(evolveNodes[l.id]){evolveNodes[l.id].gain.gain.linearRampToValueAtTime(v,rt);if(evolveNodes[l.id].ampMod)evolveNodes[l.id].ampMod.gain.linearRampToValueAtTime(l.aMod*v,rt);}}}
+  };
+  let vF=Math.random()<0.65?rV(0.25,0.85):0;
+  let vP=Math.random()<0.75?rV(0.15,0.75):0;
+  if(vF<=0&&vP<=0){Math.random()<0.5?vF=rV(0.35,0.7):vP=rV(0.35,0.7);}
+  const fL=PAD_LAYERS.find(l=>l.id==='foundation');const pL=PAD_LAYERS.find(l=>l.id==='pads');const tL=PAD_LAYERS.find(l=>l.id==='texture');
+  if(fL)applyL(fL,vF);if(pL)applyL(pL,vP);if(tL)applyL(tL,Math.random()<0.45?rV(0.15,0.65):0);
+  const wasArpZ=arpVol<=0;arpVol=Math.random()<0.35?rV(0.1,0.55):0;
+  if(arpVol>0&&wasArpZ)startArp();else if(arpVol<=0)stopArp();
+  const wasMvZ=movementVol<=0;movementVol=Math.random()<0.35?rV(0.15,0.55):0;
+  if(movementVol>0&&wasMvZ)startMovement();else if(movementVol<=0)stopMovement();
   saveSettings();buildEditSheet();
 }
 function buildEditSheet(){
