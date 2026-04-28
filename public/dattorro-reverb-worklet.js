@@ -73,8 +73,8 @@ class DattorroReverb extends AudioWorkletProcessor {
   readDelayCAt(index, i) {
     const d = this._Delays[index],
           frac = i - ~~i,
-          int  = ~~i + d[2] - 1,
           mask = d[3];
+    let int = ~~i + d[2] - 1;
     const x0 = d[0][int++ & mask],
           x1 = d[0][int++ & mask],
           x2 = d[0][int++ & mask],
