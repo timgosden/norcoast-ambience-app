@@ -166,7 +166,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.0</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.01</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -205,7 +205,7 @@
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
       <button id="clickX2Btn" class="evolve-pill off" onclick="toggleClickX2()" style="padding:8px 10px;font-size:9px;letter-spacing:1px">x2</button>
     </div>
-    <div class="app-version">v1.0</div>
+    <div class="app-version">v1.01</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -685,13 +685,26 @@ function createShimmerReverb(){
   let pitchNode=null;
   try{pitchNode=new AudioWorkletNode(ctx,'pitch-shifter');}catch(e){}
   if(pitchNode){
-    // HPF stops bass buildup. LPF stops harsh top-end stacking from repeated shifts.
+    // HPF stops bass buildup. LPF tames the harsh top-end that stacks from
+    // repeated +12 shifts. Chorus after pitch-shift micropitches the cascade
+    // so each pass detunes slightly — prevents the "stacked sine" glitchiness.
     const fbHPF=ctx.createBiquadFilter();fbHPF.type='highpass';fbHPF.frequency.value=180;fbHPF.Q.value=0.5;
-    const fbLPF=ctx.createBiquadFilter();fbLPF.type='lowpass';fbLPF.frequency.value=5500;fbLPF.Q.value=0.5;
+    const fbLPF=ctx.createBiquadFilter();fbLPF.type='lowpass';fbLPF.frequency.value=5000;fbLPF.Q.value=0.5;
     const fbGain=ctx.createGain();fbGain.gain.value=0.62;
+    // Juno-style chorus: dry + modulated delay parallel paths
+    const chMix=ctx.createGain();
+    const chDry=ctx.createGain();chDry.gain.value=0.6;
+    const chWet=ctx.createGain();chWet.gain.value=0.4;
+    const chDelay=ctx.createDelay(0.05);chDelay.delayTime.value=0.014;
+    const chLFO=ctx.createOscillator();chLFO.type='sine';chLFO.frequency.value=0.83;
+    const chLFOG=ctx.createGain();chLFOG.gain.value=0.0035;
+    chLFO.connect(chLFOG);chLFOG.connect(chDelay.delayTime);chLFO.start();
+    // Wire: reverb tap → fbGain → HPF → LPF → pitch+12 → [dry + chorused] → reverb input
     reverb.connect(fbGain);
     fbGain.connect(fbHPF);fbHPF.connect(fbLPF);fbLPF.connect(pitchNode);
-    pitchNode.connect(reverb);
+    pitchNode.connect(chDry);chDry.connect(chMix);
+    pitchNode.connect(chDelay);chDelay.connect(chWet);chWet.connect(chMix);
+    chMix.connect(reverb);
   }
   // Haas stereo spread on the dry-tap output
   const dL=ctx.createDelay(0.05);dL.delayTime.value=0.011;
