@@ -1,5 +1,5 @@
-const CACHE = 'norcoast-v103';
-const PRECACHE = ['./', './manifest.json', './icons/icon.svg', './icons/icon-maskable.svg', './pitch-shifter-worklet.js', './dattorro-reverb-worklet.js', './phase-vocoder-worklet.js'];
+const CACHE = 'norcoast-v104';
+const PRECACHE = ['./', './manifest.json', './icons/icon.svg', './icons/icon-maskable.svg', './dattorro-reverb-worklet.js', './phase-vocoder-worklet.js'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(PRECACHE)));

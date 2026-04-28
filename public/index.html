@@ -166,7 +166,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.03</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.04</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -205,7 +205,7 @@
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
       <button id="clickX2Btn" class="evolve-pill off" onclick="toggleClickX2()" style="padding:8px 10px;font-size:9px;letter-spacing:1px">x2</button>
     </div>
-    <div class="app-version">v1.03</div>
+    <div class="app-version">v1.04</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -697,7 +697,7 @@ function createShimmerReverb(){
     // micropitches each cascade so passes detune slightly — anti-stacking.
     const fbHPF=ctx.createBiquadFilter();fbHPF.type='highpass';fbHPF.frequency.value=180;fbHPF.Q.value=0.5;
     const fbLPF=ctx.createBiquadFilter();fbLPF.type='lowpass';fbLPF.frequency.value=6500;fbLPF.Q.value=0.5;
-    const fbGain=ctx.createGain();fbGain.gain.value=0.62;
+    const fbGain=ctx.createGain();fbGain.gain.value=0.75;
     // Juno-style chorus: dry + modulated delay parallel paths
     const chMix=ctx.createGain();
     const chDry=ctx.createGain();chDry.gain.value=0.6;
@@ -727,7 +727,7 @@ function startShimmer(vol){
   shimmerGainNode=shimmerNode.output;
   shimmerGainNode.gain.cancelScheduledValues(ctx.currentTime);
   shimmerGainNode.gain.setValueAtTime(shimmerGainNode.gain.value,ctx.currentTime);
-  shimmerGainNode.gain.linearRampToValueAtTime(vol*0.28,ctx.currentTime+ATTACK*2);
+  shimmerGainNode.gain.linearRampToValueAtTime(vol*1.5,ctx.currentTime+ATTACK*2);
 }
 function stopShimmer(){
   if(!shimmerNode)return;
@@ -1014,7 +1014,7 @@ function reverbSizeToFB(v){return Math.pow(10,-1.5/(1+v*19))}
 function buildSatCurve(amt){
   const c=new Float32Array(512);
   if(amt<0.005){for(let i=0;i<512;i++)c[i]=(i*2/511)-1;}
-  else{const k=amt*5.0;const n=Math.tanh(k);for(let i=0;i<512;i++){const x=(i*2/511)-1;c[i]=Math.tanh(x*k)/n;}}
+  else{const k=amt*3.5;const n=Math.tanh(k);for(let i=0;i<512;i++){const x=(i*2/511)-1;c[i]=Math.tanh(x*k)/n;}}
   return c;
 }
 function lpfFaderToHz(v){return Math.exp(Math.log(100)+v*v*(Math.log(20000)-Math.log(100)))}
@@ -1367,7 +1367,7 @@ function buildEditSheet(){
   wireSR(c,'dlyFB',r=>{delayFeedback=r*0.85;if(delayFB)delayFB.gain.linearRampToValueAtTime(delayFeedback,ctx.currentTime+0.1);return Math.round(r*100)+'%'});
   wireSR(c,'dlyT',r=>{delayTimeVal=0.05*Math.pow(2.0/0.05,r);if(delayNode&&!delaySync)delayNode.delayTime.linearRampToValueAtTime(delayTimeVal,ctx.currentTime+0.1);return Math.round(delayTimeVal*1000)+'ms'});
   wireSR(c,'dlyTone',r=>{delayTone=r;if(dToneNode)dToneNode.gain.linearRampToValueAtTime((r-0.5)*24,ctx.currentTime+0.05);return r<0.42?'Dark':r>0.58?'Bright':'Neutral'});
-  wireSR(c,'shm',r=>{const v=r*0.5;const was=shimmerVol;shimmerVol=v;if(v>0&&was===0)startShimmer(v);else if(v<=0)stopShimmer();else if(shimmerNode){shimmerNode.output.gain.cancelScheduledValues(ctx.currentTime);shimmerNode.output.gain.setValueAtTime(shimmerNode.output.gain.value,ctx.currentTime);shimmerNode.output.gain.linearRampToValueAtTime(v*0.28,ctx.currentTime+0.15);}return Math.round(r*100)+'%'});
+  wireSR(c,'shm',r=>{const v=r*0.5;const was=shimmerVol;shimmerVol=v;if(v>0&&was===0)startShimmer(v);else if(v<=0)stopShimmer();else if(shimmerNode){shimmerNode.output.gain.cancelScheduledValues(ctx.currentTime);shimmerNode.output.gain.setValueAtTime(shimmerNode.output.gain.value,ctx.currentTime);shimmerNode.output.gain.linearRampToValueAtTime(v*1.5,ctx.currentTime+0.15);}return Math.round(r*100)+'%'});
   wireSR(c,'wid',r=>{widthMod=r;if(widthLFOGain)widthLFOGain.gain.linearRampToValueAtTime(r*0.5,ctx.currentTime+0.1);return Math.round(r*100)+'%'});
   wireSR(c,'chr',r=>{chorusMix=r;if(chorusGainNode)chorusGainNode.gain.linearRampToValueAtTime(r*0.5,ctx.currentTime+0.1);return Math.round(r*100)+'%'});
   // Wire Tone sliders
@@ -1875,7 +1875,7 @@ function applyMidiParam(id,val){
     case'dlyTone':delayTone=val;if(dToneNode)dToneNode.gain.linearRampToValueAtTime((val-0.5)*24,ctx.currentTime+0.05);break;
     case'chr':chorusMix=val;if(chorusGainNode)chorusGainNode.gain.linearRampToValueAtTime(val*0.5,ctx.currentTime+0.1);break;
     case'wid':widthMod=val;if(widthLFOGain)widthLFOGain.gain.linearRampToValueAtTime(val*0.5,ctx.currentTime+0.1);break;
-    case'shm':{const v=val*0.5;const wasS=shimmerVol;shimmerVol=v;if(v>0&&wasS===0)startShimmer(v);else if(v<=0)stopShimmer();else if(shimmerNode)shimmerNode.output.gain.linearRampToValueAtTime(v*0.28,ctx.currentTime+0.1);break}
+    case'shm':{const v=val*0.5;const wasS=shimmerVol;shimmerVol=v;if(v>0&&wasS===0)startShimmer(v);else if(v<=0)stopShimmer();else if(shimmerNode)shimmerNode.output.gain.linearRampToValueAtTime(v*1.5,ctx.currentTime+0.1);break}
     case'lpf':lpfValue=val;{const hz=lpfFaderToHz(val);if(globalLPF){globalLPF.frequency.linearRampToValueAtTime(hz,ctx.currentTime+0.1);if(globalLPF2&&lpfSlope===24)globalLPF2.frequency.linearRampToValueAtTime(hz,ctx.currentTime+0.1)}if(_drumLPF)_drumLPF.frequency.linearRampToValueAtTime(hz,ctx.currentTime+0.1)}break;
     case'hpf':hpfValue=val;{const hz=hpfFaderToHz(val);if(globalHPF){globalHPF.frequency.linearRampToValueAtTime(hz,ctx.currentTime+0.1);if(globalHPF2&&hpfSlope===24)globalHPF2.frequency.linearRampToValueAtTime(hz,ctx.currentTime+0.1)}if(_drumHPF)_drumHPF.frequency.linearRampToValueAtTime(hz,ctx.currentTime+0.1)}break;
     case'spd':evolveSpeed=faderToVol(val);break;
@@ -1933,7 +1933,7 @@ function handleMIDI(msg){
       21:r=>{lpfValue=r;const hz21=lpfFaderToHz(r);if(globalLPF){globalLPF.frequency.linearRampToValueAtTime(hz21,ctx.currentTime+0.05);if(globalLPF2&&lpfSlope===24)globalLPF2.frequency.linearRampToValueAtTime(hz21,ctx.currentTime+0.05)}if(_drumLPF)_drumLPF.frequency.linearRampToValueAtTime(hz21,ctx.currentTime+0.05)},
       22:r=>{hpfValue=r;const hz22=hpfFaderToHz(r);if(globalHPF){globalHPF.frequency.linearRampToValueAtTime(hz22,ctx.currentTime+0.05);if(globalHPF2&&hpfSlope===24)globalHPF2.frequency.linearRampToValueAtTime(hz22,ctx.currentTime+0.05)}if(_drumHPF)_drumHPF.frequency.linearRampToValueAtTime(hz22,ctx.currentTime+0.05)},
       23:r=>{delayMixVal=r;if(delayGainN)delayGainN.gain.value=r*0.7;if(_drumDelaySend)_drumDelaySend.gain.value=r*1.5},
-      24:r=>{const v=r*0.5;const was=shimmerVol;shimmerVol=v;if(v>0&&was===0)startShimmer(v);else if(v<=0)stopShimmer();else if(shimmerNode)shimmerNode.output.gain.linearRampToValueAtTime(v*0.28,ctx.currentTime+0.1)},
+      24:r=>{const v=r*0.5;const was=shimmerVol;shimmerVol=v;if(v>0&&was===0)startShimmer(v);else if(v<=0)stopShimmer();else if(shimmerNode)shimmerNode.output.gain.linearRampToValueAtTime(v*1.5,ctx.currentTime+0.1)},
       26:r=>{chorusMix=r;if(chorusGainNode)chorusGainNode.gain.linearRampToValueAtTime(chorusMix*0.5,ctx.currentTime+0.05)},
       27:r=>{reverbSize=r;if(reverb&&reverb.fbGain)reverb.fbGain.gain.linearRampToValueAtTime(reverbSizeToFB(r),ctx.currentTime+0.1)},
       28:r=>{delayFeedback=r*0.85;if(delayFB)delayFB.gain.linearRampToValueAtTime(delayFeedback,ctx.currentTime+0.1)},
