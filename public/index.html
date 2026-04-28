@@ -233,7 +233,7 @@ const CHORD_TYPES=[
   {name:"Sus2",     semis:[2,7],      weight:4},
   {name:"Sus4",     semis:[5,7],      weight:3},
   {name:"5th+Oct",  semis:[7,12],     weight:3},
-  {name:"Maj7th",   semis:[11],       weight:3},
+  {name:"Maj7th",   semis:[11],       weight:3, voicing:[0,7,11]},
   {name:"5th+9th",  semis:[7,14],     weight:3},
   {name:"6th",      semis:[9],        weight:2},
   {name:"5th+Maj7", semis:[7,11],     weight:2},
@@ -833,16 +833,15 @@ function _arpExtraOct(){
   if(bar%16!==15) return 0;
   return (Math.floor(bar/16)%2===0) ? 1 : -1;
 }
-function getArpVoicing(semis){
-  // Always returns exactly 3 semitones regardless of chord type.
-  // Single-interval chords get root → interval → octave.
-  // Multi-interval chords get low → high → low+octave.
+function getArpVoicing(chord){
+  if(chord.voicing)return chord.voicing;
+  const semis=chord.semis;
   if(semis.length===1)return[0,semis[0],12];
   return[semis[0],semis[semis.length-1],semis[0]+12];
 }
 function fireArpNote(){
   if(!ctx||!waves||arpVol<=0)return;
-  const voicing=getArpVoicing(CHORD_TYPES[currentEvolve].semis);
+  const voicing=getArpVoicing(CHORD_TYPES[currentEvolve]);
   const semitone=voicing[arpStep%3];
   const octShift=Math.floor(arpStep/3)%2;
   const extraOct=_arpExtraOct();
