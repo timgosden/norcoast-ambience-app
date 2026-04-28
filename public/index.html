@@ -166,7 +166,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.08</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.09</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -205,7 +205,7 @@
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
       <button id="clickX2Btn" class="evolve-pill off" onclick="toggleClickX2()" style="padding:8px 10px;font-size:9px;letter-spacing:1px">x2</button>
     </div>
-    <div class="app-version">v1.08</div>
+    <div class="app-version">v1.09</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -1199,6 +1199,7 @@ function randomise(){
   delayMixVal=Math.random()*0.75;
   if(delayGainN)delayGainN.gain.linearRampToValueAtTime(delayMixVal*0.7,t);
   if(_drumDelaySend)_drumDelaySend.gain.linearRampToValueAtTime(delayMixVal*1.5,t);
+  if(!delaySync){delayTimeVal=0.05*Math.pow(2.0/0.05,Math.random());if(delayNode)delayNode.delayTime.linearRampToValueAtTime(delayTimeVal,t);}
   chorusMix=Math.random()*0.9;
   if(chorusGainNode)chorusGainNode.gain.linearRampToValueAtTime(chorusMix*0.5,t);
   lpfValue=0.35+Math.random()*0.65;
@@ -1242,7 +1243,7 @@ function buildEditSheet(){
     h+='<span class="edit-layer-name" style="color:'+(on?'rgba(255,255,255,0.8)':'rgba(255,255,255,0.35)')+'">'+l.name+'</span>';
     h+='<input type="range" min="0" max="1" step="0.003" value="'+fPos+'" data-lid="'+l.id+'" style="background:linear-gradient(to right,'+l.color+'55 '+fPos*100+'%,rgba(255,255,255,0.06) '+fPos*100+'%);accent-color:'+l.color+'">';
     if(l.id==='texture')h+='<button class="slope-btn'+(textureOctUp?' active':'')+'" onclick="toggleTextureOct()" style="flex-shrink:0;padding:4px 8px;font-size:10px;'+(textureOctUp?'background:rgba(196,145,94,0.15);border-color:rgba(196,145,94,0.4);color:#c4915e':'')+'">+Oct</button>';
-    if(l.id==='foundation')h+='<button class="slope-btn'+(foundationSubOct?' active':'')+'" onclick="toggleFoundationSub()" style="flex-shrink:0;padding:4px 8px;font-size:10px;'+(foundationSubOct?'background:rgba(94,184,138,0.15);border-color:rgba(94,184,138,0.4);color:#5eb88a':'')+'">−8ve</button>';
+    if(l.id==='foundation')h+='<button class="slope-btn'+(foundationSubOct?' active':'')+'" onclick="toggleFoundationSub()" style="flex-shrink:0;padding:4px 8px;font-size:10px;'+(foundationSubOct?'background:rgba(94,184,138,0.15);border-color:rgba(94,184,138,0.4);color:#5eb88a':'')+'">-Oct</button>';
     h+='</div>';
   });
   // Arp — lives in Layers as another sound source
@@ -1254,9 +1255,9 @@ function buildEditSheet(){
   h+='<span class="slider-val" id="sr_arp">'+Math.round(arpVol*100)+'%</span></div>';
   h+='<div class="slope-row" style="padding:2px 12px 10px"><span class="slope-label">Rate</span>';
   [[0.0625,'1/16'],[0.125,'1/8'],[0.25,'1/4'],[0.5,'1/2'],[1,'1 bar']].forEach(([r,l])=>{h+='<button class="slope-btn'+(arpRate===r?' active':'')+'" onclick="setArpRate('+r+')" style="padding:6px 10px">'+l+'</button>';});
-  h+='<button class="slope-btn'+(arpOct===-1?' active':'')+'" onclick="setArpOct(-1)" style="padding:6px 10px;margin-left:6px">−8ve</button>';
+  h+='<button class="slope-btn'+(arpOct===-1?' active':'')+'" onclick="setArpOct(-1)" style="padding:6px 10px;margin-left:6px">-Oct</button>';
   h+='<button class="slope-btn'+(arpOct===0?' active':'')+'" onclick="setArpOct(0)" style="padding:6px 10px">Mid</button>';
-  h+='<button class="slope-btn'+(arpOct===1?' active':'')+'" onclick="setArpOct(1)" style="padding:6px 10px">+8ve</button>';
+  h+='<button class="slope-btn'+(arpOct===1?' active':'')+'" onclick="setArpOct(1)" style="padding:6px 10px">+Oct</button>';
   h+='</div>';
   h+='<div class="slope-row" style="padding:2px 12px 10px"><span class="slope-label">Voice</span>';
   h+='<button class="slope-btn'+(arpVoice==='juno'?' active':'')+'" onclick="setArpVoice(\'juno\')" style="padding:6px 10px">Bloom</button>';
