@@ -149,6 +149,14 @@
   .drag-handle{color:rgba(255,255,255,0.2);font-size:18px;padding:4px 6px;cursor:grab;touch-action:none;user-select:none;line-height:1;flex-shrink:0}
   .drag-handle:active{cursor:grabbing;color:rgba(196,145,94,0.6)}
   .preset-row.dragging{opacity:0.55;position:relative;z-index:10;background:rgba(255,255,255,0.04)}
+  .preset-row.active .preset-name{color:#c4915e}
+  .preset-row.active{border-bottom-color:rgba(196,145,94,0.15)}
+  .preset-active-row{display:flex;align-items:center;gap:10px;padding:10px 0 14px;border-bottom:1px solid rgba(255,255,255,0.06);margin-bottom:4px}
+  .preset-active-name{flex:1;font-size:14px;color:rgba(255,255,255,0.75);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .preset-update-btn{padding:8px 16px;border-radius:8px;border:1px solid rgba(196,145,94,0.5);background:rgba(196,145,94,0.12);color:#c4915e;font-size:11px;cursor:pointer;letter-spacing:0.5px;white-space:nowrap;flex-shrink:0}
+  .sheet-tab-bar{display:flex;gap:0;border-bottom:1px solid rgba(255,255,255,0.07);margin:8px 16px 0}
+  .sheet-tab{flex:1;padding:10px 0;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;text-align:center;color:rgba(255,255,255,0.3);background:none;border:none;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:color 0.2s,border-color 0.2s}
+  .sheet-tab.active{color:#c4915e;border-bottom-color:#c4915e}
   .fx-section-header{font-size:10px;font-weight:700;letter-spacing:1.5px;color:rgba(255,255,255,0.55);text-transform:uppercase;padding:8px 12px;margin:10px -16px 6px;}
   .preset-drag{font-size:16px;color:rgba(255,255,255,0.2);cursor:grab;padding:0 2px;user-select:none;flex-shrink:0}
   .preset-info{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}
@@ -189,7 +197,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.31</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.32</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -215,9 +223,13 @@
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" id="compactIco"><polyline points="4,14 4,20 10,20"/><polyline points="20,10 20,4 14,4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
         <span style="font-size:9px;letter-spacing:0.5px;margin-top:1px" id="compactLbl">Focus</span>
       </button>
-      <button class="edit-btn" onclick="toggleEdit()">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-        <span style="font-size:9px;letter-spacing:0.5px;margin-top:1px">MENU</span>
+      <button class="edit-btn" id="setlistTabBtn" onclick="openSetlist()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="3.5" cy="6" r="1.5" fill="currentColor" stroke="none"/><circle cx="3.5" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="3.5" cy="18" r="1.5" fill="currentColor" stroke="none"/></svg>
+        <span style="font-size:9px;letter-spacing:0.5px;margin-top:1px">Setlist</span>
+      </button>
+      <button class="edit-btn" id="createTabBtn" onclick="openCreate()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+        <span style="font-size:9px;letter-spacing:0.5px;margin-top:1px">Create</span>
       </button>
     </div>
   </div>
@@ -246,7 +258,7 @@
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
       <button id="clickX2Btn" class="evolve-pill off" onclick="toggleClickX2()" style="padding:8px 10px;font-size:9px;letter-spacing:1px">x2</button>
     </div>
-    <div class="app-version">v1.31</div>
+    <div class="app-version">v1.32</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -358,6 +370,7 @@ let shimmerGainNode=null,shimmerVol=0.07;
 let granularTimers={},granularGain=null,reversedBuf=null;
 let evolveTimer=null,animFrame=null;
 let currentPresetName=null;
+let sheetMode="setlist";
 let audioPaused=false;
 let easyMode=true;
 let enabledEvolveIdx=new Set([0,1,2,3,4,5,6,7,8,9]);
@@ -1166,9 +1179,34 @@ function openEdit(){
   document.getElementById('editSheet').classList.add('open');
   document.getElementById('editBackdrop').classList.add('visible');
 }
+function openSetlist(){
+  sheetMode='setlist';
+  const s=document.getElementById('setlistTabBtn'),c=document.getElementById('createTabBtn');
+  if(s){s.style.color='#c4915e';}if(c){c.style.color='';}
+  buildEditSheet();
+  document.getElementById('editSheet').classList.add('open');
+  document.getElementById('editBackdrop').classList.add('visible');
+}
+function openCreate(){
+  sheetMode='create';
+  const s=document.getElementById('setlistTabBtn'),c=document.getElementById('createTabBtn');
+  if(s){s.style.color='';}if(c){c.style.color='#c4915e';}
+  buildEditSheet();
+  document.getElementById('editSheet').classList.add('open');
+  document.getElementById('editBackdrop').classList.add('visible');
+}
 function closeEdit(){
   document.getElementById('editSheet').classList.remove('open');
   document.getElementById('editBackdrop').classList.remove('visible');
+  const s=document.getElementById('setlistTabBtn'),c=document.getElementById('createTabBtn');
+  if(s){s.style.color='';}if(c){c.style.color='';}
+}
+function updatePreset(){
+  if(!currentPresetName)return;
+  const ps=getPresets();if(!ps[currentPresetName])return;
+  ps[currentPresetName]=captureState();
+  localStorage.setItem('norcoast_presets',JSON.stringify(ps));
+  buildEditSheet();updatePerfSetlist();
 }
 function toggleLayer(id){
   const l=PAD_LAYERS.find(x=>x.id===id),st=layerState[id];
@@ -1321,6 +1359,16 @@ function rebuildCustomPattern(){
 }
 function buildEditSheet(){
   const c=document.getElementById('editContent');c.innerHTML='';
+  if(sheetMode==='setlist'){
+    const presets=getPresets();const presetNames=Object.keys(presets);
+    let h='<div class="edit-section"><div class="edit-title">Setlist</div>';
+    if(currentPresetName){h+='<div class="preset-active-row"><span class="preset-active-name">'+escapeHTML(currentPresetName)+'</span><button class="preset-update-btn" onclick="updatePreset()">Update</button></div>';}
+    h+='<div class="preset-save-row"><input class="preset-input" id="presetNameInput" placeholder="Add this song to setlist+" /><button class="preset-save-btn" onclick="savePreset(document.getElementById(\'presetNameInput\').value)">Save</button></div>';
+    if(presetNames.length===0){h+='<div class="preset-empty">No saved songs yet</div>';}
+    else{presetNames.forEach(n=>{const pd=presets[n];const ns=n.replace(/'/g,"\'");const cn=pd.enabledEvolveIdx&&pd.enabledEvolveIdx.length>0?CHORD_TYPES[pd.enabledEvolveIdx[0]]?.name:'';const meta=[pd.homeRoot||'',cn,pd.clickBPM?pd.clickBPM+' bpm':''].filter(Boolean).join(' · ');const isActive=currentPresetName===n;h+='<div class="preset-row'+(isActive?' active':'')+'" data-pn="'+escapeHTML(n)+'">'+'<div class="drag-handle">⠿</div><div class="preset-info"><span class="preset-name">'+escapeHTML(n)+'</span>'+(meta?'<span class="preset-meta">'+escapeHTML(meta)+'</span>':'')+'</div><button class="preset-load-btn" onclick="loadPreset(\''+ns+'\')">Load</button><button class="preset-del-btn" onclick="deletePreset(\''+ns+'\')">✕</button></div>';});}
+    h+='</div><div class="edit-bottom-pad"></div>';
+    c.innerHTML=h;initPresetDrag(c);return;
+  }
   // ── Chords ──
   let h='<div class="edit-section" style="padding:10px 20px 12px"><div style="display:flex;align-items:center;justify-content:space-between"><span style="font-size:9px;letter-spacing:3.5px;text-transform:uppercase;color:rgba(255,255,255,0.22);font-weight:600">Mode</span><div style="display:flex;gap:6px"><button class="slope-btn'+(easyMode?'':' active')+'" onclick="setMode(false)" style="padding:6px 16px">Advanced</button><button class="slope-btn'+(easyMode?' active':'')+'" onclick="setMode(true)" style="padding:6px 16px">Easy</button></div></div></div><div class="edit-divider"></div>';
   h+='<div class="edit-section"><div class="edit-title">Chords</div><div class="chord-pills">';
@@ -1420,13 +1468,7 @@ function buildEditSheet(){
     h+=sliderRowHTML('lpf','Filter','#d46b8a',lpfValue,formatHz(lpfFaderToHz(lpfValue)));
     h+=sliderRowHTML('mst','Volume','#c4915e',volToFader(masterVol),Math.round(masterVol*100)+'%');
     h+='</div><div class="edit-divider"></div>';
-    // Setlist in easy mode
-    const presetsE=getPresets();const presetNamesE=Object.keys(presetsE);
-    h+='<div class="edit-section"><div class="edit-title">Setlist</div>';
-    h+='<div class="preset-save-row"><input class="preset-input" id="presetNameInput" placeholder="Add this song to setlist+" /><button class="preset-save-btn" onclick="savePreset(document.getElementById(\'presetNameInput\').value)">Save</button></div>';
-    if(presetNamesE.length===0){h+='<div class="preset-empty">No saved sounds yet</div>'}
-    else{presetNamesE.forEach(n=>{const pd=presetsE[n];const ns=n.replace(/'/g,"\\'");const cn=pd.enabledEvolveIdx&&pd.enabledEvolveIdx.length>0?CHORD_TYPES[pd.enabledEvolveIdx[0]]?.name:'';const meta=[pd.homeRoot||'',cn,pd.clickBPM?pd.clickBPM+' bpm':''].filter(Boolean).join(' · ');h+='<div class="preset-row" data-pn="'+escapeHTML(n)+'"><div class="drag-handle">⠿</div><div class="preset-info"><span class="preset-name">'+escapeHTML(n)+'</span>'+(meta?'<span class="preset-meta">'+escapeHTML(meta)+'</span>':'')+'</div><button class="preset-load-btn" onclick="loadPreset(\''+ns+'\')">Load</button><button class="preset-del-btn" onclick="deletePreset(\''+ns+'\')">✕</button></div>';});}
-    h+='</div><div class="edit-bottom-pad"></div>';
+    h+='<div class="edit-bottom-pad"></div>';
   }else{
     // ── Advanced Mode: full controls ──
     const rvSz=reverbSize;
@@ -1484,13 +1526,7 @@ function buildEditSheet(){
     h+='</div>';
     h+='<div class="bpm-row" style="justify-content:center;margin:12px 0 4px"><button class="bpm-nudge" onclick="setBPM(clickBPM-1)">−</button><button class="bpm-tap-main" onclick="tapTempo()" style="flex:1;max-width:120px;margin:0 8px"><span id="bpmMenuDisplay">'+clickBPM+'</span><span class="bpm-tap-label">BPM · TAP</span></button><button class="bpm-nudge" onclick="setBPM(clickBPM+1)">+</button></div>';
     h+='</div><div class="edit-divider"></div>';
-    // Setlist
-    const presets=getPresets();const presetNames=Object.keys(presets);
-    h+='<div class="edit-section"><div class="edit-title">Setlist</div>';
-    h+='<div class="preset-save-row"><input class="preset-input" id="presetNameInput" placeholder="Add this song to setlist+" /><button class="preset-save-btn" onclick="savePreset(document.getElementById(\'presetNameInput\').value)">Save</button></div>';
-    if(presetNames.length===0){h+='<div class="preset-empty">No saved sounds yet</div>'}
-    else{presetNames.forEach((n,idx)=>{const pd=presets[n];const ns=n.replace(/'/g,"\\'");const cn=pd.enabledEvolveIdx&&pd.enabledEvolveIdx.length>0?CHORD_TYPES[pd.enabledEvolveIdx[0]]?.name:'';const meta=[pd.homeRoot||'',cn,pd.clickBPM?pd.clickBPM+' bpm':''].filter(Boolean).join(' · ');h+='<div class="preset-row" data-pn="'+escapeHTML(n)+'"><div class="drag-handle" title="Drag to reorder">⠿</div><div class="preset-info"><span class="preset-name">'+escapeHTML(n)+'</span>'+(meta?'<span class="preset-meta">'+escapeHTML(meta)+'</span>':'')+'</div><button class="preset-load-btn" onclick="loadPreset(\''+ns+'\')">Load</button><button class="preset-del-btn" onclick="deletePreset(\''+ns+'\')">✕</button></div>';});}
-    h+='</div><div class="edit-divider"></div>';
+
     // Master
     h+='<div class="edit-section"><div class="edit-title">Master</div>';
     h+=sliderRowHTML('mst','Volume','#c4915e',volToFader(masterVol),Math.round(masterVol*100)+'%');
