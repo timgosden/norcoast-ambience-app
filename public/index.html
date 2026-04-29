@@ -197,7 +197,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.46</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.47</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -258,7 +258,7 @@
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
       <button id="clickX2Btn" class="evolve-pill off" onclick="toggleClickX2()" style="padding:8px 10px;font-size:9px;letter-spacing:1px">x2</button>
     </div>
-    <div class="app-version">v1.46</div>
+    <div class="app-version">v1.47</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -839,14 +839,20 @@ function stopPad(id,rel){
 
 function evolveVoice(ei){
   const ef=getEvolveFreq(homeRoot,ei);
+  const now=ctx.currentTime;
   PAD_LAYERS.forEach(l=>{
     if(l.type==="granular")return;
     if(layerState[l.id].volume>0&&!l.rootOnly){
-      fadeOut(evolveNodes[l.id],XFADE);
+      // Match startPad's quick-cut behaviour: if the node we're replacing is
+      // still in its fade-in, cut it short so a key press hitting during an
+      // evolve doesn't stack two slow XFADE-out groups.
+      const old=evolveNodes[l.id];
+      const xfo=(old&&old._atkUntil>now)?0.3:XFADE;
+      fadeOut(old,xfo);
       evolveNodes[l.id]=buildGroup(l,ef,layerState[l.id].volume,XFADE);
+      evolveNodes[l.id]._atkUntil=now+XFADE;
     }
   });
-  
 }
 
 // ─── EVOLUTION ───
@@ -1247,12 +1253,11 @@ function toggleLayer(id){
   const l=PAD_LAYERS.find(x=>x.id===id),st=layerState[id];
   if(st.volume>0){
     st._prevVol=st.volume;st.volume=0;
-    if(l.type==="granular"){stopGranular();if(granularGain)granularGain.gain.linearRampToValueAtTime(0,ctx.currentTime+0.5)}
-    else{
-      const t=ctx.currentTime+2.5;
-      if(staticNodes[id]){staticNodes[id].gain.gain.linearRampToValueAtTime(0,t);if(staticNodes[id].ampMod)staticNodes[id].ampMod.gain.linearRampToValueAtTime(0,t);if(staticNodes[id].breathMod)staticNodes[id].breathMod.gain.linearRampToValueAtTime(0,t);}
-      if(evolveNodes[id]){evolveNodes[id].gain.gain.linearRampToValueAtTime(0,t);if(evolveNodes[id].ampMod)evolveNodes[id].ampMod.gain.linearRampToValueAtTime(0,t);if(evolveNodes[id].breathMod)evolveNodes[id].breathMod.gain.linearRampToValueAtTime(0,t);}
-    }
+    // Route through stopPad so any in-flight fade-in is properly cancelled
+    // (cancelScheduledValues + setValueAtTime + linearRamp). The previous
+    // direct linearRampToValueAtTime didn't cancel earlier automation, so a
+    // mute pressed during a key's ATTACK ramp would race the rising target.
+    stopPad(id,2.5);
   }else{
     st.volume=st._prevVol||0.5;
     if(l.type==="granular")startGranular(st.volume);
@@ -1832,7 +1837,13 @@ function loadPreset(name){try{
   if(delayGainN)delayGainN.gain.value=delayMixVal*0.7;if(delayFB)delayFB.gain.value=delayFeedback;if(dToneNode)dToneNode.gain.value=(delayTone-0.5)*24;if(delayNode&&!delaySync)delayNode.delayTime.value=delayTimeVal;applyDelaySync();if(_drumDelaySend)_drumDelaySend.gain.value=delayMixVal*1.5;
   // Pick a valid evolve voice BEFORE restarting layers, otherwise the first
   // 0.6s of the new preset uses the previous chord-set's evolve frequencies.
-  if(!enabledEvolveIdx.has(currentEvolve))currentEvolve=[...enabledEvolveIdx][0];
+  if(!enabledEvolveIdx.has(currentEvolve)){
+    // If a preset shipped with an empty enabledEvolveIdx, [...enabledEvolveIdx][0]
+    // is undefined and CHORD_TYPES[undefined].name will crash a few lines down.
+    // Fall back to chord 0 (5th) and re-enable it.
+    currentEvolve=[...enabledEvolveIdx][0]??0;
+    if(enabledEvolveIdx.size===0)enabledEvolveIdx.add(currentEvolve);
+  }
   // Restart layers — fast crossfade so preset switches feel snappy
   PAD_LAYERS.forEach(l=>{if(l.type!=="granular")startPad(l,layerState[l.id].volume,homeRoot,currentEvolve,PRESET_FADE,PRESET_FADE)});
   if(layerState.texture&&layerState.texture.volume>0)startGranular(layerState.texture.volume,PRESET_FADE);else stopGranular();
@@ -2433,7 +2444,12 @@ async function initAndStart(){
         if(document.visibilityState==='visible'&&ctx.state==='suspended'&&!audioPaused)ctx.resume();
       });
       window.addEventListener('focus',()=>{if(ctx&&ctx.state==='suspended'&&!audioPaused)ctx.resume()});
-      window.addEventListener('pagehide',()=>{if(ctx)ctx.close();});
+      window.addEventListener('pagehide',e=>{
+        // Only tear down on actual unload — if persisted=true the browser is
+        // freezing the page into bfcache and will restore it on back-nav. Closing
+        // ctx in that case leaves the user with no audio when they return.
+        if(!e.persisted&&ctx)ctx.close();
+      });
     }
     loadMidiMappings();buildKeys();startVis();scheduleEvolve();initMIDI();updatePerfSetlist();initQuickStrips();
     if(compactMode)toggleCompact();
@@ -2444,7 +2460,7 @@ async function initAndStart(){
     {const eb=document.getElementById('evolveBtn');if(eb){eb.className='evolve-pill '+(evolving?'on':'off');eb.textContent=evolving?'Evolving':'Static'}}
     {const xb=document.getElementById('clickX2Btn');if(xb)xb.className='evolve-pill '+(clickRateX2?'on':'off');}
     const _bd=document.getElementById('bpmDisplay');if(_bd)_bd.textContent=clickBPM;
-    document.getElementById('stateEvolve').textContent=CHORD_TYPES[currentEvolve].name;
+    {const se=document.getElementById('stateEvolve');if(se&&CHORD_TYPES[currentEvolve])se.textContent=CHORD_TYPES[currentEvolve].name;}
   }catch(e){if(ls)ls.textContent='Error: '+e.message;}
   finally{
     prompt.style.opacity='0';
