@@ -197,7 +197,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.48</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.49</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -258,7 +258,7 @@
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
       <button id="clickX2Btn" class="evolve-pill off" onclick="toggleClickX2()" style="padding:8px 10px;font-size:9px;letter-spacing:1px">x2</button>
     </div>
-    <div class="app-version">v1.48</div>
+    <div class="app-version">v1.49</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -1499,16 +1499,20 @@ function buildEditSheet(){
   h+='<div style="padding:0 12px 10px">';
   h+='<button class="sub-panel-toggle" onclick="toggleSeqPanel(this)">'+(seqPanelOpen?'Step Sequencer ▴':'Step Sequencer ▾')+'</button>';
   h+='<div class="sub-panel'+(seqPanelOpen?' open':'')+'" id="seqPanel">';
+  // 4/4 → 16 steps grouped 4 per beat (4 beats); 6/8 → 12 steps grouped
+  // 3 per beat (4 beats of triplet sub-divisions).
+  const seqLen=timeSig==='6/8'?12:16;
+  const seqBeat=timeSig==='6/8'?3:4;
   [['lo','#c4915e'],['md','#5eb88a'],['hh','#6a9fd8']].forEach(([row,color])=>{
-    h+='<div class="seq-row-wrap"><span class="seq-label">'+row+'</span><div class="seq-row">';
-    for(let i=0;i<16;i++){
+    h+='<div class="seq-row-wrap"><span class="seq-label">'+row+'</span><div class="seq-row" style="grid-template-columns:repeat('+seqLen+',1fr)">';
+    for(let i=0;i<seqLen;i++){
       const on=customSeqGrid[row][i];
-      const beatMark=i%4===0&&i>0?'margin-left:3px;':'';
+      const beatMark=i%seqBeat===0&&i>0?'margin-left:3px;':'';
       h+='<button class="seq-step'+(on?' on-'+row:'')+'" onclick="toggleSeqStep(\''+row+'\','+i+')" style="'+beatMark+'"></button>';
     }
     h+='</div></div>';
   });
-  h+='<div style="margin-top:8px;font-size:9px;color:rgba(255,255,255,0.22);text-align:center">Select "Custom" pattern above · 4 steps per beat</div>';
+  h+='<div style="margin-top:8px;font-size:9px;color:rgba(255,255,255,0.22);text-align:center">Select "Custom" pattern above · '+seqBeat+' steps per beat</div>';
   h+='</div></div>';
   h+='</div>';
   } // end !easyMode step sequencer
