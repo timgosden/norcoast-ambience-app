@@ -16,14 +16,16 @@
   html,body{height:100%;overflow:hidden;background:#030508}
   body{font-family:'Open Sans',sans-serif;color:#fff;-webkit-tap-highlight-color:transparent;-webkit-font-smoothing:antialiased;user-select:none;-webkit-user-select:none}
   /* ── Performance layout ── */
-  #perf{position:fixed;inset:0;display:flex;flex-direction:column;background:linear-gradient(160deg,#07090e,#0b0f1a 40%,#06080d);padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
+  body{background:#07090e;margin:0}
+  #perf-wrap{position:fixed;inset:0;display:flex;justify-content:center;background:#07090e}
+  #perf{width:100%;max-width:500px;height:100%;display:flex;flex-direction:column;background:linear-gradient(160deg,#07090e,#0b0f1a 40%,#06080d);padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right);position:relative}
   @media(min-width:500px){
     .perf-keys{grid-template-columns:repeat(6,1fr);gap:6px;padding:0 20px 4px}
     .key-btn{height:auto;border-radius:14px;font-size:15px}
     .key-btn.sharp{font-size:12px}
     .perf-vis-wrap{flex:1;min-height:44px;padding:4px 20px}
     .perf-bottom{padding:6px 20px 12px}
-    #editSheet{left:0;right:0;transform:none;max-width:none}
+    #editSheet{max-width:500px}
   }
   @media(min-width:1100px){
     .perf-keys{grid-template-columns:repeat(12,1fr);gap:8px;padding:0 28px 4px}
@@ -92,8 +94,8 @@
   #editBackdrop{position:fixed;inset:0;background:rgba(0,0,0,0);pointer-events:none;z-index:40;transition:background 0.3s}
   #editBackdrop.visible{background:rgba(0,0,0,0.52);pointer-events:all}
   /* ── Edit sheet ── */
-  #editSheet{position:fixed;left:0;right:0;bottom:0;background:linear-gradient(180deg,#0e1120 0%,#090c16 100%);border-radius:24px 24px 0 0;border-top:1px solid rgba(255,255,255,0.15);box-shadow:0 -8px 40px rgba(0,0,0,0.5);transform:translateY(100%);transition:transform 0.4s cubic-bezier(0.32,0.72,0,1);max-height:84vh;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;z-index:50;padding-bottom:env(safe-area-inset-bottom);padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
-  #editSheet.open{transform:translateY(0)}
+  #editSheet{position:fixed;left:50%;transform:translateX(-50%) translateY(100%);bottom:0;width:100%;max-width:500px;background:linear-gradient(180deg,#0e1120 0%,#090c16 100%);border-radius:24px 24px 0 0;border-top:1px solid rgba(255,255,255,0.15);box-shadow:0 -8px 40px rgba(0,0,0,0.5);transition:transform 0.4s cubic-bezier(0.32,0.72,0,1);max-height:84vh;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;z-index:50;padding-bottom:env(safe-area-inset-bottom);padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
+  #editSheet.open{transform:translateX(-50%) translateY(0)}
   .sheet-handle{width:36px;height:4px;background:rgba(255,255,255,0.15);border-radius:2px;margin:12px auto 2px;cursor:pointer}
   /* ── Edit content ── */
   .edit-section{padding:20px 20px 0}
@@ -199,7 +201,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.37</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.38</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -208,7 +210,7 @@
 @keyframes splashPulse{0%,100%{opacity:0.22}50%{opacity:0.65}}
 </style>
 <!-- Performance mode -->
-<div id="perf">
+<div id="perf-wrap"><div id="perf">
   <div class="perf-top">
     <div class="perf-logo">
       <svg width="28" height="28" viewBox="0 0 100 100" fill="none">
@@ -260,9 +262,10 @@
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
       <button id="clickX2Btn" class="evolve-pill off" onclick="toggleClickX2()" style="padding:8px 10px;font-size:9px;letter-spacing:1px">x2</button>
     </div>
-    <div class="app-version">v1.37</div>
+    <div class="app-version">v1.38</div>
   </div>
 </div>
+</div><!-- /perf-wrap -->
 <!-- Edit backdrop -->
 <div id="editBackdrop" onclick="closeEdit()"></div>
 <!-- Edit sheet -->
