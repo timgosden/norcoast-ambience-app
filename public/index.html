@@ -166,7 +166,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.09</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.10</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -205,7 +205,7 @@
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
       <button id="clickX2Btn" class="evolve-pill off" onclick="toggleClickX2()" style="padding:8px 10px;font-size:9px;letter-spacing:1px">x2</button>
     </div>
-    <div class="app-version">v1.09</div>
+    <div class="app-version">v1.10</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -1221,8 +1221,15 @@ function randomise(){
   if(fL)applyL(fL,vF);if(pL)applyL(pL,vP);if(tL)applyL(tL,Math.random()<0.45?rV(0.15,0.65):0);
   const wasArpZ=arpVol<=0;arpVol=Math.random()<0.35?rV(0.1,0.55):0;
   if(arpVol>0&&wasArpZ)startArp();else if(arpVol<=0)stopArp();
+  arpOct=[-1,0,1][Math.floor(Math.random()*3)];
+  arpVoice=['juno','soft','sine'][Math.floor(Math.random()*3)];
+  arpRate=[0.0625,0.125,0.25,0.5,1][Math.floor(Math.random()*5)];
   const wasMvZ=movementVol<=0;movementVol=Math.random()<0.35?rV(0.15,0.55):0;
   if(movementVol>0&&wasMvZ)startMovement();else if(movementVol<=0)stopMovement();
+  movementPattern=Math.floor(Math.random()*MOVEMENT_PATTERNS.length);movementStep=0;
+  textureOctUp=Math.random()<0.5;
+  foundationSubOct=Math.random()<0.5;
+  const fd=PAD_LAYERS.find(l=>l.id==='foundation');if(fd)fd.octaves=foundationSubOct?[-2,-1]:[-1];
   saveSettings();buildEditSheet();
 }
 function buildEditSheet(){
