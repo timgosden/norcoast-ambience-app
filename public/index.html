@@ -67,8 +67,8 @@
   .perf-vol-row input[type=range]{flex:1;height:3px;-webkit-appearance:none;appearance:none;border-radius:2px;outline:none;cursor:pointer;accent-color:#c4915e;background:linear-gradient(to right,rgba(196,145,94,0.5) 80%,rgba(255,255,255,0.1) 80%)}
   .perf-vol-icon{font-size:11px;color:rgba(255,255,255,0.3);flex-shrink:0;letter-spacing:1px;text-transform:uppercase}
   .perf-vol-pct{font-size:10px;color:rgba(255,255,255,0.25);flex-shrink:0;width:30px;text-align:right;font-variant-numeric:tabular-nums}
-  .perf-bottom{display:flex;align-items:center;justify-content:center;padding:8px 10px 14px;flex-shrink:0;gap:6px;position:relative}
-  .app-version{position:absolute;bottom:6px;right:10px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none;font-variant-numeric:tabular-nums}
+  .perf-bottom{display:flex;align-items:center;justify-content:center;padding:8px 10px calc(16px + env(safe-area-inset-bottom, 0px));flex-shrink:0;gap:6px;position:relative}
+  .app-version{position:absolute;bottom:calc(4px + env(safe-area-inset-bottom, 0px));right:10px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none;font-variant-numeric:tabular-nums}
   .bpm-click-group{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:14px;padding:4px 6px}
   .evolve-pill{padding:8px 13px;border-radius:20px;font-size:10px;letter-spacing:2px;text-transform:uppercase;font-weight:500;cursor:pointer;transition:all 0.3s;border:1px solid transparent}
   .fade-btn{display:flex;align-items:center;justify-content:center;padding:8px 13px;border-radius:20px;font-size:10px;letter-spacing:2px;text-transform:uppercase;font-weight:500;cursor:pointer;transition:border-color 0.3s,color 0.3s,box-shadow 0.3s;border:1px solid rgba(212,107,138,0.35);background:rgba(212,107,138,0.08);color:rgba(212,107,138,0.7);touch-action:manipulation;position:relative;overflow:hidden}
@@ -166,7 +166,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.11</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.12</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -205,7 +205,7 @@
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
       <button id="clickX2Btn" class="evolve-pill off" onclick="toggleClickX2()" style="padding:8px 10px;font-size:9px;letter-spacing:1px">x2</button>
     </div>
-    <div class="app-version">v1.11</div>
+    <div class="app-version">v1.12</div>
   </div>
 </div>
 <!-- Edit backdrop -->
