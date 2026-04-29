@@ -59,9 +59,11 @@
   /* ── Key grid ── */
   .perf-keys{padding:0 12px;flex-shrink:0;display:grid;grid-template-columns:repeat(4,1fr);gap:8px;border-top:1px solid rgba(255,255,255,0.07);margin-top:6px;padding-top:10px}
   .key-btn{aspect-ratio:1;border-radius:16px;font-size:16px;font-family:'Open Sans',sans-serif;font-weight:500;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);cursor:pointer;transition:background 0.15s,border-color 0.15s,color 0.15s,box-shadow 0.15s;display:flex;align-items:center;justify-content:center;letter-spacing:0.5px;width:100%}
-  .key-btn.sharp{color:rgba(255,255,255,0.38);font-size:13px}
+  .key-btn.sharp{font-size:13px}
   .key-btn.active{background:rgba(196,145,94,0.18);border-color:rgba(196,145,94,0.45);color:#c4915e;box-shadow:0 0 20px rgba(196,145,94,0.12)}
+  .key-btn.sharp.active{color:#c4915e}
   .key-btn.active.paused{background:rgba(196,145,94,0.04);border-color:rgba(196,145,94,0.15);color:rgba(196,145,94,0.35);box-shadow:none}
+  .key-btn.sharp.active.paused{color:rgba(196,145,94,0.35)}
   /* ── Bottom bar ── */
   .perf-vol-row{display:flex;align-items:center;gap:10px;padding:0 20px 6px;flex-shrink:0}
   .perf-vol-row input[type=range]{flex:1;height:3px;-webkit-appearance:none;appearance:none;border-radius:2px;outline:none;cursor:pointer;accent-color:#c4915e;background:linear-gradient(to right,rgba(196,145,94,0.5) 80%,rgba(255,255,255,0.1) 80%)}
@@ -181,7 +183,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.17</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.18</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -220,7 +222,7 @@
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
       <button id="clickX2Btn" class="evolve-pill off" onclick="toggleClickX2()" style="padding:8px 10px;font-size:9px;letter-spacing:1px">x2</button>
     </div>
-    <div class="app-version">v1.17</div>
+    <div class="app-version">v1.18</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -1104,7 +1106,7 @@ function buildKeys(){
   const flats=new Set(['Db','Eb','Gb','Ab','Bb']);
   NOTES.forEach(n=>{
     const btn=document.createElement('button');
-    btn.className='key-btn'+(flats.has(n)?' sharp':'')+(n===homeRoot?' active':'')+(n===homeRoot&&audioPaused?' paused':'');
+    btn.className='key-btn'+(n===homeRoot?' active':'')+(n===homeRoot&&audioPaused?' paused':'');
     btn.textContent=n;
     btn.onclick=()=>{
       if(n===homeRoot){
@@ -2065,6 +2067,7 @@ function handleMIDI(msg){
     const val=d2/127;
     // Learn mode: capture this CC for the pending param
     if(midiLearnMode&&midiLearnPending){
+      Object.keys(midiMappings).forEach(k=>{if(midiMappings[k]===d1)delete midiMappings[k];});
       midiMappings[midiLearnPending]=d1;
       saveMidiMappings();
       midiLearnPending=null;
