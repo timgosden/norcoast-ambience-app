@@ -197,7 +197,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.42</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.43</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -251,14 +251,14 @@
   </div>
   <div class="perf-keys" id="keyRow"></div>
   <div class="perf-bottom">
-    <button id="fadeBtn" class="fade-btn" onclick="triggerFade()">Fade</button>
+    <button id="fadeBtn" class="fade-btn" onclick="triggerFade()">Stop</button>
     <button id="evolveBtn" class="evolve-pill on" onclick="toggleEvolving()">Evolving</button>
     <div class="bpm-click-group">
       <button class="bpm-tap-main" id="bpmTapMain" onclick="tapTempo()" onpointerdown="onBpmPointerDown()" onpointerup="onBpmPointerUp()" onpointerleave="onBpmPointerUp()" onpointercancel="onBpmPointerUp()" title="Tap · Hold to type"><span id="bpmDisplay">70</span><span class="bpm-tap-label">BPM</span></button>
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
       <button id="clickX2Btn" class="evolve-pill off" onclick="toggleClickX2()" style="padding:8px 10px;font-size:9px;letter-spacing:1px">x2</button>
     </div>
-    <div class="app-version">v1.42</div>
+    <div class="app-version">v1.43</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -333,7 +333,7 @@ const PAD_LAYERS=[
   {id:"texture",name:"Texture",color:"#a08060",type:"granular"},
 ];
 
-const ATTACK=8,RELEASE=8,XFADE=8,ROOT_OCT=3,DELAY_Q=60/70,PRESET_FADE=0.6;
+const ATTACK=5,RELEASE=5,XFADE=5,ROOT_OCT=3,DELAY_Q=60/70,PRESET_FADE=0.6;
 
 // ─── STATE ───
 let ctx,waves,master,reverb,reverbGain,dryGain,delayNode,delayGainN,delayFB,dToneNode,analyser;
@@ -539,14 +539,15 @@ function grainStream(streamId){
   granularTimers[streamId]=setTimeout(()=>grainStream(streamId),msUntilNext);
 }
 
-function stopGranular(){
+function stopGranular(rel){
+  if(rel==null)rel=RELEASE;
   Object.values(granularTimers).forEach(t=>clearTimeout(t));
   granularTimers={};
   if(granularGain){
     const now=ctx.currentTime;
-    granularGain.gain.linearRampToValueAtTime(0,now+RELEASE);
+    granularGain.gain.linearRampToValueAtTime(0,now+rel);
     const g=granularGain;
-    setTimeout(()=>{try{g.disconnect()}catch(e){}},RELEASE*1000+500);
+    setTimeout(()=>{try{g.disconnect()}catch(e){}},rel*1000+500);
     granularGain=null;
   }
 }
@@ -812,10 +813,11 @@ function startPad(def,vol,root,ei,atk,xfo){
   staticNodes[def.id]=buildGroup(def,getStaticFreqs(root,def),vol,atk);
   if(!def.rootOnly)evolveNodes[def.id]=buildGroup(def,getEvolveFreq(root,ei),vol,atk);
 }
-function stopPad(id){
+function stopPad(id,rel){
+  if(rel==null)rel=RELEASE;
   const def=PAD_LAYERS.find(l=>l.id===id);
-  if(def&&def.type==="granular"){stopGranular();return}
-  fadeOut(staticNodes[id],RELEASE);fadeOut(evolveNodes[id],RELEASE);
+  if(def&&def.type==="granular"){stopGranular(rel);return}
+  fadeOut(staticNodes[id],rel);fadeOut(evolveNodes[id],rel);
   delete staticNodes[id];delete evolveNodes[id];
 }
 
@@ -1667,8 +1669,24 @@ function triggerFade(){
   function tick(){btn.textContent=remaining+'s';remaining--;if(remaining>0)_fadeCountT=setTimeout(tick,1000);}
   if(btn){btn.classList.add('fading');tick();}
   _fadeTimer=setTimeout(()=>{
-    _fadeActive=false;audioPaused=true;stopArp();
-    if(btn){btn.classList.remove('fading');btn.textContent='Fade';}
+    _fadeActive=false;audioPaused=true;stopArp();stopMovement();
+    // Snap layers to silence (20ms) BEFORE bringing master back, otherwise
+    // the old key's still-running pads become audible at full volume the
+    // moment master returns — the "old key tail" bug. Shimmer is left
+    // running so its slider position is preserved; with master silent + no
+    // pad input, it naturally decays.
+    PAD_LAYERS.forEach(l=>stopPad(l.id,0.02));
+    // Master is at 0 from the fade — bring it back to the user's volume now
+    // (while the bus is silent post-teardown), so the next key press's
+    // ATTACK ramp on the layers is what actually defines the fade-in.
+    master.gain.cancelScheduledValues(ctx.currentTime);
+    master.gain.setValueAtTime(0,ctx.currentTime);
+    master.gain.linearRampToValueAtTime(masterVol,ctx.currentTime+0.05);
+    if(_drumMaster){_drumMaster.gain.cancelScheduledValues(ctx.currentTime);_drumMaster.gain.setValueAtTime(0,ctx.currentTime);_drumMaster.gain.linearRampToValueAtTime(masterVol,ctx.currentTime+0.05);}
+    // Deactivate any selected key — next press becomes a fresh start.
+    homeRoot='';
+    buildKeys();
+    if(btn){btn.classList.remove('fading');btn.textContent='Stop';}
   },DUR*1000+100);
 }
 function cancelFade(){
@@ -1679,7 +1697,7 @@ function cancelFade(){
     master.gain.linearRampToValueAtTime(masterVol,ctx.currentTime+0.5);
     if(_drumMaster){_drumMaster.gain.cancelScheduledValues(ctx.currentTime);_drumMaster.gain.setValueAtTime(_drumMaster.gain.value,ctx.currentTime);_drumMaster.gain.linearRampToValueAtTime(masterVol,ctx.currentTime+0.5);}
   }
-  const btn=document.getElementById('fadeBtn');if(btn){btn.classList.remove('fading');btn.textContent='Fade';}
+  const btn=document.getElementById('fadeBtn');if(btn){btn.classList.remove('fading');btn.textContent='Stop';}
 }
 function toggleEvolving(){evolving=!evolving;const btn=document.getElementById('evolveBtn');btn.className='evolve-pill '+(evolving?'on':'off');btn.textContent=evolving?'Evolving':'Static';saveSettings();if(evolving)scheduleEvolve()}
 function toggleTextureOct(){textureOctUp=!textureOctUp;saveSettings();buildEditSheet()}
