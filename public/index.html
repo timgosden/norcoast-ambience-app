@@ -197,7 +197,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.33</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.34</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -254,11 +254,11 @@
     <button id="fadeBtn" class="fade-btn" onclick="triggerFade()">Fade</button>
     <button id="evolveBtn" class="evolve-pill on" onclick="toggleEvolving()">Evolving</button>
     <div class="bpm-click-group">
-      <button class="bpm-tap-main" id="bpmTapMain" onclick="tapTempo()" title="Tap for BPM"><span id="bpmDisplay">70</span><span class="bpm-tap-label">BPM</span></button>
+      <button class="bpm-tap-main" id="bpmTapMain" onclick="tapTempo()" onpointerdown="onBpmPointerDown()" onpointerup="onBpmPointerUp()" onpointerleave="onBpmPointerUp()" onpointercancel="onBpmPointerUp()" title="Tap · Hold to type"><span id="bpmDisplay">70</span><span class="bpm-tap-label">BPM</span></button>
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
       <button id="clickX2Btn" class="evolve-pill off" onclick="toggleClickX2()" style="padding:8px 10px;font-size:9px;letter-spacing:1px">x2</button>
     </div>
-    <div class="app-version">v1.33</div>
+    <div class="app-version">v1.34</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -1968,7 +1968,42 @@ function toggleDelaySync(){delaySync=!delaySync;applyDelaySync();saveSettings();
 function setDelaySyncDiv(d){delaySyncDiv=d;applyDelaySync();saveSettings();buildEditSheet()}
 
 let _tapTimes=[];
+let _bpmPressTimer=null,_bpmLongPressed=false;
+function onBpmPointerDown(){
+  _bpmLongPressed=false;
+  _bpmPressTimer=setTimeout(()=>{_bpmLongPressed=true;showBpmTypeInput();},600);
+}
+function onBpmPointerUp(){
+  if(_bpmPressTimer){clearTimeout(_bpmPressTimer);_bpmPressTimer=null;}
+}
+function showBpmTypeInput(){
+  const btn=document.getElementById('bpmTapMain');
+  btn.innerHTML='<input id="bpmTypeInp" type="number" min="50" max="250" value="'+clickBPM+'" style="width:52px;background:transparent;border:none;outline:none;color:#c4915e;font-size:18px;font-weight:700;font-family:Open Sans,sans-serif;text-align:center;-moz-appearance:textfield;-webkit-appearance:none" onclick="event.stopPropagation()" /><span class="bpm-tap-label">TYPE BPM</span>';
+  btn.onclick=null;
+  const inp=document.getElementById('bpmTypeInp');
+  setTimeout(()=>{inp.select();inp.focus();},50);
+  inp.addEventListener('keydown',e=>{if(e.key==='Enter'){confirmBpmType();}if(e.key==='Escape'){restoreBpmButton();}e.stopPropagation();});
+  inp.addEventListener('blur',()=>setTimeout(confirmBpmType,100));
+}
+function confirmBpmType(){
+  const inp=document.getElementById('bpmTypeInp');
+  if(!inp)return;
+  const val=parseInt(inp.value);
+  if(val>=50&&val<=250)setBPM(val);
+  restoreBpmButton();
+}
+function restoreBpmButton(){
+  if(!document.getElementById('bpmTypeInp'))return;
+  const btn=document.getElementById('bpmTapMain');
+  btn.innerHTML='<span id="bpmDisplay">'+clickBPM+'</span><span class="bpm-tap-label">BPM</span>';
+  btn.onclick=tapTempo;
+  btn.onpointerdown=onBpmPointerDown;
+  btn.onpointerup=onBpmPointerUp;
+  btn.onpointerleave=onBpmPointerUp;
+  btn.onpointercancel=onBpmPointerUp;
+}
 function tapTempo(){
+  if(_bpmLongPressed){_bpmLongPressed=false;return;}
   const now=performance.now();
   if(_tapTimes.length>0&&now-_tapTimes[_tapTimes.length-1]>2500)_tapTimes=[];
   _tapTimes.push(now);
