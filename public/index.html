@@ -197,7 +197,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.41</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.42</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -258,7 +258,7 @@
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
       <button id="clickX2Btn" class="evolve-pill off" onclick="toggleClickX2()" style="padding:8px 10px;font-size:9px;letter-spacing:1px">x2</button>
     </div>
-    <div class="app-version">v1.41</div>
+    <div class="app-version">v1.42</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -333,7 +333,7 @@ const PAD_LAYERS=[
   {id:"texture",name:"Texture",color:"#a08060",type:"granular"},
 ];
 
-const ATTACK=8,RELEASE=8,XFADE=8,ROOT_OCT=3,DELAY_Q=60/70;
+const ATTACK=8,RELEASE=8,XFADE=8,ROOT_OCT=3,DELAY_Q=60/70,PRESET_FADE=0.6;
 
 // ─── STATE ───
 let ctx,waves,master,reverb,reverbGain,dryGain,delayNode,delayGainN,delayFB,dToneNode,analyser;
@@ -450,14 +450,15 @@ function createReversedBuffer(buf){
   return rev;
 }
 
-function startGranular(vol){
+function startGranular(vol,atk){
+  if(atk==null)atk=ATTACK;
   if(!dulcimerBuf||vol<=0) return;
   stopGranular();
   if(!reversedBuf) reversedBuf=createReversedBuffer(dulcimerBuf);
 
   granularGain=ctx.createGain();
   granularGain.gain.setValueAtTime(0,ctx.currentTime);
-  granularGain.gain.linearRampToValueAtTime(vol*0.8,ctx.currentTime+ATTACK);
+  granularGain.gain.linearRampToValueAtTime(vol*0.8,ctx.currentTime+atk);
   granularGain.connect(master);
 
   // 5 streams: root, 5th, evolve voice, root+oct, 5th+oct
@@ -786,12 +787,13 @@ function createShimmerReverb(){
   outputG.connect(dR);dR.connect(pR);
   return{input:inputG,output:outputG,stereoL:pL,stereoR:pR};
 }
-function startShimmer(vol){
+function startShimmer(vol,atk){
+  if(atk==null)atk=ATTACK*2;
   if(!shimmerNode)return; // created in initAudio
   shimmerGainNode=shimmerNode.output;
   shimmerGainNode.gain.cancelScheduledValues(ctx.currentTime);
   shimmerGainNode.gain.setValueAtTime(shimmerGainNode.gain.value,ctx.currentTime);
-  shimmerGainNode.gain.linearRampToValueAtTime(vol*1.5,ctx.currentTime+ATTACK*2);
+  shimmerGainNode.gain.linearRampToValueAtTime(vol*1.5,ctx.currentTime+atk);
 }
 function stopShimmer(){
   if(!shimmerNode)return;
@@ -802,12 +804,13 @@ function stopShimmer(){
   shimmerGainNode=null;
 }
 
-function startPad(def,vol,root,ei){
-  if(def.type==="granular"){startGranular(vol);return}
+function startPad(def,vol,root,ei,atk,xfo){
+  if(atk==null)atk=ATTACK;if(xfo==null)xfo=XFADE;
+  if(def.type==="granular"){startGranular(vol,atk);return}
   if(vol<=0){stopPad(def.id);return;}
-  fadeOut(staticNodes[def.id],XFADE);fadeOut(evolveNodes[def.id],XFADE);
-  staticNodes[def.id]=buildGroup(def,getStaticFreqs(root,def),vol,ATTACK);
-  if(!def.rootOnly)evolveNodes[def.id]=buildGroup(def,getEvolveFreq(root,ei),vol,ATTACK);
+  fadeOut(staticNodes[def.id],xfo);fadeOut(evolveNodes[def.id],xfo);
+  staticNodes[def.id]=buildGroup(def,getStaticFreqs(root,def),vol,atk);
+  if(!def.rootOnly)evolveNodes[def.id]=buildGroup(def,getEvolveFreq(root,ei),vol,atk);
 }
 function stopPad(id){
   const def=PAD_LAYERS.find(l=>l.id===id);
@@ -1730,7 +1733,10 @@ function loadPreset(name){try{
   if(s.arpRate!=null)arpRate=s.arpRate;
   if(s.arpOct!=null)arpOct=s.arpOct;
   if(s.arpVoice)arpVoice=s.arpVoice;
-  if(s.masterVol!=null){masterVol=s.masterVol;if(master)master.gain.linearRampToValueAtTime(masterVol,ctx.currentTime+0.1);if(_drumMaster)_drumMaster.gain.linearRampToValueAtTime(masterVol,ctx.currentTime+0.1);}
+  // Master volume is intentionally NOT restored from presets — v1.35 saved it
+  // but v1.36 dropped it because reloading a preset would override the user's
+  // live master fader (and any preset saved with low/zero masterVol drops audio
+  // to silence on load).
   updateQuickStrips();
   if(s.satAmt!=null){satAmt=s.satAmt;if(satWS)satWS.curve=buildSatCurve(satAmt);if(satCompNode)satCompNode.gain.linearRampToValueAtTime(1-satAmt*0.3,ctx.currentTime+0.05);}
   if(s.arpVol!=null){arpVol=s.arpVol;arpStep=0;if(ctx&&arpVol>0)startArp();else stopArp();}
@@ -1757,11 +1763,13 @@ function loadPreset(name){try{
   if(reverbModRGain)reverbModRGain.gain.value=0.0025*reverbMod;
 
   if(delayGainN)delayGainN.gain.value=delayMixVal*0.7;if(delayFB)delayFB.gain.value=delayFeedback;if(dToneNode)dToneNode.gain.value=(delayTone-0.5)*24;if(delayNode&&!delaySync)delayNode.delayTime.value=delayTimeVal;applyDelaySync();if(_drumDelaySend)_drumDelaySend.gain.value=delayMixVal*1.5;
-  // Restart layers
-  PAD_LAYERS.forEach(l=>{if(l.type!=="granular")startPad(l,layerState[l.id].volume,homeRoot,currentEvolve)});
-  if(layerState.texture&&layerState.texture.volume>0)startGranular(layerState.texture.volume);else stopGranular();
-  if(shimmerVol>0)startShimmer(shimmerVol);else stopShimmer();
-  if(!enabledEvolveIdx.has(currentEvolve)){currentEvolve=[...enabledEvolveIdx][0];evolveVoice(currentEvolve)}
+  // Pick a valid evolve voice BEFORE restarting layers, otherwise the first
+  // 0.6s of the new preset uses the previous chord-set's evolve frequencies.
+  if(!enabledEvolveIdx.has(currentEvolve))currentEvolve=[...enabledEvolveIdx][0];
+  // Restart layers — fast crossfade so preset switches feel snappy
+  PAD_LAYERS.forEach(l=>{if(l.type!=="granular")startPad(l,layerState[l.id].volume,homeRoot,currentEvolve,PRESET_FADE,PRESET_FADE)});
+  if(layerState.texture&&layerState.texture.volume>0)startGranular(layerState.texture.volume,PRESET_FADE);else stopGranular();
+  if(shimmerVol>0)startShimmer(shimmerVol,PRESET_FADE);else stopShimmer();
   // Update UI
   document.getElementById('stateRoot').textContent=homeRoot;
   document.getElementById('stateEvolve').textContent=CHORD_TYPES[currentEvolve].name;
