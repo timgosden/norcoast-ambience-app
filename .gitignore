@@ -9,3 +9,4 @@ DerivedData/
 *.moved-aside
 *.hmap
 *.ipa
+public/index.html.bak-*
