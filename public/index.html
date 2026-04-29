@@ -35,12 +35,12 @@
   .bpm-tap-label{font-size:9px;letter-spacing:1px;opacity:0.7;margin-top:1px}
   .perf-top{display:flex;align-items:center;justify-content:space-between;padding:14px 20px 10px;flex-shrink:0;position:relative;z-index:45}
   .perf-logo{flex-shrink:0;width:36px;display:flex;align-items:center}
-  .perf-state{flex:1;text-align:center;font-weight:300;line-height:1}
+  .perf-state{flex:1;text-align:center;font-weight:300;line-height:1;overflow:hidden;min-width:0}
   .perf-state .root{color:#c4915e;font-size:42px;font-weight:300;letter-spacing:2px}
   .perf-state .sep{color:rgba(255,255,255,0.18);margin:0 8px;font-size:22px}
-  .perf-state .evo{color:rgba(255,255,255,0.82);font-size:26px;font-weight:300;letter-spacing:1.5px;transition:color 0.15s}
+  .perf-state .evo{color:rgba(255,255,255,0.82);font-size:22px;font-weight:300;letter-spacing:1px;transition:color 0.15s;white-space:nowrap}
   .perf-state .evo.evo-flash{color:#c4915e}
-  .perf-state .evo-pend{color:#6a9fd8;font-size:26px;font-weight:300;letter-spacing:1.5px;opacity:0;transition:opacity 0.4s}
+  .perf-state .evo-pend{color:#6a9fd8;font-size:22px;font-weight:300;letter-spacing:1px;opacity:0;transition:opacity 0.4s;white-space:nowrap}
   .edit-btn{border-radius:10px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.18);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:7px 12px;cursor:pointer;color:rgba(255,255,255,0.75);transition:all 0.2s;flex-shrink:0;gap:3px}
   .edit-btn:active{background:rgba(255,255,255,0.15)}
   .edit-btn:active{background:rgba(255,255,255,0.12)}
@@ -197,7 +197,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.34</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.41</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -258,7 +258,7 @@
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
       <button id="clickX2Btn" class="evolve-pill off" onclick="toggleClickX2()" style="padding:8px 10px;font-size:9px;letter-spacing:1px">x2</button>
     </div>
-    <div class="app-version">v1.34</div>
+    <div class="app-version">v1.41</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -333,7 +333,7 @@ const PAD_LAYERS=[
   {id:"texture",name:"Texture",color:"#a08060",type:"granular"},
 ];
 
-const ATTACK=4,RELEASE=5,XFADE=5,ROOT_OCT=3,DELAY_Q=60/70;
+const ATTACK=8,RELEASE=8,XFADE=8,ROOT_OCT=3,DELAY_Q=60/70;
 
 // ─── STATE ───
 let ctx,waves,master,reverb,reverbGain,dryGain,delayNode,delayGainN,delayFB,dToneNode,analyser;
@@ -1150,7 +1150,7 @@ function buildKeys(){
       if(n===homeRoot){
         audioPaused=!audioPaused;
         if(audioPaused){master.gain.linearRampToValueAtTime(0,ctx.currentTime+0.4);if(_drumMaster)_drumMaster.gain.linearRampToValueAtTime(0,ctx.currentTime+0.4);stopArp();btn.classList.add('paused');if('mediaSession' in navigator)navigator.mediaSession.playbackState='paused';}
-        else{ctx.resume();if(arpVol>0)startArp();master.gain.linearRampToValueAtTime(masterVol,ctx.currentTime+0.4);if(_drumMaster)_drumMaster.gain.linearRampToValueAtTime(masterVol,ctx.currentTime+0.4);btn.classList.remove('paused');if('mediaSession' in navigator)navigator.mediaSession.playbackState='playing';}
+        else{ctx.resume();if(arpVol>0)startArp();master.gain.linearRampToValueAtTime(masterVol,ctx.currentTime+3.0);if(_drumMaster)_drumMaster.gain.linearRampToValueAtTime(masterVol,ctx.currentTime+0.4);btn.classList.remove('paused');if('mediaSession' in navigator)navigator.mediaSession.playbackState='playing';}
         return;
       }
       homeRoot=n;currentPresetName=null;document.getElementById('stateRoot').textContent=n;
