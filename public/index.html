@@ -197,7 +197,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.50</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.51</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -258,7 +258,7 @@
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
       <button id="clickX2Btn" class="evolve-pill off" onclick="toggleClickX2()" style="padding:8px 10px;font-size:9px;letter-spacing:1px">x2</button>
     </div>
-    <div class="app-version">v1.50</div>
+    <div class="app-version">v1.51</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -333,7 +333,7 @@ const PAD_LAYERS=[
   {id:"texture",name:"Texture",color:"#a08060",type:"granular"},
 ];
 
-const ATTACK=7,RELEASE=7,XFADE=7,ROOT_OCT=3,DELAY_Q=60/70,PRESET_FADE=0.6;
+const ATTACK=7,RELEASE=7,XFADE=7,ROOT_OCT=3,DELAY_Q=60/70,PRESET_FADE=3;
 
 // ─── STATE ───
 let ctx,waves,master,reverb,reverbGain,dryGain,delayNode,delayGainN,delayFB,dToneNode,analyser;
@@ -713,6 +713,17 @@ function buildGroup(def,freqs,vol,atk){
   return{oscs,lfos,gain:gG,filter:flt,filterLG:fG,ampMod:aG,breathMod:bG};
 }
 
+// Smoothly ramp an AudioParam to a target value. Used by loadPreset so
+// FX / filter / EQ parameters crossfade with the pads instead of snapping.
+function rampParam(param,target,dur){
+  if(!param||!ctx)return;
+  const t=ctx.currentTime;
+  try{
+    param.cancelScheduledValues(t);
+    param.setValueAtTime(param.value,t);
+    param.linearRampToValueAtTime(target,t+dur);
+  }catch(e){param.value=target;}
+}
 function fadeOut(nodes,time){
   if(!nodes)return;const now=ctx.currentTime;
   nodes.gain.gain.cancelScheduledValues(now);nodes.gain.gain.setValueAtTime(nodes.gain.gain.value,now);
@@ -1804,7 +1815,7 @@ function loadPreset(name){try{
   const ps=getPresets();const s=ps[name];if(!s)return;
   if(s.homeRoot)homeRoot=s.homeRoot;if(s.evolving!=null)evolving=s.evolving;if(s.evolveSpeed!=null)evolveSpeed=s.evolveSpeed;
   if(s.lpfValue!=null)lpfValue=s.lpfValue;if(s.hpfValue!=null)hpfValue=s.hpfValue;if(s.lpfQ!=null)lpfQ=s.lpfQ;if(s.hpfQ!=null)hpfQ=s.hpfQ;
-  if(s.eqLowGain!=null)eqLowGain=s.eqLowGain;if(s.eqLoMidGain!=null)eqLoMidGain=s.eqLoMidGain;if(s.eqHiMidGain!=null)eqHiMidGain=s.eqHiMidGain;if(s.eqHighGain!=null)eqHighGain=s.eqHighGain;if(s.chorusMix!=null)chorusMix=s.chorusMix;if(s.widthMod!=null){widthMod=s.widthMod;if(widthLFOGain)widthLFOGain.gain.value=widthMod*0.5;}
+  if(s.eqLowGain!=null)eqLowGain=s.eqLowGain;if(s.eqLoMidGain!=null)eqLoMidGain=s.eqLoMidGain;if(s.eqHiMidGain!=null)eqHiMidGain=s.eqHiMidGain;if(s.eqHighGain!=null)eqHighGain=s.eqHighGain;if(s.chorusMix!=null)chorusMix=s.chorusMix;if(s.widthMod!=null)widthMod=s.widthMod;
   if(s.reverbMix!=null)reverbMix=s.reverbMix;if(s.reverbSize!=null)reverbSize=s.reverbSize;if(s.reverbMod!=null)reverbMod=s.reverbMod;
   if(s.delayMixVal!=null)delayMixVal=s.delayMixVal;if(s.delayFeedback!=null)delayFeedback=s.delayFeedback;if(s.delayTone!=null)delayTone=s.delayTone;if(s.shimmerVol!=null)shimmerVol=Math.min(s.shimmerVol,0.5);
   if(s.delaySync!=null)delaySync=s.delaySync;if(s.delaySyncDiv)delaySyncDiv=s.delaySyncDiv;if(s.delayTimeVal!=null)delayTimeVal=s.delayTimeVal;
@@ -1830,21 +1841,36 @@ function loadPreset(name){try{
   // Apply audio nodes
   if(s.lpfSlope!=null)lpfSlope=s.lpfSlope;
   if(s.hpfSlope!=null)hpfSlope=s.hpfSlope;
-  if(globalLPF){globalLPF.frequency.value=lpfFaderToHz(lpfValue);globalLPF.Q.value=lpfQ}
-  if(globalLPF2)globalLPF2.frequency.value=lpfSlope===24?lpfFaderToHz(lpfValue):22000;
-  if(globalHPF){globalHPF.frequency.value=hpfFaderToHz(hpfValue);globalHPF.Q.value=hpfQ}
-  if(globalHPF2)globalHPF2.frequency.value=hpfSlope===24?hpfFaderToHz(hpfValue):20;
-  if(_drumLPF){_drumLPF.frequency.value=lpfFaderToHz(lpfValue);_drumLPF.Q.value=lpfQ}
-  if(_drumHPF){_drumHPF.frequency.value=hpfFaderToHz(hpfValue);_drumHPF.Q.value=hpfQ}
-  if(eqLowNode)eqLowNode.gain.value=eqLowGain;if(eqLoMidNode)eqLoMidNode.gain.value=eqLoMidGain;if(eqHiMidNode)eqHiMidNode.gain.value=eqHiMidGain;if(eqHighNode)eqHighNode.gain.value=eqHighGain;if(chorusGainNode)chorusGainNode.gain.value=chorusMix*0.5;
-  if(reverbGain){reverbGain.gain.value=reverbMix;dryGain.gain.value=1-reverbMix}
-  if(reverb&&reverb.fbGain)reverb.fbGain.gain.value=reverbSizeToFB(reverbSize);
-  if(reverb&&reverb.excDepth){reverb.excDepth.value=reverbMod*1.5;reverb.excRate.value=0.3+reverbMod*1.7;}
-  if(reverbModWet)reverbModWet.gain.value=reverbMod*0.7*reverbMix;
-  if(reverbModLGain)reverbModLGain.gain.value=0.0025*reverbMod;
-  if(reverbModRGain)reverbModRGain.gain.value=0.0025*reverbMod;
+  // Ramp every FX / filter / EQ param over PRESET_FADE so the audio
+  // crossfade actually crossfades — previously these all snapped with
+  // .value = X while only the pads were ramping, which is why preset
+  // switches felt abrupt.
+  const PF=PRESET_FADE;
+  if(globalLPF){rampParam(globalLPF.frequency,lpfFaderToHz(lpfValue),PF);rampParam(globalLPF.Q,lpfQ,PF);}
+  if(globalLPF2)rampParam(globalLPF2.frequency,lpfSlope===24?lpfFaderToHz(lpfValue):22000,PF);
+  if(globalHPF){rampParam(globalHPF.frequency,hpfFaderToHz(hpfValue),PF);rampParam(globalHPF.Q,hpfQ,PF);}
+  if(globalHPF2)rampParam(globalHPF2.frequency,hpfSlope===24?hpfFaderToHz(hpfValue):20,PF);
+  if(_drumLPF){rampParam(_drumLPF.frequency,lpfFaderToHz(lpfValue),PF);rampParam(_drumLPF.Q,lpfQ,PF);}
+  if(_drumHPF){rampParam(_drumHPF.frequency,hpfFaderToHz(hpfValue),PF);rampParam(_drumHPF.Q,hpfQ,PF);}
+  if(eqLowNode)rampParam(eqLowNode.gain,eqLowGain,PF);
+  if(eqLoMidNode)rampParam(eqLoMidNode.gain,eqLoMidGain,PF);
+  if(eqHiMidNode)rampParam(eqHiMidNode.gain,eqHiMidGain,PF);
+  if(eqHighNode)rampParam(eqHighNode.gain,eqHighGain,PF);
+  if(chorusGainNode)rampParam(chorusGainNode.gain,chorusMix*0.5,PF);
+  if(reverbGain){rampParam(reverbGain.gain,reverbMix,PF);rampParam(dryGain.gain,1-reverbMix,PF);}
+  if(reverb&&reverb.fbGain)rampParam(reverb.fbGain.gain,reverbSizeToFB(reverbSize),PF);
+  if(reverb&&reverb.excDepth){rampParam(reverb.excDepth,reverbMod*1.5,PF);rampParam(reverb.excRate,0.3+reverbMod*1.7,PF);}
+  if(reverbModWet)rampParam(reverbModWet.gain,reverbMod*0.7*reverbMix,PF);
+  if(reverbModLGain)rampParam(reverbModLGain.gain,0.0025*reverbMod,PF);
+  if(reverbModRGain)rampParam(reverbModRGain.gain,0.0025*reverbMod,PF);
+  if(widthLFOGain)rampParam(widthLFOGain.gain,widthMod*0.5,PF);
 
-  if(delayGainN)delayGainN.gain.value=delayMixVal*0.7;if(delayFB)delayFB.gain.value=delayFeedback;if(dToneNode)dToneNode.gain.value=(delayTone-0.5)*24;if(delayNode&&!delaySync)delayNode.delayTime.value=delayTimeVal;applyDelaySync();if(_drumDelaySend)_drumDelaySend.gain.value=delayMixVal*1.5;
+  if(delayGainN)rampParam(delayGainN.gain,delayMixVal*0.7,PF);
+  if(delayFB)rampParam(delayFB.gain,delayFeedback,PF);
+  if(dToneNode)rampParam(dToneNode.gain,(delayTone-0.5)*24,PF);
+  if(delayNode&&!delaySync)rampParam(delayNode.delayTime,delayTimeVal,PF);
+  applyDelaySync();
+  if(_drumDelaySend)rampParam(_drumDelaySend.gain,delayMixVal*1.5,PF);
   // Pick a valid evolve voice BEFORE restarting layers, otherwise the first
   // 0.6s of the new preset uses the previous chord-set's evolve frequencies.
   if(!enabledEvolveIdx.has(currentEvolve)){
