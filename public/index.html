@@ -45,7 +45,7 @@
   .edit-btn:active{background:rgba(255,255,255,0.15)}
   .edit-btn:active{background:rgba(255,255,255,0.12)}
   /* ── Visualiser ── */
-  .perf-vis-wrap{height:54px;padding:6px 16px;flex-shrink:0;display:flex;align-items:center}
+  .perf-vis-wrap{height:54px;padding:6px 16px;flex-shrink:0;display:flex;align-items:center;overflow:hidden;transition:height 0.3s ease,padding 0.3s ease}
   #visualiser{width:100%;border-radius:6px;display:block;height:42px}
   /* ── Setlist ── */
   .perf-setlist{flex:1;min-height:0;padding:4px 12px 4px;overflow-y:auto;display:flex;flex-direction:column;gap:5px;scrollbar-width:none}
@@ -71,7 +71,9 @@
   .perf-vol-row.lpf-row input[type=range]{accent-color:#6a9fd8}
   .perf-vol-icon{font-size:9px;color:rgba(255,255,255,0.3);flex-shrink:0;letter-spacing:1px;text-transform:uppercase;width:26px}
   .perf-vol-pct{font-size:10px;color:rgba(255,255,255,0.25);flex-shrink:0;width:36px;text-align:right;font-variant-numeric:tabular-nums}
-  .perf-bottom{display:flex;align-items:center;justify-content:center;padding:8px 10px calc(16px + env(safe-area-inset-bottom, 0px));flex-shrink:0;gap:6px;position:relative}
+  .perf-bottom{display:flex;align-items:center;justify-content:center;padding:8px 10px calc(16px + env(safe-area-inset-bottom, 0px));flex-shrink:0;gap:6px;position:relative;overflow:hidden;transition:max-height 0.3s ease,padding 0.3s ease;max-height:120px}
+  #perf.compact .perf-vis-wrap{height:0;padding-top:0;padding-bottom:0}
+  #perf.compact .perf-bottom{max-height:0;padding-top:0;padding-bottom:0}
   .app-version{position:absolute;bottom:calc(4px + env(safe-area-inset-bottom, 0px));right:10px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none;font-variant-numeric:tabular-nums}
   .bpm-click-group{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:14px;padding:4px 6px}
   .evolve-pill{padding:8px 13px;border-radius:20px;font-size:10px;letter-spacing:2px;text-transform:uppercase;font-weight:500;cursor:pointer;transition:all 0.3s;border:1px solid transparent}
@@ -185,7 +187,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.22</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.23</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -206,10 +208,16 @@
     <div class="perf-state">
       <span class="root" id="stateRoot">C</span><span class="sep">·</span><span class="evo" id="stateEvolve">5th</span><span class="sep" id="statePendSep" style="opacity:0">·</span><span class="evo-pend" id="statePending"></span>
     </div>
-    <button class="edit-btn" onclick="toggleEdit()">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-      <span style="font-size:9px;letter-spacing:0.5px;margin-top:1px">MENU</span>
-    </button>
+    <div style="display:flex;gap:6px;align-items:center">
+      <button class="edit-btn" id="compactBtn" onclick="toggleCompact()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" id="compactIco"><polyline points="4,14 4,20 10,20"/><polyline points="20,10 20,4 14,4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+        <span style="font-size:9px;letter-spacing:0.5px;margin-top:1px" id="compactLbl">Focus</span>
+      </button>
+      <button class="edit-btn" onclick="toggleEdit()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        <span style="font-size:9px;letter-spacing:0.5px;margin-top:1px">MENU</span>
+      </button>
+    </div>
   </div>
   <div class="perf-vis-wrap">
     <canvas id="visualiser" width="800" height="300"></canvas>
@@ -236,7 +244,7 @@
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
       <button id="clickX2Btn" class="evolve-pill off" onclick="toggleClickX2()" style="padding:8px 10px;font-size:9px;letter-spacing:1px">x2</button>
     </div>
-    <div class="app-version">v1.22</div>
+    <div class="app-version">v1.23</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -2126,6 +2134,20 @@ function handleMIDI(msg){
     buildKeys();saveSettings();
   }
 }
+let compactMode=localStorage.getItem('norcoast_compact')==='1';
+function toggleCompact(){
+  compactMode=!compactMode;
+  document.getElementById('perf').classList.toggle('compact',compactMode);
+  const lbl=document.getElementById('compactLbl'),ico=document.getElementById('compactIco');
+  if(compactMode){
+    lbl.textContent='Full';
+    ico.innerHTML='<polyline points="15,3 21,3 21,9"/><polyline points="9,21 3,21 3,15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>';
+  } else {
+    lbl.textContent='Focus';
+    ico.innerHTML='<polyline points="4,14 4,20 10,20"/><polyline points="20,10 20,4 14,4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/>';
+  }
+  localStorage.setItem('norcoast_compact',compactMode?'1':'0');
+}
 function updateQuickStrips(){
   const vi=document.getElementById('qsVolInp'),vp=document.getElementById('qsVolPct');
   const li=document.getElementById('qsLpfInp'),lp=document.getElementById('qsLpfPct');
@@ -2254,6 +2276,7 @@ async function initAndStart(){
       window.addEventListener('pagehide',()=>{if(ctx)ctx.close();});
     }
     loadMidiMappings();buildKeys();startVis();scheduleEvolve();initMIDI();updatePerfSetlist();initQuickStrips();
+    if(compactMode)toggleCompact();
     // Swipe down to close edit sheet
     {const sheet=document.getElementById('editSheet');let _sy=0,_sw=false;
     sheet.addEventListener('touchstart',e=>{if(e.touches.length===1&&e.target.closest('input[type=range]')==null){_sy=e.touches[0].clientY;_sw=true;}},{passive:true});
