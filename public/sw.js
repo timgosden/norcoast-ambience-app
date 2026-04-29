@@ -1,4 +1,4 @@
-const CACHE = 'norcoast-v130';
+const CACHE = 'norcoast-v131';
 const PRECACHE = ['./', './manifest.json', './icons/icon.svg', './icons/icon-maskable.svg', './dattorro-reverb-worklet.js', './phase-vocoder-worklet.js'];
 
 self.addEventListener('install', e => {

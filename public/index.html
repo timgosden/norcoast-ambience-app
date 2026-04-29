@@ -189,7 +189,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.30</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.31</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -246,7 +246,7 @@
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
       <button id="clickX2Btn" class="evolve-pill off" onclick="toggleClickX2()" style="padding:8px 10px;font-size:9px;letter-spacing:1px">x2</button>
     </div>
-    <div class="app-version">v1.30</div>
+    <div class="app-version">v1.31</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -1423,7 +1423,7 @@ function buildEditSheet(){
     // Setlist in easy mode
     const presetsE=getPresets();const presetNamesE=Object.keys(presetsE);
     h+='<div class="edit-section"><div class="edit-title">Setlist</div>';
-    h+='<div class="preset-save-row"><input class="preset-input" id="presetNameInput" placeholder="Name this sound…" /><button class="preset-save-btn" onclick="savePreset(document.getElementById(\'presetNameInput\').value)">Save</button></div>';
+    h+='<div class="preset-save-row"><input class="preset-input" id="presetNameInput" placeholder="Add this song to setlist+" /><button class="preset-save-btn" onclick="savePreset(document.getElementById(\'presetNameInput\').value)">Save</button></div>';
     if(presetNamesE.length===0){h+='<div class="preset-empty">No saved sounds yet</div>'}
     else{presetNamesE.forEach(n=>{const pd=presetsE[n];const ns=n.replace(/'/g,"\\'");const cn=pd.enabledEvolveIdx&&pd.enabledEvolveIdx.length>0?CHORD_TYPES[pd.enabledEvolveIdx[0]]?.name:'';const meta=[pd.homeRoot||'',cn,pd.clickBPM?pd.clickBPM+' bpm':''].filter(Boolean).join(' · ');h+='<div class="preset-row" data-pn="'+escapeHTML(n)+'"><div class="drag-handle">⠿</div><div class="preset-info"><span class="preset-name">'+escapeHTML(n)+'</span>'+(meta?'<span class="preset-meta">'+escapeHTML(meta)+'</span>':'')+'</div><button class="preset-load-btn" onclick="loadPreset(\''+ns+'\')">Load</button><button class="preset-del-btn" onclick="deletePreset(\''+ns+'\')">✕</button></div>';});}
     h+='</div><div class="edit-bottom-pad"></div>';
@@ -1487,7 +1487,7 @@ function buildEditSheet(){
     // Setlist
     const presets=getPresets();const presetNames=Object.keys(presets);
     h+='<div class="edit-section"><div class="edit-title">Setlist</div>';
-    h+='<div class="preset-save-row"><input class="preset-input" id="presetNameInput" placeholder="Name this sound…" /><button class="preset-save-btn" onclick="savePreset(document.getElementById(\'presetNameInput\').value)">Save</button></div>';
+    h+='<div class="preset-save-row"><input class="preset-input" id="presetNameInput" placeholder="Add this song to setlist+" /><button class="preset-save-btn" onclick="savePreset(document.getElementById(\'presetNameInput\').value)">Save</button></div>';
     if(presetNames.length===0){h+='<div class="preset-empty">No saved sounds yet</div>'}
     else{presetNames.forEach((n,idx)=>{const pd=presets[n];const ns=n.replace(/'/g,"\\'");const cn=pd.enabledEvolveIdx&&pd.enabledEvolveIdx.length>0?CHORD_TYPES[pd.enabledEvolveIdx[0]]?.name:'';const meta=[pd.homeRoot||'',cn,pd.clickBPM?pd.clickBPM+' bpm':''].filter(Boolean).join(' · ');h+='<div class="preset-row" data-pn="'+escapeHTML(n)+'"><div class="drag-handle" title="Drag to reorder">⠿</div><div class="preset-info"><span class="preset-name">'+escapeHTML(n)+'</span>'+(meta?'<span class="preset-meta">'+escapeHTML(meta)+'</span>':'')+'</div><button class="preset-load-btn" onclick="loadPreset(\''+ns+'\')">Load</button><button class="preset-del-btn" onclick="deletePreset(\''+ns+'\')">✕</button></div>';});}
     h+='</div><div class="edit-divider"></div>';
