@@ -181,7 +181,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.16</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.17</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -220,7 +220,7 @@
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
       <button id="clickX2Btn" class="evolve-pill off" onclick="toggleClickX2()" style="padding:8px 10px;font-size:9px;letter-spacing:1px">x2</button>
     </div>
-    <div class="app-version">v1.16</div>
+    <div class="app-version">v1.17</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -1991,6 +1991,7 @@ let midiReady=false,midiLearnMode=false,midiLearnPending=null,midiMappings={};
 let midiOutputs=[],midiClockOut=false,midiClockIn=false;
 const _midiClkTimes=[];
 let midiPulseNext=0;
+const _midiHeldNotes=new Set();
 const MIDI_NOTE_NAMES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 function loadMidiMappings(){try{midiMappings=JSON.parse(localStorage.getItem('norcoast_midi')||'{}')}catch(e){midiMappings={}}}
 function saveMidiMappings(){localStorage.setItem('norcoast_midi',JSON.stringify(midiMappings))}
@@ -2086,7 +2087,10 @@ function handleMIDI(msg){
       28:r=>{delayFeedback=r*0.85;if(delayFB)delayFB.gain.linearRampToValueAtTime(delayFeedback,ctx.currentTime+0.1)},
     })[d1]?.(val);queueSave();
   }
-  if(type===0x90&&d2>0){// Note On → change root
+  if(type===0x80||(type===0x90&&d2===0)){_midiHeldNotes.delete(d1);return;}
+  if(type===0x90&&d2>0){// Note On → change root (monophonic: ignore if another key already held)
+    _midiHeldNotes.add(d1);
+    if(_midiHeldNotes.size>1)return;
     const n=MIDI_NOTE_NAMES[d1%12];
     if(n===homeRoot)return;
     homeRoot=n;document.getElementById('stateRoot').textContent=n;
