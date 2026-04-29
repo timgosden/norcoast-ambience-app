@@ -197,7 +197,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.49</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.50</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -258,7 +258,7 @@
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
       <button id="clickX2Btn" class="evolve-pill off" onclick="toggleClickX2()" style="padding:8px 10px;font-size:9px;letter-spacing:1px">x2</button>
     </div>
-    <div class="app-version">v1.49</div>
+    <div class="app-version">v1.50</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -1405,8 +1405,8 @@ function buildEditSheet(){
     if(currentPresetName){h+='<div class="preset-active-row"><span class="preset-active-name">'+escapeHTML(currentPresetName)+'</span><button class="preset-update-btn" onclick="updatePreset()">Update</button></div>';}
     h+='<div class="preset-save-row"><input class="preset-input" id="presetNameInput" placeholder="Add this song to setlist+" /><button class="preset-save-btn" onclick="savePreset(document.getElementById(\'presetNameInput\').value)">Save</button></div>';
     if(presetNames.length===0){h+='<div class="preset-empty">No saved songs yet</div>';}
-    else{presetNames.forEach(n=>{const pd=presets[n];const cn=pd.enabledEvolveIdx&&pd.enabledEvolveIdx.length>0?CHORD_TYPES[pd.enabledEvolveIdx[0]]?.name:'';const meta=[pd.homeRoot||'',cn,pd.clickBPM?pd.clickBPM+' bpm':''].filter(Boolean).join(' · ');const isActive=currentPresetName===n;h+='<div class="preset-row'+(isActive?' active':'')+'" data-pn="'+escapeHTML(n)+'">'+'<div class="drag-handle">⠿</div><div class="preset-info"><span class="preset-name">'+escapeHTML(n)+'</span>'+(meta?'<span class="preset-meta">'+escapeHTML(meta)+'</span>':'')+'</div><button class="preset-load-btn" data-act="load">Load</button><button class="preset-del-btn" data-act="del">✕</button></div>';});}
-    h+='<div style="display:flex;gap:8px;margin-top:14px"><button class="preset-export-btn" data-act="export" style="flex:1;margin-top:0">Export All</button><button class="preset-export-btn" data-act="import" style="flex:1;margin-top:0">Import</button></div>';
+    else{presetNames.forEach(n=>{const pd=presets[n];const cn=pd.enabledEvolveIdx&&pd.enabledEvolveIdx.length>0?CHORD_TYPES[pd.enabledEvolveIdx[0]]?.name:'';const meta=[pd.homeRoot||'',cn,pd.clickBPM?pd.clickBPM+' bpm':''].filter(Boolean).join(' · ');const isActive=currentPresetName===n;h+='<div class="preset-row'+(isActive?' active':'')+'" data-pn="'+escapeHTML(n)+'">'+'<div class="drag-handle">⠿</div><div class="preset-info"><span class="preset-name">'+escapeHTML(n)+'</span>'+(meta?'<span class="preset-meta">'+escapeHTML(meta)+'</span>':'')+'</div><button class="preset-load-btn" data-act="export" title="Export this song" style="padding:7px 9px">⤴</button><button class="preset-load-btn" data-act="load">Load</button><button class="preset-del-btn" data-act="del">✕</button></div>';});}
+    h+='<div style="margin-top:14px"><button class="preset-export-btn" data-act="import" style="margin-top:0">Import</button></div>';
     h+='<div id="importPanel" style="display:none;margin-top:10px"><textarea id="importJson" placeholder="Paste setlist JSON here…" style="width:100%;min-height:120px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:10px;color:rgba(255,255,255,0.85);font-family:monospace;font-size:11px;resize:vertical;outline:none"></textarea><div style="display:flex;gap:8px;margin-top:8px"><button class="preset-export-btn" data-act="import-confirm" style="flex:1;margin-top:0;border-color:rgba(196,145,94,0.35);background:rgba(196,145,94,0.1);color:#c4915e">Import</button><button class="preset-export-btn" data-act="import-cancel" style="flex:1;margin-top:0">Cancel</button></div><div id="importStatus" style="font-size:10px;color:rgba(255,255,255,0.45);margin-top:6px;min-height:14px"></div></div>';
     h+='</div><div class="edit-bottom-pad"></div>';
     c.innerHTML=h;initPresetDrag(c);
@@ -1417,8 +1417,8 @@ function buildEditSheet(){
       const pn=row.dataset.pn;
       const lb=row.querySelector('[data-act="load"]');if(lb)lb.addEventListener('click',()=>loadPreset(pn));
       const db=row.querySelector('[data-act="del"]');if(db)db.addEventListener('click',()=>deletePreset(pn));
+      const xb=row.querySelector('[data-act="export"]');if(xb)xb.addEventListener('click',()=>exportSinglePreset(pn,xb));
     });
-    {const eb=c.querySelector('[data-act="export"]');if(eb)eb.addEventListener('click',()=>exportPresets(eb));}
     {const ib=c.querySelector('[data-act="import"]');if(ib)ib.addEventListener('click',()=>{const p=c.querySelector('#importPanel');if(p)p.style.display=p.style.display==='none'?'block':'none';});}
     {const ic=c.querySelector('[data-act="import-confirm"]');if(ic)ic.addEventListener('click',()=>importPresets(c.querySelector('#importJson').value,c.querySelector('#importStatus')));}
     {const ix=c.querySelector('[data-act="import-cancel"]');if(ix)ix.addEventListener('click',()=>{const p=c.querySelector('#importPanel');if(p)p.style.display='none';});}
@@ -1872,6 +1872,21 @@ function deletePreset(name){
 function exportPresets(btn){
   const json=JSON.stringify(getPresets(),null,2);
   navigator.clipboard.writeText(json).then(()=>{btn.textContent='Copied!';setTimeout(()=>btn.textContent='Export All',2000)}).catch(()=>{btn.textContent='Copy failed';setTimeout(()=>btn.textContent='Export All',2000)});
+}
+function exportSinglePreset(name,btn){
+  const ps=getPresets();const pd=ps[name];if(!pd)return;
+  // Wrapped in {[name]: data} so the same Import flow round-trips it.
+  const json=JSON.stringify({[name]:pd},null,2);
+  const flash=msg=>{const orig=btn.textContent;btn.textContent=msg;setTimeout(()=>{btn.textContent=orig},1600);};
+  // Prefer the iOS share sheet (AirDrop / save to Files / mail / messages),
+  // fall back to clipboard if Web Share isn't available or the user dismisses.
+  if(navigator.share){
+    navigator.share({title:'Norcoast: '+name,text:json}).catch(()=>{
+      navigator.clipboard.writeText(json).then(()=>flash('Copied')).catch(()=>flash('Failed'));
+    });
+  }else{
+    navigator.clipboard.writeText(json).then(()=>flash('Copied')).catch(()=>flash('Failed'));
+  }
 }
 // Whitelist of fields we trust to pull from imported JSON. Any unknown field
 // is dropped so a malicious or malformed import can't smuggle in surprises.
