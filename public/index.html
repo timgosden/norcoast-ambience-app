@@ -197,7 +197,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.51</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.52</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -258,7 +258,7 @@
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
       <button id="clickX2Btn" class="evolve-pill off" onclick="toggleClickX2()" style="padding:8px 10px;font-size:9px;letter-spacing:1px">x2</button>
     </div>
-    <div class="app-version">v1.51</div>
+    <div class="app-version">v1.52</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -1191,8 +1191,8 @@ function buildKeys(){
     btn.onclick=()=>{
       if(n===homeRoot){
         audioPaused=!audioPaused;
-        if(audioPaused){const t=ctx.currentTime;master.gain.cancelScheduledValues(t);master.gain.setValueAtTime(master.gain.value,t);master.gain.linearRampToValueAtTime(0,t+2.0);if(_drumMaster){_drumMaster.gain.cancelScheduledValues(t);_drumMaster.gain.setValueAtTime(_drumMaster.gain.value,t);_drumMaster.gain.linearRampToValueAtTime(0,t+2.0);}if(arpBus){arpBus.gain.cancelScheduledValues(t);arpBus.gain.setValueAtTime(arpBus.gain.value,t);arpBus.gain.linearRampToValueAtTime(0,t+2.0);}stopArp();btn.classList.add('paused');if('mediaSession' in navigator)navigator.mediaSession.playbackState='paused';}
-        else{const t=ctx.currentTime;ctx.resume();if(arpVol>0)startArp();master.gain.linearRampToValueAtTime(masterVol,t+3.0);if(_drumMaster)_drumMaster.gain.linearRampToValueAtTime(masterVol,t+3.0);if(arpBus)arpBus.gain.linearRampToValueAtTime(1,t+3.0);btn.classList.remove('paused');if('mediaSession' in navigator)navigator.mediaSession.playbackState='playing';}
+        if(audioPaused){const t=ctx.currentTime;master.gain.cancelScheduledValues(t);master.gain.setValueAtTime(master.gain.value,t);master.gain.linearRampToValueAtTime(0,t+2.0);if(_drumMaster){_drumMaster.gain.cancelScheduledValues(t);_drumMaster.gain.setValueAtTime(_drumMaster.gain.value,t);_drumMaster.gain.linearRampToValueAtTime(0,t+2.0);}if(arpBus){arpBus.gain.cancelScheduledValues(t);arpBus.gain.setValueAtTime(arpBus.gain.value,t);arpBus.gain.linearRampToValueAtTime(0,t+2.0);}if(_sumBus){_sumBus.gain.cancelScheduledValues(t);_sumBus.gain.setValueAtTime(_sumBus.gain.value,t);_sumBus.gain.linearRampToValueAtTime(0,t+2.0);}stopArp();btn.classList.add('paused');if('mediaSession' in navigator)navigator.mediaSession.playbackState='paused';}
+        else{const t=ctx.currentTime;ctx.resume();if(arpVol>0)startArp();master.gain.linearRampToValueAtTime(masterVol,t+3.0);if(_drumMaster)_drumMaster.gain.linearRampToValueAtTime(masterVol,t+3.0);if(arpBus)arpBus.gain.linearRampToValueAtTime(1,t+3.0);if(_sumBus)_sumBus.gain.linearRampToValueAtTime(0.7,t+3.0);btn.classList.remove('paused');if('mediaSession' in navigator)navigator.mediaSession.playbackState='playing';}
         return;
       }
       homeRoot=n;currentPresetName=null;document.getElementById('stateRoot').textContent=n;
@@ -1206,6 +1206,10 @@ function buildKeys(){
         master.gain.cancelScheduledValues(t);master.gain.setValueAtTime(master.gain.value,t);master.gain.linearRampToValueAtTime(masterVol,t+0.05);
         if(_drumMaster){_drumMaster.gain.cancelScheduledValues(t);_drumMaster.gain.setValueAtTime(_drumMaster.gain.value,t);_drumMaster.gain.linearRampToValueAtTime(masterVol,t+ATTACK);}
         if(arpBus){arpBus.gain.cancelScheduledValues(t);arpBus.gain.setValueAtTime(arpBus.gain.value,t);arpBus.gain.linearRampToValueAtTime(1,t+ATTACK);}
+        // FX bus was killed at fade-complete to stop reverb/delay overhang —
+        // bring it back over ATTACK so reverb and delay tails of the new key
+        // build up alongside the pads instead of arriving full-strength.
+        if(_sumBus){_sumBus.gain.cancelScheduledValues(t);_sumBus.gain.setValueAtTime(_sumBus.gain.value,t);_sumBus.gain.linearRampToValueAtTime(0.7,t+ATTACK);}
       }
       arpStep=0;
       const firstChord=[...enabledEvolveIdx][0]??0;
@@ -1751,6 +1755,12 @@ function triggerFade(){
     // over ATTACK so movement and arp join in at the same rate as the pads.
     if(_drumMaster){_drumMaster.gain.cancelScheduledValues(ctx.currentTime);_drumMaster.gain.setValueAtTime(_drumMaster.gain.value,ctx.currentTime);_drumMaster.gain.linearRampToValueAtTime(0,ctx.currentTime+0.05);}
     if(arpBus){arpBus.gain.cancelScheduledValues(ctx.currentTime);arpBus.gain.setValueAtTime(arpBus.gain.value,ctx.currentTime);arpBus.gain.linearRampToValueAtTime(0,ctx.currentTime+0.05);}
+    // Kill the FX-return bus too so any reverb / delay / shimmer tails that
+    // were still echoing through their internal feedback loops are silenced
+    // — otherwise that residue bleeds into the next key as "overhang". The
+    // next key press will ramp _sumBus back up over ATTACK alongside the
+    // layers and arp/drum buses.
+    if(_sumBus){_sumBus.gain.cancelScheduledValues(ctx.currentTime);_sumBus.gain.setValueAtTime(_sumBus.gain.value,ctx.currentTime);_sumBus.gain.linearRampToValueAtTime(0,ctx.currentTime+0.05);}
     // Deactivate any selected key — next press becomes a fresh start.
     homeRoot='';
     buildKeys();
@@ -1832,9 +1842,42 @@ function loadPreset(name){try{
   // to silence on load).
   updateQuickStrips();
   if(s.satAmt!=null){satAmt=s.satAmt;if(satWS)satWS.curve=buildSatCurve(satAmt);if(satCompNode)satCompNode.gain.linearRampToValueAtTime(1-satAmt*0.3,ctx.currentTime+0.05);}
-  if(s.arpVol!=null){arpVol=s.arpVol;arpStep=0;if(ctx&&arpVol>0)startArp();else stopArp();}
+  // Crossfade arp and drums via their bus gains so preset transitions don't
+  // feel "instant". Three cases:
+  //   both old + new have it  → dip-and-rise on the bus
+  //   new on, old off          → bus from 0, ramp up, start timer now
+  //   old on, new off          → ramp bus to 0, then stop timer
+  const _half=PRESET_FADE/2;
+  if(s.arpVol!=null){
+    const oldA=arpVol,newA=s.arpVol;
+    if(newA>0&&oldA>0){
+      // Mid-transition: dip the bus, switch state at the dip, ramp back up.
+      if(arpBus)rampParam(arpBus.gain,0,_half);
+      setTimeout(()=>{arpVol=newA;arpStep=0;if(ctx)startArp();if(arpBus)rampParam(arpBus.gain,1,_half);},_half*1000);
+    }else if(newA>0){
+      arpVol=newA;arpStep=0;
+      if(ctx)startArp();
+      if(arpBus){arpBus.gain.cancelScheduledValues(ctx.currentTime);arpBus.gain.setValueAtTime(0,ctx.currentTime);arpBus.gain.linearRampToValueAtTime(1,ctx.currentTime+PRESET_FADE);}
+    }else if(oldA>0){
+      if(arpBus)rampParam(arpBus.gain,0,PRESET_FADE);
+      setTimeout(()=>{arpVol=0;stopArp();if(arpBus)arpBus.gain.value=1;},PRESET_FADE*1000);
+    }else{arpVol=newA;}
+  }
   if(s.movementPattern!=null)movementPattern=s.movementPattern;
-  if(s.movementVol!=null){movementVol=s.movementVol;movementStep=0;if(ctx&&movementVol>0)startMovement();else stopMovement();}
+  if(s.movementVol!=null){
+    const oldM=movementVol,newM=s.movementVol;
+    if(newM>0&&oldM>0){
+      if(_drumMaster)rampParam(_drumMaster.gain,0,_half);
+      setTimeout(()=>{movementVol=newM;movementStep=0;if(ctx)startMovement();if(_drumMaster)rampParam(_drumMaster.gain,masterVol,_half);},_half*1000);
+    }else if(newM>0){
+      movementVol=newM;movementStep=0;
+      if(ctx)startMovement();
+      if(_drumMaster){_drumMaster.gain.cancelScheduledValues(ctx.currentTime);_drumMaster.gain.setValueAtTime(0,ctx.currentTime);_drumMaster.gain.linearRampToValueAtTime(masterVol,ctx.currentTime+PRESET_FADE);}
+    }else if(oldM>0){
+      if(_drumMaster)rampParam(_drumMaster.gain,0,PRESET_FADE);
+      setTimeout(()=>{movementVol=0;stopMovement();if(_drumMaster)_drumMaster.gain.value=masterVol;},PRESET_FADE*1000);
+    }else{movementVol=newM;}
+  }
   if(s.clickBPM!=null){clickBPM=s.clickBPM;if(clickActive){stopClick();startClick()}}
   if(Array.isArray(s.enabledEvolveIdx)&&s.enabledEvolveIdx.length>0)enabledEvolveIdx=new Set(s.enabledEvolveIdx);
   if(s.layers)PAD_LAYERS.forEach(l=>{if(s.layers[l.id]!=null)layerState[l.id].volume=s.layers[l.id].volume??0});
@@ -1927,8 +1970,13 @@ function sanitizePreset(p){
 }
 function importPresets(text,statusEl){
   const setStatus=m=>{if(statusEl)statusEl.textContent=m;};
+  // Be lenient — share-sheet output often prefixes "Norcoast: foo\n{..."
+  // and Notes / mail can append signatures. Pull out the JSON object.
+  const raw=String(text||'');
+  const first=raw.indexOf('{'),last=raw.lastIndexOf('}');
+  const slice=(first>=0&&last>first)?raw.slice(first,last+1):raw;
   let parsed;
-  try{parsed=JSON.parse(text);}
+  try{parsed=JSON.parse(slice);}
   catch(e){setStatus('Could not parse JSON.');return;}
   if(!parsed||typeof parsed!=='object'||Array.isArray(parsed)){setStatus('Expected an object of presets.');return;}
   const incoming=Object.entries(parsed);
