@@ -197,7 +197,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.52</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.53</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -258,7 +258,7 @@
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
       <button id="clickX2Btn" class="evolve-pill off" onclick="toggleClickX2()" style="padding:8px 10px;font-size:9px;letter-spacing:1px">x2</button>
     </div>
-    <div class="app-version">v1.52</div>
+    <div class="app-version">v1.53</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -558,10 +558,6 @@ async function initAudio(){
   ctx=new(window.AudioContext||window.webkitAudioContext)();
   const sb=ctx.createBuffer(1,1,ctx.sampleRate);
   const s=ctx.createBufferSource();s.buffer=sb;s.connect(ctx.destination);s.start(0);
-  // Load pitch-shifter worklet (fail gracefully — shimmer still works without it)
-  try{
-    await ctx.audioWorklet.addModule('./pitch-shifter-worklet.js');
-  }catch(e){console.warn('Pitch-shifter worklet unavailable:',e);}
   try{
     await ctx.audioWorklet.addModule('./dattorro-reverb-worklet.js');
   }catch(e){console.error('Dattorro reverb worklet failed to load:',e);}
@@ -1127,7 +1123,6 @@ function lpfFaderToHz(v){return Math.exp(Math.log(100)+v*v*(Math.log(20000)-Math
 function hpfFaderToHz(v){if(v<0.01)return 20;return Math.exp(Math.log(20)+v*(Math.log(500)-Math.log(20)))}
 function formatHz(hz){return hz>=1000?(hz/1000).toFixed(1)+'kHz':Math.round(hz)+'Hz'}
 function formatDb(db){return(db>0?'+':db<0?'':'')+db.toFixed(1)+'dB'}
-function qToSlider(q){return(q-0.1)/11.9}
 function sliderToQ(r){return 0.1+r*11.9}
 function eqGainToSlider(db){return(db+12)/24}
 function sliderToEqGain(r){return(r-0.5)*24}
@@ -1938,10 +1933,6 @@ function loadPreset(name){try{
 function deletePreset(name){
   const ps=getPresets();delete ps[name];localStorage.setItem('norcoast_presets',JSON.stringify(ps));buildEditSheet();updatePerfSetlist();
 }
-function exportPresets(btn){
-  const json=JSON.stringify(getPresets(),null,2);
-  navigator.clipboard.writeText(json).then(()=>{btn.textContent='Copied!';setTimeout(()=>btn.textContent='Export All',2000)}).catch(()=>{btn.textContent='Copy failed';setTimeout(()=>btn.textContent='Export All',2000)});
-}
 function exportSinglePreset(name,btn){
   const ps=getPresets();const pd=ps[name];if(!pd)return;
   // Wrapped in {[name]: data} so the same Import flow round-trips it.
@@ -2239,15 +2230,6 @@ function tapTempo(){
 
 let _dragCleanup=null;
 // ─── SETLIST REORDER ───
-function movePreset(name,dir){
-  const ps=getPresets();const keys=Object.keys(ps);
-  const i=keys.indexOf(name);if(i<0)return;
-  const j=i+dir;if(j<0||j>=keys.length)return;
-  [keys[i],keys[j]]=[keys[j],keys[i]];
-  const newPs={};keys.forEach(k=>{newPs[k]=ps[k]});
-  localStorage.setItem('norcoast_presets',JSON.stringify(newPs));
-  buildEditSheet();updatePerfSetlist();
-}
 function movePresetTo(name,targetIdx){
   const ps=getPresets();const keys=Object.keys(ps);
   const fromIdx=keys.indexOf(name);if(fromIdx<0||targetIdx<0||targetIdx>=keys.length)return;
