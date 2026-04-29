@@ -185,7 +185,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.21</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.22</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -236,7 +236,7 @@
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
       <button id="clickX2Btn" class="evolve-pill off" onclick="toggleClickX2()" style="padding:8px 10px;font-size:9px;letter-spacing:1px">x2</button>
     </div>
-    <div class="app-version">v1.21</div>
+    <div class="app-version">v1.22</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -1239,7 +1239,7 @@ function randomise(){
   delayMixVal=Math.random()*0.75;
   if(delayGainN)delayGainN.gain.linearRampToValueAtTime(delayMixVal*0.7,t);
   if(_drumDelaySend)_drumDelaySend.gain.linearRampToValueAtTime(delayMixVal*1.5,t);
-  if(!delaySync){delayTimeVal=0.05*Math.pow(0.75/0.05,Math.random());if(delayNode)delayNode.delayTime.linearRampToValueAtTime(delayTimeVal,t);}
+  if(!delaySync){delayTimeVal=0.05*Math.pow(1.0/0.05,Math.random());if(delayNode)delayNode.delayTime.linearRampToValueAtTime(delayTimeVal,t);}
   chorusMix=Math.random()*0.9;
   if(chorusGainNode)chorusGainNode.gain.linearRampToValueAtTime(chorusMix*0.5,t);
   lpfValue=0.35+Math.random()*0.65;
@@ -1420,13 +1420,13 @@ function buildEditSheet(){
     h+=sliderRowHTML('rvMod','Mod','#6a9fd8',reverbMod,Math.round(reverbMod*100)+'%');
     h+='<div class="fx-section-header" style="background:rgba(94,184,138,0.08);border-left:3px solid #5eb88a">Delay</div>';
     h+=sliderRowHTML('dly','Mix','#5eb88a',delayMixVal,Math.round(delayMixVal*100)+'%');
-    h+=sliderRowHTML('dlyFB','Feedback','#5eb88a',delayFeedback/0.90,Math.round(delayFeedback/0.90*100)+'%');
+    h+=sliderRowHTML('dlyFB','Feedback','#5eb88a',delayFeedback/0.70,Math.round(delayFeedback/0.70*100)+'%');
     const toneLabel=delayTone<0.42?'Dark':delayTone>0.58?'Bright':'Neutral';
     h+=sliderRowHTML('dlyTone','Filter','#5eb88a',delayTone,toneLabel);
     h+='<div class="slope-row"><span class="slope-label">BPM Sync</span><button class="slope-btn'+(delaySync?' active':'')+'" onclick="toggleDelaySync()">'+(delaySync?'On':'Off')+'</button>';
     if(delaySync){[['1/2','1/2'],['1/4d','q.'],['1/4','q'],['1/8d','1/8.'],['1/8','1/8']].forEach(([lbl,dv])=>{h+='<button class="slope-btn'+(delaySyncDiv===dv?' active':'')+'" onclick="setDelaySyncDiv(\''+dv+'\')" style="padding:6px 10px">'+lbl+'</button>'})}
     h+='</div>';
-    if(!delaySync){const dtR=Math.log(delayTimeVal/0.05)/Math.log(0.75/0.05);h+=sliderRowHTML('dlyT','Time','#5eb88a',dtR,Math.round(delayTimeVal*1000)+'ms')}
+    if(!delaySync){const dtR=Math.log(delayTimeVal/0.05)/Math.log(1.0/0.05);h+=sliderRowHTML('dlyT','Time','#5eb88a',dtR,Math.round(delayTimeVal*1000)+'ms')}
     h+='<div class="fx-section-header" style="background:rgba(196,183,232,0.08);border-left:3px solid #c4b8e8">Modulation</div>';
     h+=sliderRowHTML('wid','Width','#c4b8e8',widthMod,Math.round(widthMod*100)+'%');
     h+=sliderRowHTML('chr','Chorus','#c4b8e8',chorusMix,Math.round(chorusMix*100)+'%');
@@ -1527,8 +1527,8 @@ function buildEditSheet(){
   wireSR(c,'rvSz',r=>{reverbSize=r;if(reverb&&reverb.fbGain)reverb.fbGain.gain.linearRampToValueAtTime(reverbSizeToFB(r),ctx.currentTime+0.1);return Math.round(1+r*9)+'s'});
   wireSR(c,'rvMod',r=>{reverbMod=r;if(reverb&&reverb.excDepth){reverb.excDepth.linearRampToValueAtTime(r*1.5,ctx.currentTime+0.1);reverb.excRate.linearRampToValueAtTime(0.3+r*1.7,ctx.currentTime+0.1);}if(reverbModWet)reverbModWet.gain.linearRampToValueAtTime(r*0.7*reverbMix,ctx.currentTime+0.1);if(reverbModLGain)reverbModLGain.gain.linearRampToValueAtTime(0.0025*r,ctx.currentTime+0.1);if(reverbModRGain)reverbModRGain.gain.linearRampToValueAtTime(0.0025*r,ctx.currentTime+0.1);return Math.round(r*100)+'%'});
   wireSR(c,'dly',r=>{delayMixVal=r;delayGainN.gain.linearRampToValueAtTime(r*0.7,ctx.currentTime+0.05);if(_drumDelaySend)_drumDelaySend.gain.linearRampToValueAtTime(r*1.5,ctx.currentTime+0.05);return Math.round(r*100)+'%'});
-  wireSR(c,'dlyFB',r=>{delayFeedback=r*0.90;if(delayFB)delayFB.gain.linearRampToValueAtTime(delayFeedback,ctx.currentTime+0.1);return Math.round(r*100)+'%'});
-  wireSR(c,'dlyT',r=>{delayTimeVal=0.05*Math.pow(0.75/0.05,r);if(delayNode&&!delaySync)delayNode.delayTime.linearRampToValueAtTime(delayTimeVal,ctx.currentTime+0.1);return Math.round(delayTimeVal*1000)+'ms'});
+  wireSR(c,'dlyFB',r=>{delayFeedback=r*0.70;if(delayFB)delayFB.gain.linearRampToValueAtTime(delayFeedback,ctx.currentTime+0.1);return Math.round(r*100)+'%'});
+  wireSR(c,'dlyT',r=>{delayTimeVal=0.05*Math.pow(1.0/0.05,r);if(delayNode&&!delaySync)delayNode.delayTime.linearRampToValueAtTime(delayTimeVal,ctx.currentTime+0.1);return Math.round(delayTimeVal*1000)+'ms'});
   wireSR(c,'dlyTone',r=>{delayTone=r;if(dToneNode)dToneNode.gain.linearRampToValueAtTime((r-0.5)*24,ctx.currentTime+0.05);return r<0.42?'Dark':r>0.58?'Bright':'Neutral'});
   wireSR(c,'shm',r=>{const v=r*0.5;const was=shimmerVol;shimmerVol=v;if(v>0&&was===0)startShimmer(v);else if(v<=0)stopShimmer();else if(shimmerNode){shimmerNode.output.gain.cancelScheduledValues(ctx.currentTime);shimmerNode.output.gain.setValueAtTime(shimmerNode.output.gain.value,ctx.currentTime);shimmerNode.output.gain.linearRampToValueAtTime(v*1.5,ctx.currentTime+0.15);}return Math.round(r*100)+'%'});
   wireSR(c,'wid',r=>{widthMod=r;if(widthLFOGain)widthLFOGain.gain.linearRampToValueAtTime(r*0.5,ctx.currentTime+0.1);return Math.round(r*100)+'%'});
@@ -2037,8 +2037,8 @@ function applyMidiParam(id,val){
     case'rvSz':reverbSize=val;if(reverb&&reverb.fbGain)reverb.fbGain.gain.linearRampToValueAtTime(reverbSizeToFB(val),ctx.currentTime+0.1);break;
     case'rvMod':reverbMod=val;if(reverb&&reverb.excDepth){reverb.excDepth.linearRampToValueAtTime(val*1.5,ctx.currentTime+0.1);reverb.excRate.linearRampToValueAtTime(0.3+val*1.7,ctx.currentTime+0.1);}if(reverbModWet)reverbModWet.gain.linearRampToValueAtTime(val*0.7*reverbMix,ctx.currentTime+0.1);if(reverbModLGain)reverbModLGain.gain.linearRampToValueAtTime(0.0025*val,ctx.currentTime+0.1);if(reverbModRGain)reverbModRGain.gain.linearRampToValueAtTime(0.0025*val,ctx.currentTime+0.1);break;
     case'dly':delayMixVal=val;if(delayGainN)delayGainN.gain.value=val*0.7;break;
-    case'dlyFB':delayFeedback=val*0.90;if(delayFB)delayFB.gain.linearRampToValueAtTime(delayFeedback,ctx.currentTime+0.1);break;
-    case'dlyT':delayTimeVal=0.05*Math.pow(0.75/0.05,val);if(delayNode&&!delaySync)delayNode.delayTime.linearRampToValueAtTime(delayTimeVal,ctx.currentTime+0.1);break;
+    case'dlyFB':delayFeedback=val*0.70;if(delayFB)delayFB.gain.linearRampToValueAtTime(delayFeedback,ctx.currentTime+0.1);break;
+    case'dlyT':delayTimeVal=0.05*Math.pow(1.0/0.05,val);if(delayNode&&!delaySync)delayNode.delayTime.linearRampToValueAtTime(delayTimeVal,ctx.currentTime+0.1);break;
     case'dlyTone':delayTone=val;if(dToneNode)dToneNode.gain.linearRampToValueAtTime((val-0.5)*24,ctx.currentTime+0.05);break;
     case'chr':chorusMix=val;if(chorusGainNode)chorusGainNode.gain.linearRampToValueAtTime(val*0.5,ctx.currentTime+0.1);break;
     case'wid':widthMod=val;if(widthLFOGain)widthLFOGain.gain.linearRampToValueAtTime(val*0.5,ctx.currentTime+0.1);break;
@@ -2049,7 +2049,7 @@ function applyMidiParam(id,val){
     case'mst':masterVol=faderToVol(val);if(master)master.gain.linearRampToValueAtTime(masterVol,ctx.currentTime+0.1);if(_drumMaster)_drumMaster.gain.linearRampToValueAtTime(masterVol,ctx.currentTime+0.1);updateQuickStrips();break;
     case'sat':satAmt=val;if(satWS)satWS.curve=buildSatCurve(val);if(satCompNode)satCompNode.gain.linearRampToValueAtTime(1-val*0.3,ctx.currentTime+0.05);break;
   }
-  {const _fmt={'rev':()=>Math.round(val*100)+'%','rvSz':()=>Math.round(1+val*9)+'s','rvMod':()=>Math.round(val*100)+'%','dly':()=>Math.round(val*100)+'%','dlyFB':()=>Math.round(val*100)+'%','dlyT':()=>Math.round(0.05*Math.pow(0.75/0.05,val)*1000)+'ms','dlyTone':()=>val<0.42?'Dark':val>0.58?'Bright':'Neutral','chr':()=>Math.round(val*100)+'%','wid':()=>Math.round(val*100)+'%','shm':()=>Math.round(val*100)+'%','lpf':()=>formatHz(lpfFaderToHz(val)),'hpf':()=>formatHz(hpfFaderToHz(val)),'spd':()=>Math.round(faderToVol(val)*100)+'%','mst':()=>Math.round(faderToVol(val)*100)+'%','sat':()=>Math.round(val*100)+'%'}[id];if(_fmt){const _inp=document.querySelector('input[data-sr="'+id+'"]');const _lbl=document.getElementById('sr_'+id);if(_inp){_inp.value=val;const _c=_inp.dataset.color||'#6a9fd8';_inp.style.background='linear-gradient(to right,'+_c+'66 '+val*100+'%,rgba(255,255,255,0.06) '+val*100+'%)';}if(_lbl)_lbl.textContent=_fmt();}}
+  {const _fmt={'rev':()=>Math.round(val*100)+'%','rvSz':()=>Math.round(1+val*9)+'s','rvMod':()=>Math.round(val*100)+'%','dly':()=>Math.round(val*100)+'%','dlyFB':()=>Math.round(val*100)+'%','dlyT':()=>Math.round(0.05*Math.pow(1.0/0.05,val)*1000)+'ms','dlyTone':()=>val<0.42?'Dark':val>0.58?'Bright':'Neutral','chr':()=>Math.round(val*100)+'%','wid':()=>Math.round(val*100)+'%','shm':()=>Math.round(val*100)+'%','lpf':()=>formatHz(lpfFaderToHz(val)),'hpf':()=>formatHz(hpfFaderToHz(val)),'spd':()=>Math.round(faderToVol(val)*100)+'%','mst':()=>Math.round(faderToVol(val)*100)+'%','sat':()=>Math.round(val*100)+'%'}[id];if(_fmt){const _inp=document.querySelector('input[data-sr="'+id+'"]');const _lbl=document.getElementById('sr_'+id);if(_inp){_inp.value=val;const _c=_inp.dataset.color||'#6a9fd8';_inp.style.background='linear-gradient(to right,'+_c+'66 '+val*100+'%,rgba(255,255,255,0.06) '+val*100+'%)';}if(_lbl)_lbl.textContent=_fmt();}}
   queueSave();
 }
 function handleMIDI(msg){
