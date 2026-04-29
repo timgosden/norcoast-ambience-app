@@ -197,7 +197,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.44</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.45</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -258,7 +258,7 @@
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
       <button id="clickX2Btn" class="evolve-pill off" onclick="toggleClickX2()" style="padding:8px 10px;font-size:9px;letter-spacing:1px">x2</button>
     </div>
-    <div class="app-version">v1.44</div>
+    <div class="app-version">v1.45</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -351,7 +351,7 @@ let lpfValue=0.897,hpfValue=0;
 let reverbMix=0.71,reverbSize=0.92,reverbMod=0.74,delayMixVal=0.46,delayFeedback=0.57,delayTone=1.0,masterVol=0.5,satAmt=0;
 let textureOctUp=true,foundationSubOct=true;
 let widthMod=0.39;
-let arpVol=0.14,arpRate=0.125,arpOct=0,arpVoice='soft',arpStep=0,arpTimer=null;
+let arpVol=0.14,arpRate=0.125,arpOct=0,arpVoice='soft',arpStep=0,arpTimer=null,arpBus=null;
 let movementVol=0,movementPattern=0,movementStep=0,movementTimer=null,movementReverb=null;
 const CUSTOM_CHORD_IDX=CHORD_TYPES.length-1;
 const CUSTOM_PAT_IDX=MOVEMENT_PATTERNS.length-1;
@@ -570,6 +570,10 @@ async function initAudio(){
   }catch(e){console.error('Phase vocoder worklet failed to load:',e);}
   initWaves();
   master=ctx.createGain();master.gain.value=masterVol;
+  // arpBus sits between arp notes and master so arp can fade in/out
+  // independently — pads fade via their own layer gain, arp had no equivalent
+  // and was coming in at full volume on every resume.
+  arpBus=ctx.createGain();arpBus.gain.value=1;arpBus.connect(master);
   globalLPF=ctx.createBiquadFilter();globalLPF.type="lowpass";globalLPF.frequency.value=lpfFaderToHz(lpfValue);globalLPF.Q.value=lpfQ;
   globalLPF2=ctx.createBiquadFilter();globalLPF2.type="lowpass";globalLPF2.frequency.value=lpfSlope===24?lpfFaderToHz(lpfValue):22000;globalLPF2.Q.value=lpfQ;
   globalHPF=ctx.createBiquadFilter();globalHPF.type="highpass";globalHPF.frequency.value=hpfFaderToHz(hpfValue);globalHPF.Q.value=hpfQ;
@@ -922,7 +926,7 @@ function fireArpNote(){
       env.gain.linearRampToValueAtTime(0,t0+noteDur);
       pan.pan.value=panV;
       osc.connect(filt);filt.connect(env);env.connect(pan);
-      pan.connect(master);
+      pan.connect(arpBus||master);
       osc.start();osc.stop(t0+noteDur+0.5);
       osc.onended=()=>{try{osc.disconnect();filt.disconnect();env.disconnect();pan.disconnect()}catch(e){}};
     });
@@ -942,7 +946,7 @@ function fireArpNote(){
       env.gain.linearRampToValueAtTime(0,t0+noteDur);
       pan.pan.value=panV;
       osc.connect(env);env.connect(pan);
-      pan.connect(master);
+      pan.connect(arpBus||master);
       osc.start();osc.stop(t0+noteDur+0.5);
       osc.onended=()=>{try{osc.disconnect();env.disconnect();pan.disconnect()}catch(e){}};
     });
@@ -972,7 +976,7 @@ function fireArpNote(){
       env.gain.linearRampToValueAtTime(0,t0+noteDur);
       pan.pan.value=panV;
       osc.connect(filt);filt.connect(env);env.connect(pan);
-      pan.connect(master);
+      pan.connect(arpBus||master);
       osc.start();osc.stop(t0+noteDur+0.5);
       osc.onended=()=>{try{osc.disconnect();filt.disconnect();env.disconnect();pan.disconnect()}catch(e){}};
     });
@@ -1166,12 +1170,22 @@ function buildKeys(){
     btn.onclick=()=>{
       if(n===homeRoot){
         audioPaused=!audioPaused;
-        if(audioPaused){master.gain.cancelScheduledValues(ctx.currentTime);master.gain.setValueAtTime(master.gain.value,ctx.currentTime);master.gain.linearRampToValueAtTime(0,ctx.currentTime+2.0);if(_drumMaster){_drumMaster.gain.cancelScheduledValues(ctx.currentTime);_drumMaster.gain.setValueAtTime(_drumMaster.gain.value,ctx.currentTime);_drumMaster.gain.linearRampToValueAtTime(0,ctx.currentTime+2.0);}stopArp();btn.classList.add('paused');if('mediaSession' in navigator)navigator.mediaSession.playbackState='paused';}
-        else{ctx.resume();if(arpVol>0)startArp();master.gain.linearRampToValueAtTime(masterVol,ctx.currentTime+3.0);if(_drumMaster)_drumMaster.gain.linearRampToValueAtTime(masterVol,ctx.currentTime+0.4);btn.classList.remove('paused');if('mediaSession' in navigator)navigator.mediaSession.playbackState='playing';}
+        if(audioPaused){const t=ctx.currentTime;master.gain.cancelScheduledValues(t);master.gain.setValueAtTime(master.gain.value,t);master.gain.linearRampToValueAtTime(0,t+2.0);if(_drumMaster){_drumMaster.gain.cancelScheduledValues(t);_drumMaster.gain.setValueAtTime(_drumMaster.gain.value,t);_drumMaster.gain.linearRampToValueAtTime(0,t+2.0);}if(arpBus){arpBus.gain.cancelScheduledValues(t);arpBus.gain.setValueAtTime(arpBus.gain.value,t);arpBus.gain.linearRampToValueAtTime(0,t+2.0);}stopArp();btn.classList.add('paused');if('mediaSession' in navigator)navigator.mediaSession.playbackState='paused';}
+        else{const t=ctx.currentTime;ctx.resume();if(arpVol>0)startArp();master.gain.linearRampToValueAtTime(masterVol,t+3.0);if(_drumMaster)_drumMaster.gain.linearRampToValueAtTime(masterVol,t+3.0);if(arpBus)arpBus.gain.linearRampToValueAtTime(1,t+3.0);btn.classList.remove('paused');if('mediaSession' in navigator)navigator.mediaSession.playbackState='playing';}
         return;
       }
       homeRoot=n;currentPresetName=null;document.getElementById('stateRoot').textContent=n;
-      if(audioPaused){audioPaused=false;ctx.resume();master.gain.cancelScheduledValues(ctx.currentTime);master.gain.setValueAtTime(master.gain.value,ctx.currentTime);master.gain.linearRampToValueAtTime(masterVol,ctx.currentTime+0.3);if(_drumMaster){_drumMaster.gain.cancelScheduledValues(ctx.currentTime);_drumMaster.gain.setValueAtTime(_drumMaster.gain.value,ctx.currentTime);_drumMaster.gain.linearRampToValueAtTime(masterVol,ctx.currentTime+0.3);}}
+      if(audioPaused){
+        audioPaused=false;ctx.resume();
+        const t=ctx.currentTime;
+        // Master itself only needs a quick unmute — we just want it out of the
+        // way. The slow musical fade-in is on the layers (already via ATTACK
+        // in startPad) and on arpBus / _drumMaster below, so arp and movement
+        // come up at the same rate as the pads.
+        master.gain.cancelScheduledValues(t);master.gain.setValueAtTime(master.gain.value,t);master.gain.linearRampToValueAtTime(masterVol,t+0.05);
+        if(_drumMaster){_drumMaster.gain.cancelScheduledValues(t);_drumMaster.gain.setValueAtTime(_drumMaster.gain.value,t);_drumMaster.gain.linearRampToValueAtTime(masterVol,t+ATTACK);}
+        if(arpBus){arpBus.gain.cancelScheduledValues(t);arpBus.gain.setValueAtTime(arpBus.gain.value,t);arpBus.gain.linearRampToValueAtTime(1,t+ATTACK);}
+      }
       arpStep=0;
       const firstChord=[...enabledEvolveIdx][0]??0;
       currentEvolve=firstChord;pendingEvolve=-1;
@@ -1694,7 +1708,10 @@ function triggerFade(){
     master.gain.cancelScheduledValues(ctx.currentTime);
     master.gain.setValueAtTime(0,ctx.currentTime);
     master.gain.linearRampToValueAtTime(masterVol,ctx.currentTime+0.05);
-    if(_drumMaster){_drumMaster.gain.cancelScheduledValues(ctx.currentTime);_drumMaster.gain.setValueAtTime(0,ctx.currentTime);_drumMaster.gain.linearRampToValueAtTime(masterVol,ctx.currentTime+0.05);}
+    // Drum bus and arp bus stay at 0 — the next key press will fade them up
+    // over ATTACK so movement and arp join in at the same rate as the pads.
+    if(_drumMaster){_drumMaster.gain.cancelScheduledValues(ctx.currentTime);_drumMaster.gain.setValueAtTime(_drumMaster.gain.value,ctx.currentTime);_drumMaster.gain.linearRampToValueAtTime(0,ctx.currentTime+0.05);}
+    if(arpBus){arpBus.gain.cancelScheduledValues(ctx.currentTime);arpBus.gain.setValueAtTime(arpBus.gain.value,ctx.currentTime);arpBus.gain.linearRampToValueAtTime(0,ctx.currentTime+0.05);}
     // Deactivate any selected key — next press becomes a fresh start.
     homeRoot='';
     buildKeys();
@@ -2242,7 +2259,7 @@ function handleMIDI(msg){
     const n=MIDI_NOTE_NAMES[d1%12];
     if(n===homeRoot)return;
     homeRoot=n;document.getElementById('stateRoot').textContent=n;
-    if(audioPaused){audioPaused=false;ctx.resume();master.gain.cancelScheduledValues(ctx.currentTime);master.gain.setValueAtTime(master.gain.value,ctx.currentTime);master.gain.linearRampToValueAtTime(masterVol,ctx.currentTime+0.3);if(_drumMaster){_drumMaster.gain.cancelScheduledValues(ctx.currentTime);_drumMaster.gain.setValueAtTime(_drumMaster.gain.value,ctx.currentTime);_drumMaster.gain.linearRampToValueAtTime(masterVol,ctx.currentTime+0.3);}}
+    if(audioPaused){audioPaused=false;ctx.resume();const _t=ctx.currentTime;master.gain.cancelScheduledValues(_t);master.gain.setValueAtTime(master.gain.value,_t);master.gain.linearRampToValueAtTime(masterVol,_t+0.05);if(_drumMaster){_drumMaster.gain.cancelScheduledValues(_t);_drumMaster.gain.setValueAtTime(_drumMaster.gain.value,_t);_drumMaster.gain.linearRampToValueAtTime(masterVol,_t+ATTACK);}if(arpBus){arpBus.gain.cancelScheduledValues(_t);arpBus.gain.setValueAtTime(arpBus.gain.value,_t);arpBus.gain.linearRampToValueAtTime(1,_t+ATTACK);}}
     arpStep=0;
     const _fc=[...enabledEvolveIdx][0]??0;
     currentEvolve=_fc;pendingEvolve=-1;
@@ -2320,10 +2337,12 @@ function norcoast_resume(){
   if(!ctx||!audioPaused)return;
   audioPaused=false;
   ctx.resume();
-  master.gain.cancelScheduledValues(ctx.currentTime);
-  master.gain.setValueAtTime(master.gain.value,ctx.currentTime);
-  master.gain.linearRampToValueAtTime(masterVol,ctx.currentTime+0.3);
-  if(_drumMaster){_drumMaster.gain.cancelScheduledValues(ctx.currentTime);_drumMaster.gain.setValueAtTime(_drumMaster.gain.value,ctx.currentTime);_drumMaster.gain.linearRampToValueAtTime(masterVol,ctx.currentTime+0.3);}
+  const t=ctx.currentTime;
+  master.gain.cancelScheduledValues(t);
+  master.gain.setValueAtTime(master.gain.value,t);
+  master.gain.linearRampToValueAtTime(masterVol,t+0.3);
+  if(_drumMaster){_drumMaster.gain.cancelScheduledValues(t);_drumMaster.gain.setValueAtTime(_drumMaster.gain.value,t);_drumMaster.gain.linearRampToValueAtTime(masterVol,t+0.3);}
+  if(arpBus){arpBus.gain.cancelScheduledValues(t);arpBus.gain.setValueAtTime(arpBus.gain.value,t);arpBus.gain.linearRampToValueAtTime(1,t+0.3);}
   const ab=document.querySelector('.key-btn.active');if(ab)ab.classList.remove('paused');
   if('mediaSession' in navigator)navigator.mediaSession.playbackState='playing';
   try{window.webkit.messageHandlers.bridge.postMessage('playing')}catch(_){}
@@ -2332,8 +2351,10 @@ function norcoast_pause(){
   if(!ctx||audioPaused)return;
   audioPaused=true;
   stopArp();
-  master.gain.linearRampToValueAtTime(0,ctx.currentTime+0.4);
-  if(_drumMaster)_drumMaster.gain.linearRampToValueAtTime(0,ctx.currentTime+0.4);
+  const t=ctx.currentTime;
+  master.gain.linearRampToValueAtTime(0,t+0.4);
+  if(_drumMaster)_drumMaster.gain.linearRampToValueAtTime(0,t+0.4);
+  if(arpBus)arpBus.gain.linearRampToValueAtTime(0,t+0.4);
   const ab=document.querySelector('.key-btn.active');if(ab)ab.classList.add('paused');
   if('mediaSession' in navigator)navigator.mediaSession.playbackState='paused';
   try{window.webkit.messageHandlers.bridge.postMessage('paused')}catch(_){}
