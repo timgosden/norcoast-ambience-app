@@ -110,6 +110,21 @@
   .eq-toggle:hover{background:rgba(255,255,255,0.07);color:rgba(255,255,255,0.8)}
   .eq-panel{display:none;margin-top:14px}
   .eq-panel.open{display:block}
+  .sub-panel-toggle{width:100%;padding:8px 0;margin:8px 0 0;border-radius:10px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:rgba(255,255,255,0.45);font-size:11px;letter-spacing:1px;cursor:pointer;transition:all 0.2s}
+  .sub-panel-toggle:hover{background:rgba(255,255,255,0.07);color:rgba(255,255,255,0.8)}
+  .sub-panel{display:none;margin-top:10px;padding:10px 0 4px}
+  .sub-panel.open{display:block}
+  .chord-note-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin:6px 0 4px}
+  .chord-note-btn{padding:7px 2px;border-radius:7px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:rgba(255,255,255,0.35);font-size:9px;text-align:center;cursor:pointer;transition:all 0.2s;line-height:1.4}
+  .chord-note-btn.active{background:rgba(106,159,216,0.18);border-color:rgba(106,159,216,0.45);color:rgba(106,159,216,0.95)}
+  .chord-note-btn.root{background:rgba(196,145,94,0.15);border-color:rgba(196,145,94,0.4);color:rgba(196,145,94,0.85);cursor:default}
+  .seq-row-wrap{display:flex;align-items:center;gap:5px;margin-bottom:5px}
+  .seq-label{font-size:9px;color:rgba(255,255,255,0.38);width:18px;flex-shrink:0;text-align:center;letter-spacing:0.5px}
+  .seq-row{display:grid;grid-template-columns:repeat(16,1fr);gap:2px;flex:1}
+  .seq-step{height:22px;border-radius:3px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);cursor:pointer;touch-action:manipulation;transition:background 0.1s,border-color 0.1s}
+  .seq-step.on-lo{background:rgba(196,145,94,0.55);border-color:rgba(196,145,94,0.8)}
+  .seq-step.on-md{background:rgba(94,184,138,0.55);border-color:rgba(94,184,138,0.8)}
+  .seq-step.on-hh{background:rgba(106,159,216,0.55);border-color:rgba(106,159,216,0.8)}
 .eq-section-title{font-size:10px;letter-spacing:2px;color:rgba(255,255,255,0.25);text-transform:uppercase;margin:14px 0 8px;padding-left:2px}
   .slope-row{display:flex;align-items:center;gap:8px;margin:8px 0 4px;flex-wrap:wrap}
   .slope-label{font-size:11px;color:rgba(255,255,255,0.35);letter-spacing:0.5px;flex:1}
@@ -166,7 +181,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.12</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.13</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -205,7 +220,7 @@
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
       <button id="clickX2Btn" class="evolve-pill off" onclick="toggleClickX2()" style="padding:8px 10px;font-size:9px;letter-spacing:1px">x2</button>
     </div>
-    <div class="app-version">v1.12</div>
+    <div class="app-version">v1.13</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -237,6 +252,7 @@ const CHORD_TYPES=[
   {name:"5th+9th",  semis:[7,14],     weight:3},
   {name:"6th",      semis:[9],        weight:2},
   {name:"5th+Maj7", semis:[7,11],     weight:2},
+  {name:"Custom",   semis:[7],        weight:3},
 ];
 
 // 1/16 grid patterns per time signature. 4/4 patterns use 16 or 32 steps
@@ -264,6 +280,7 @@ const MOVEMENT_PATTERNS=[
            ['lo','hh'],'','','hh','md','','hh','','','hh','','hh','md','','hh',''],
     '6/8':[['lo','hh'],'','','hh','','hh',['md','hh'],'','','','hh','']
   }},
+  {name:'Custom', steps:{'4/4':Array(16).fill(''),'6/8':Array(12).fill('')}},
 ];
 function _movSteps(pat){return pat&&pat.steps&&(pat.steps[timeSig]||pat.steps['4/4']);}
 
@@ -298,6 +315,12 @@ let textureOctUp=true,foundationSubOct=true;
 let widthMod=0.39;
 let arpVol=0.14,arpRate=0.125,arpOct=0,arpVoice='soft',arpStep=0,arpTimer=null;
 let movementVol=0,movementPattern=0,movementStep=0,movementTimer=null,movementReverb=null;
+const CUSTOM_CHORD_IDX=CHORD_TYPES.length-1;
+const CUSTOM_PAT_IDX=MOVEMENT_PATTERNS.length-1;
+const MAJOR_STEPS=[0,2,4,5,7,9,11];
+let customChordSemis=[7];
+let customSeqGrid={'lo':Array(16).fill(false),'md':Array(16).fill(false),'hh':Array(16).fill(false)};
+let customChordPanelOpen=false,seqPanelOpen=false;
 let limiter=null,clickOutBus=null,satCompNode=null,satWS=null;
 let _drumLPF=null,_drumHPF=null,_drumDelaySend=null;
 let clickBPM=140,clickActive=false,clickMuted=true,clickNextTime=0,clickSchedId=null,clickBeat=0,clickRateX2=false,clickAccent=true;
@@ -1175,7 +1198,7 @@ function randomise(){
   if(!ctx)return;
   // ── Chords: swap 2-4, always evolve to a fresh chord ──
   const enabled=[...enabledEvolveIdx];
-  const disabled=CHORD_TYPES.map((_,i)=>i).filter(i=>!enabledEvolveIdx.has(i));
+  const disabled=CHORD_TYPES.map((_,i)=>i).filter(i=>!enabledEvolveIdx.has(i)&&i!==CUSTOM_CHORD_IDX);
   if(enabled.length>1&&disabled.length>0){
     for(let i=enabled.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[enabled[i],enabled[j]]=[enabled[j],enabled[i]];}
     for(let i=disabled.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[disabled[i],disabled[j]]=[disabled[j],disabled[i]];}
@@ -1226,11 +1249,48 @@ function randomise(){
   arpRate=[0.0625,0.125,0.25,0.5,1][Math.floor(Math.random()*5)];
   const wasMvZ=movementVol<=0;movementVol=Math.random()<0.35?rV(0.15,0.55):0;
   if(movementVol>0&&wasMvZ)startMovement();else if(movementVol<=0)stopMovement();
-  movementPattern=Math.floor(Math.random()*MOVEMENT_PATTERNS.length);movementStep=0;
+  movementPattern=Math.floor(Math.random()*(MOVEMENT_PATTERNS.length-1));movementStep=0;
   textureOctUp=Math.random()<0.5;
   foundationSubOct=Math.random()<0.5;
   const fd=PAD_LAYERS.find(l=>l.id==='foundation');if(fd)fd.octaves=foundationSubOct?[-2,-1]:[-1];
   saveSettings();buildEditSheet();
+}
+// ─── CUSTOM CHORD BUILDER ───
+function toggleCustomChordPanel(btn){
+  customChordPanelOpen=!customChordPanelOpen;
+  const panel=document.getElementById('customChordPanel');if(!panel)return;
+  panel.classList.toggle('open',customChordPanelOpen);
+  btn.textContent=customChordPanelOpen?'Custom Chord ▴':'Custom Chord ▾';
+}
+function toggleCustomNote(semi){
+  if(semi===0)return;
+  const idx=customChordSemis.indexOf(semi);
+  if(idx>=0){if(customChordSemis.length<=1)return;customChordSemis.splice(idx,1);}
+  else{customChordSemis.push(semi);customChordSemis.sort((a,b)=>a-b);}
+  CHORD_TYPES[CUSTOM_CHORD_IDX].semis=[...customChordSemis];
+  if(currentEvolve===CUSTOM_CHORD_IDX)evolveVoice(CUSTOM_CHORD_IDX);
+  saveSettings();buildEditSheet();
+}
+// ─── STEP SEQUENCER ───
+function toggleSeqPanel(btn){
+  seqPanelOpen=!seqPanelOpen;
+  const panel=document.getElementById('seqPanel');if(!panel)return;
+  panel.classList.toggle('open',seqPanelOpen);
+  btn.textContent=seqPanelOpen?'Step Sequencer ▴':'Step Sequencer ▾';
+}
+function toggleSeqStep(row,step){
+  customSeqGrid[row][step]=!customSeqGrid[row][step];
+  rebuildCustomPattern();
+  saveSettings();buildEditSheet();
+}
+function rebuildCustomPattern(){
+  ['4/4','6/8'].forEach(sig=>{
+    const len=sig==='6/8'?12:16;
+    MOVEMENT_PATTERNS[CUSTOM_PAT_IDX].steps[sig]=Array.from({length:len},(_,i)=>{
+      const sounds=['lo','md','hh'].filter(r=>customSeqGrid[r][i]);
+      return sounds.length===0?'':sounds.length===1?sounds[0]:sounds;
+    });
+  });
 }
 function buildEditSheet(){
   const c=document.getElementById('editContent');c.innerHTML='';
@@ -1240,6 +1300,24 @@ function buildEditSheet(){
   CHORD_TYPES.forEach((iv,i)=>{h+='<button class="chord-pill'+(enabledEvolveIdx.has(i)?' active':'')+'" data-ci="'+i+'" onclick="toggleChord('+i+')">'+iv.name+'</button>'});
   h+='</div>';
   h+='<div style="margin:10px 0 4px;text-align:center"><button class="slope-btn" onclick="randomise()" style="padding:7px 24px;font-size:11px;letter-spacing:1px">✦ Randomise</button></div>';
+  // Custom chord builder sub-panel
+  h+='<div style="padding:0 12px 10px">';
+  h+='<button class="sub-panel-toggle" onclick="toggleCustomChordPanel(this)">'+(customChordPanelOpen?'Custom Chord ▴':'Custom Chord ▾')+'</button>';
+  h+='<div class="sub-panel'+(customChordPanelOpen?' open':'')+'" id="customChordPanel">';
+  h+='<div style="font-size:9px;letter-spacing:2px;color:rgba(255,255,255,0.25);text-transform:uppercase;margin-bottom:6px">Notes in '+homeRoot+' major</div>';
+  h+='<div class="chord-note-grid">';
+  const _rootIdx=NOTES.indexOf(homeRoot);
+  MAJOR_STEPS.forEach((s,di)=>{
+    const noteName=NOTES[(_rootIdx+s)%12];
+    const degLabel=['1','2','3','4','5','6','7'][di];
+    const isRoot=s===0;const isActive=isRoot||customChordSemis.includes(s);
+    h+='<button class="chord-note-btn'+(isRoot?' root':isActive?' active':'')+'"'+(isRoot?'':' onclick="toggleCustomNote('+s+')"')+'>';
+    h+='<div style="font-size:11px;font-weight:600">'+noteName+'</div>';
+    h+='<div style="font-size:8px;opacity:0.65">'+degLabel+'</div></button>';
+  });
+  h+='</div>';
+  h+='<div style="font-size:9px;color:rgba(255,255,255,0.22);text-align:center;margin-top:4px">Root is always on · enable "Custom" chord above to hear it</div>';
+  h+='</div></div>';
   h+='</div><div class="edit-divider"></div>';
   // ── Layers ──
   h+='<div class="edit-section"><div class="edit-title">Layers</div>';
@@ -1281,6 +1359,21 @@ function buildEditSheet(){
   h+='<div class="slope-row" style="padding:2px 12px 10px;flex-wrap:wrap"><span class="slope-label">Pattern</span>';
   MOVEMENT_PATTERNS.forEach((p,i)=>{h+='<button class="slope-btn'+(movementPattern===i?' active':'')+'" onclick="setMovementPattern('+i+')" style="padding:6px 10px">'+p.name+'</button>';});
   h+='</div>';
+  // Step sequencer sub-panel
+  h+='<div style="padding:0 12px 10px">';
+  h+='<button class="sub-panel-toggle" onclick="toggleSeqPanel(this)">'+(seqPanelOpen?'Step Sequencer ▴':'Step Sequencer ▾')+'</button>';
+  h+='<div class="sub-panel'+(seqPanelOpen?' open':'')+'" id="seqPanel">';
+  [['lo','#c4915e'],['md','#5eb88a'],['hh','#6a9fd8']].forEach(([row,color])=>{
+    h+='<div class="seq-row-wrap"><span class="seq-label">'+row+'</span><div class="seq-row">';
+    for(let i=0;i<16;i++){
+      const on=customSeqGrid[row][i];
+      const beatMark=i%4===0&&i>0?'margin-left:3px;':'';
+      h+='<button class="seq-step'+(on?' on-'+row:'')+'" onclick="toggleSeqStep(\''+row+'\','+i+')" style="'+beatMark+'"></button>';
+    }
+    h+='</div></div>';
+  });
+  h+='<div style="margin-top:8px;font-size:9px;color:rgba(255,255,255,0.22);text-align:center">Select "Custom" pattern above · 4 steps per beat</div>';
+  h+='</div></div>';
   h+='</div><div class="edit-divider"></div>';
   if(easyMode){
     // ── Easy Mode: 6 clean sliders ──
@@ -1534,8 +1627,8 @@ function toggleSlope(type){
   }
   saveSettings();buildEditSheet();
 }
-function saveSettings(){try{const s={homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,lpfQ,hpfQ,lpfSlope,hpfSlope,eqLowGain,eqLoMidGain,eqHiMidGain,eqHighGain,chorusMix,widthMod,reverbMix,reverbSize,reverbMod,delayMixVal,delayFeedback,delayTone,delaySync,delaySyncDiv,delayTimeVal,shimmerVol,masterVol,satAmt,textureOctUp,foundationSubOct,arpVol,arpRate,arpOct,arpVoice,movementVol,movementPattern,clickBPM,clickRateX2,clickAccent,timeSig,evolveOnBeat,evolveBars,easyMode,enabledEvolveIdx:[...enabledEvolveIdx],layers:{}};PAD_LAYERS.forEach(l=>{s.layers[l.id]={volume:layerState[l.id].volume}});localStorage.setItem('norcoast_v1',JSON.stringify(s))}catch(e){}}
-function loadSettings(){try{const raw=localStorage.getItem('norcoast_v1');if(!raw)return;const s=JSON.parse(raw);if(s.homeRoot)homeRoot=s.homeRoot;if(s.evolving!=null)evolving=s.evolving;if(s.evolveSpeed!=null)evolveSpeed=s.evolveSpeed;if(s.lpfValue!=null)lpfValue=s.lpfValue;if(s.hpfValue!=null)hpfValue=s.hpfValue;if(s.lpfQ!=null)lpfQ=s.lpfQ;if(s.hpfQ!=null)hpfQ=s.hpfQ;if(s.lpfSlope!=null)lpfSlope=s.lpfSlope;if(s.hpfSlope!=null)hpfSlope=s.hpfSlope;if(s.eqLowGain!=null)eqLowGain=s.eqLowGain;if(s.eqLoMidGain!=null)eqLoMidGain=s.eqLoMidGain;if(s.eqHiMidGain!=null)eqHiMidGain=s.eqHiMidGain;if(s.eqHighGain!=null)eqHighGain=s.eqHighGain;if(s.chorusMix!=null)chorusMix=s.chorusMix;if(s.widthMod!=null)widthMod=s.widthMod;if(s.shimmerVol!=null)shimmerVol=Math.min(s.shimmerVol,0.5);if(s.reverbMix!=null)reverbMix=s.reverbMix;if(s.reverbSize!=null)reverbSize=s.reverbSize;if(s.reverbMod!=null)reverbMod=s.reverbMod;if(s.delayMixVal!=null)delayMixVal=s.delayMixVal;if(s.delayFeedback!=null)delayFeedback=s.delayFeedback;if(s.delayTone!=null)delayTone=s.delayTone;if(s.delaySync!=null)delaySync=s.delaySync;if(s.delaySyncDiv)delaySyncDiv=s.delaySyncDiv;if(s.delayTimeVal!=null)delayTimeVal=s.delayTimeVal;if(s.masterVol!=null)masterVol=s.masterVol;if(s.satAmt!=null){satAmt=s.satAmt;if(satWS)satWS.curve=buildSatCurve(satAmt);if(satCompNode)satCompNode.gain.value=1-satAmt*0.3;}if(s.textureOctUp!=null)textureOctUp=s.textureOctUp;if(s.foundationSubOct!=null)foundationSubOct=s.foundationSubOct;if(s.clickBPM!=null)clickBPM=s.clickBPM;if(s.evolveOnBeat!=null)evolveOnBeat=s.evolveOnBeat;if(s.evolveBars!=null)evolveBars=s.evolveBars;if(s.arpVol!=null)arpVol=s.arpVol;if(s.arpRate!=null)arpRate=s.arpRate;if(s.arpOct!=null)arpOct=s.arpOct;if(s.arpVoice)arpVoice=s.arpVoice;if(s.movementVol!=null)movementVol=s.movementVol;if(s.movementPattern!=null)movementPattern=s.movementPattern;if(s.clickRateX2!=null)clickRateX2=s.clickRateX2;if(s.clickAccent!=null)clickAccent=s.clickAccent;if(s.timeSig)timeSig=s.timeSig;if(s.easyMode!=null)easyMode=s.easyMode;if(Array.isArray(s.enabledEvolveIdx))enabledEvolveIdx=new Set(s.enabledEvolveIdx);if(s.layers)PAD_LAYERS.forEach(l=>{if(s.layers[l.id]!=null)layerState[l.id].volume=s.layers[l.id].volume??0})}catch(e){}}
+function saveSettings(){try{const s={homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,lpfQ,hpfQ,lpfSlope,hpfSlope,eqLowGain,eqLoMidGain,eqHiMidGain,eqHighGain,chorusMix,widthMod,reverbMix,reverbSize,reverbMod,delayMixVal,delayFeedback,delayTone,delaySync,delaySyncDiv,delayTimeVal,shimmerVol,masterVol,satAmt,textureOctUp,foundationSubOct,arpVol,arpRate,arpOct,arpVoice,movementVol,movementPattern,clickBPM,clickRateX2,clickAccent,timeSig,evolveOnBeat,evolveBars,easyMode,customChordSemis:[...customChordSemis],customSeqGrid:JSON.parse(JSON.stringify(customSeqGrid)),enabledEvolveIdx:[...enabledEvolveIdx],layers:{}};PAD_LAYERS.forEach(l=>{s.layers[l.id]={volume:layerState[l.id].volume}});localStorage.setItem('norcoast_v1',JSON.stringify(s))}catch(e){}}
+function loadSettings(){try{const raw=localStorage.getItem('norcoast_v1');if(!raw)return;const s=JSON.parse(raw);if(s.homeRoot)homeRoot=s.homeRoot;if(s.evolving!=null)evolving=s.evolving;if(s.evolveSpeed!=null)evolveSpeed=s.evolveSpeed;if(s.lpfValue!=null)lpfValue=s.lpfValue;if(s.hpfValue!=null)hpfValue=s.hpfValue;if(s.lpfQ!=null)lpfQ=s.lpfQ;if(s.hpfQ!=null)hpfQ=s.hpfQ;if(s.lpfSlope!=null)lpfSlope=s.lpfSlope;if(s.hpfSlope!=null)hpfSlope=s.hpfSlope;if(s.eqLowGain!=null)eqLowGain=s.eqLowGain;if(s.eqLoMidGain!=null)eqLoMidGain=s.eqLoMidGain;if(s.eqHiMidGain!=null)eqHiMidGain=s.eqHiMidGain;if(s.eqHighGain!=null)eqHighGain=s.eqHighGain;if(s.chorusMix!=null)chorusMix=s.chorusMix;if(s.widthMod!=null)widthMod=s.widthMod;if(s.shimmerVol!=null)shimmerVol=Math.min(s.shimmerVol,0.5);if(s.reverbMix!=null)reverbMix=s.reverbMix;if(s.reverbSize!=null)reverbSize=s.reverbSize;if(s.reverbMod!=null)reverbMod=s.reverbMod;if(s.delayMixVal!=null)delayMixVal=s.delayMixVal;if(s.delayFeedback!=null)delayFeedback=s.delayFeedback;if(s.delayTone!=null)delayTone=s.delayTone;if(s.delaySync!=null)delaySync=s.delaySync;if(s.delaySyncDiv)delaySyncDiv=s.delaySyncDiv;if(s.delayTimeVal!=null)delayTimeVal=s.delayTimeVal;if(s.masterVol!=null)masterVol=s.masterVol;if(s.satAmt!=null){satAmt=s.satAmt;if(satWS)satWS.curve=buildSatCurve(satAmt);if(satCompNode)satCompNode.gain.value=1-satAmt*0.3;}if(s.textureOctUp!=null)textureOctUp=s.textureOctUp;if(s.foundationSubOct!=null)foundationSubOct=s.foundationSubOct;if(s.clickBPM!=null)clickBPM=s.clickBPM;if(s.evolveOnBeat!=null)evolveOnBeat=s.evolveOnBeat;if(s.evolveBars!=null)evolveBars=s.evolveBars;if(s.arpVol!=null)arpVol=s.arpVol;if(s.arpRate!=null)arpRate=s.arpRate;if(s.arpOct!=null)arpOct=s.arpOct;if(s.arpVoice)arpVoice=s.arpVoice;if(s.movementVol!=null)movementVol=s.movementVol;if(s.movementPattern!=null)movementPattern=s.movementPattern;if(s.clickRateX2!=null)clickRateX2=s.clickRateX2;if(s.clickAccent!=null)clickAccent=s.clickAccent;if(s.timeSig)timeSig=s.timeSig;if(s.easyMode!=null)easyMode=s.easyMode;if(Array.isArray(s.customChordSemis)&&s.customChordSemis.length>0){customChordSemis=s.customChordSemis;CHORD_TYPES[CUSTOM_CHORD_IDX].semis=[...customChordSemis];}if(s.customSeqGrid){customSeqGrid=s.customSeqGrid;rebuildCustomPattern();}if(Array.isArray(s.enabledEvolveIdx))enabledEvolveIdx=new Set(s.enabledEvolveIdx);if(s.layers)PAD_LAYERS.forEach(l=>{if(s.layers[l.id]!=null)layerState[l.id].volume=s.layers[l.id].volume??0})}catch(e){}}
 let _saveT=null;function queueSave(){clearTimeout(_saveT);_saveT=setTimeout(saveSettings,500)}
 
 // ─── PRESETS ───
