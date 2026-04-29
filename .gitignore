@@ -10,3 +10,4 @@ DerivedData/
 *.hmap
 *.ipa
 public/index.html.bak-*
+package-lock.json
