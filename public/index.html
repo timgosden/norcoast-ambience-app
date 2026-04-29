@@ -197,7 +197,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.54</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.55</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -258,7 +258,7 @@
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
       <button id="clickX2Btn" class="evolve-pill off" onclick="toggleClickX2()" style="padding:8px 10px;font-size:9px;letter-spacing:1px">x2</button>
     </div>
-    <div class="app-version">v1.54</div>
+    <div class="app-version">v1.55</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -555,7 +555,15 @@ function stopGranular(rel){
 
 // ─── AUDIO INIT ───
 async function initAudio(){
-  ctx=new(window.AudioContext||window.webkitAudioContext)();
+  // Ask the browser for a larger output buffer. The default is 'interactive'
+  // (smallest buffer, lowest latency, hardest on CPU). 'playback' lets the
+  // browser allocate more headroom, which trades ~20-60ms of extra output
+  // latency for far fewer audio-thread underruns on lower-end devices.
+  // Inaudible for ambient material — nothing in this app is rhythm-tight
+  // enough to suffer from the latency increase.
+  const Ctor=window.AudioContext||window.webkitAudioContext;
+  try{ctx=new Ctor({latencyHint:'playback'});}
+  catch(_){ctx=new Ctor();}
   const sb=ctx.createBuffer(1,1,ctx.sampleRate);
   const s=ctx.createBufferSource();s.buffer=sb;s.connect(ctx.destination);s.start(0);
   try{
