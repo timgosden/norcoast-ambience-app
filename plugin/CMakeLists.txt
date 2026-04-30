@@ -47,6 +47,8 @@ target_sources(NorcoastAmbience PRIVATE
     Source/Waves.cpp
 )
 
+target_include_directories(NorcoastAmbience PRIVATE Source)
+
 target_compile_definitions(NorcoastAmbience PUBLIC
     JUCE_WEB_BROWSER=0
     JUCE_USE_CURL=0
