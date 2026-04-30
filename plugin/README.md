@@ -7,7 +7,7 @@ C++ codebase.
 This lives alongside the standalone web app in this repo as a **fully
 parallel experiment**. The web app under `/public/` is unaffected.
 
-## Status: phase 3b — Foundation + Pads + master reverb
+## Status: phase 3c — Foundation + Pads + master delay + reverb
 
 Both pad layers from `PAD_LAYERS` in the standalone now run in
 parallel as separate `juce::Synthesiser`s sharing the same MIDI
@@ -23,13 +23,18 @@ interchangeable with the web app's first two layers.
 LFOs run at block rate (one tick per `processBlock`) — at sub-Hz
 rates the per-block step is sub-percent so audio stays smooth.
 
-A `juce::dsp::Reverb` (Schroeder-style) sits on the master with
-`roomSize 0.92`, `wetLevel 0.71`, `dryLevel 0.29` — the standalone's
-defaults. It's a close-enough plate approximation; a port of the
-Dattorro worklet (`public/dattorro-reverb-worklet.js`) can replace
-it later for full fidelity without changing the plumbing.
+Master FX chain (signal flow): synth → delay → reverb.
 
-Texture (granular), delay, chorus, shimmer, EQ in phase 3c+.
+- **Delay**: 60/70 s (≈857 ms, quarter @ 70 BPM), feedback 0.57,
+  wet send 0.322, feedback path low-passed at 3 kHz, wet send
+  brightened with a +12 dB high-shelf at 1200 Hz. Matches the
+  standalone's `delayNode → dLP → delayFB / delayGainN → dToneNode`
+  topology.
+- **Reverb**: `juce::dsp::Reverb` (Schroeder-style) with
+  `roomSize 0.92`, `wetLevel 0.71`, `dryLevel 0.29`. Will be
+  replaced by a Dattorro port for full fidelity.
+
+Texture (granular), chorus, shimmer, EQ in phase 3d+.
 
 Test: open the Standalone, click a chord on the on-screen
 keyboard. Compare against the standalone with Texture muted. Should

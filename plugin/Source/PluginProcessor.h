@@ -46,6 +46,14 @@ private:
     juce::Synthesiser padsSynth;
     juce::MidiKeyboardState keyboardState;
 
+    // ─── Master FX chain ──────────────────────────────────────────────
+    // Order: synth → delay (parallel send/return) → reverb (wet/dry mix).
+    // Matches the standalone where the delay output also feeds the
+    // reverb tail.
+    juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Linear> delayLine { 1 << 18 };
+    juce::dsp::IIR::Filter<float> delayFbLpfL, delayFbLpfR;   // 3 kHz LPF in feedback path
+    juce::dsp::IIR::Filter<float> delayWetShelfL, delayWetShelfR; // +12 dB high-shelf on wet send
+
     juce::dsp::Reverb reverb;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (NorcoastAmbienceProcessor)
