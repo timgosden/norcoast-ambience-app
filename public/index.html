@@ -200,7 +200,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.57</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.58</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -261,7 +261,7 @@
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
       <button id="clickX2Btn" class="evolve-pill off" onclick="toggleClickX2()" style="padding:8px 10px;font-size:9px;letter-spacing:1px">x2</button>
     </div>
-    <div class="app-version">v1.57</div>
+    <div class="app-version">v1.58</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -284,15 +284,10 @@ const C2=noteFreq("C",2); // base pitch of sample
 
 const CHORD_TYPES=[
   {name:"5th",      semis:[7],        weight:5},
-  {name:"Oct",      semis:[12],       weight:5, voicing:[0,7,12]},
-  {name:"4th",      semis:[5],        weight:4},
   {name:"Sus2",     semis:[2,7],      weight:4},
   {name:"Sus4",     semis:[5,7],      weight:3},
-  {name:"5th+Oct",  semis:[7,12],     weight:3},
   {name:"Maj7th",   semis:[11],       weight:3, voicing:[0,7,11]},
   {name:"5th+9th",  semis:[7,14],     weight:3},
-  {name:"6th",      semis:[9],        weight:2},
-  {name:"5th+Maj7", semis:[7,11],     weight:2},
   {name:"Custom",   semis:[7],        weight:3},
 ];
 
@@ -352,7 +347,7 @@ let lpfQ=0.7,hpfQ=0.7,lpfSlope=12,hpfSlope=12;
 let eqLowGain=0,eqLoMidGain=-0.6,eqHiMidGain=-2.0,eqHighGain=1.4;
 let chorusGainNode=null,chorusMix=0.35;
 let dulcimerBuf=null; // decoded audio buffer
-let homeRoot="C",evolving=true,evolveSpeed=0.5,currentEvolve=6;
+let homeRoot="C",evolving=true,evolveSpeed=0.5,currentEvolve=3;
 let delayTimeVal=DELAY_Q;
 let lpfValue=0.897,hpfValue=0;
 let reverbMix=0.71,reverbSize=0.92,reverbMod=0.74,delayMixVal=0.46,delayFeedback=0.57,delayTone=1.0,masterVol=0.5,satAmt=0;
@@ -362,6 +357,26 @@ let arpVol=0.14,arpRate=0.125,arpOct=0,arpVoice='soft',arpStep=0,arpTimer=null,a
 let movementVol=0,movementPattern=0,movementStep=0,movementTimer=null,movementReverb=null;
 const CUSTOM_CHORD_IDX=CHORD_TYPES.length-1;
 const CUSTOM_PAT_IDX=MOVEMENT_PATTERNS.length-1;
+// Pre-trim chord-array order. Saved data from v1.58 and earlier stores
+// numeric indices into THIS list. On load we map old-index → name → new-
+// index, and drop any names that no longer exist.
+const LEGACY_CHORD_ORDER=["5th","Oct","4th","Sus2","Sus4","5th+Oct","Maj7th","5th+9th","6th","5th+Maj7","Custom"];
+function chordIdxFromName(name){return CHORD_TYPES.findIndex(c=>c.name===name);}
+function namesFromIdxSet(set){return [...set].map(i=>CHORD_TYPES[i]?.name).filter(Boolean);}
+function idxSetFromAny(arr){
+  if(!Array.isArray(arr))return null;
+  const idxs=arr.map(v=>{
+    if(typeof v==='string')return chordIdxFromName(v);
+    if(typeof v==='number')return chordIdxFromName(LEGACY_CHORD_ORDER[v]);
+    return -1;
+  }).filter(i=>i>=0);
+  return new Set(idxs);
+}
+function firstChordName(pd){
+  if(Array.isArray(pd.enabledEvolveNames)&&pd.enabledEvolveNames.length>0)return pd.enabledEvolveNames[0];
+  if(Array.isArray(pd.enabledEvolveIdx)&&pd.enabledEvolveIdx.length>0)return LEGACY_CHORD_ORDER[pd.enabledEvolveIdx[0]]||'';
+  return '';
+}
 const MAJOR_STEPS=[0,2,4,5,7,9,11];
 let customChordSemis=[7];
 let customSeqGrid={'lo':Array(16).fill(false),'md':Array(16).fill(false),'hh':Array(16).fill(false)};
@@ -380,7 +395,7 @@ let currentPresetName=null;
 let sheetMode="setlist";
 let audioPaused=false;
 let easyMode=true;
-let enabledEvolveIdx=new Set([0,1,2,3,4,5,6,7,8,9]);
+let enabledEvolveIdx=new Set([0,1,2,3,4]);
 
 const DEFAULT_VOLUMES={foundation:0.55,pads:0.5,texture:0.85};
 PAD_LAYERS.forEach(l=>{layerState[l.id]={active:true,volume:DEFAULT_VOLUMES[l.id]??0}});
@@ -1438,7 +1453,7 @@ function buildEditSheet(){
     if(currentPresetName){h+='<div class="preset-active-row"><span class="preset-active-name">'+escapeHTML(currentPresetName)+'</span><button class="preset-update-btn" onclick="updatePreset()">Update</button></div>';}
     h+='<div class="preset-save-row"><input class="preset-input" id="presetNameInput" placeholder="Add this song to setlist+" /><button class="preset-save-btn" onclick="savePreset(document.getElementById(\'presetNameInput\').value)">Save</button></div>';
     if(presetNames.length===0){h+='<div class="preset-empty">No saved songs yet</div>';}
-    else{presetNames.forEach(n=>{const pd=presets[n];const cn=pd.enabledEvolveIdx&&pd.enabledEvolveIdx.length>0?CHORD_TYPES[pd.enabledEvolveIdx[0]]?.name:'';const meta=[pd.homeRoot||'',cn,pd.clickBPM?pd.clickBPM+' bpm':''].filter(Boolean).join(' · ');const isActive=currentPresetName===n;h+='<div class="preset-row'+(isActive?' active':'')+'" data-pn="'+escapeHTML(n)+'">'+'<div class="drag-handle">⠿</div><div class="preset-info"><span class="preset-name">'+escapeHTML(n)+'</span>'+(meta?'<span class="preset-meta">'+escapeHTML(meta)+'</span>':'')+'</div><button class="preset-load-btn" data-act="export" title="Export this song" style="padding:7px 9px">⤴</button><button class="preset-load-btn" data-act="load">Load</button><button class="preset-del-btn" data-act="del">✕</button></div>';});}
+    else{presetNames.forEach(n=>{const pd=presets[n];const cn=firstChordName(pd);const meta=[pd.homeRoot||'',cn,pd.clickBPM?pd.clickBPM+' bpm':''].filter(Boolean).join(' · ');const isActive=currentPresetName===n;h+='<div class="preset-row'+(isActive?' active':'')+'" data-pn="'+escapeHTML(n)+'">'+'<div class="drag-handle">⠿</div><div class="preset-info"><span class="preset-name">'+escapeHTML(n)+'</span>'+(meta?'<span class="preset-meta">'+escapeHTML(meta)+'</span>':'')+'</div><button class="preset-load-btn" data-act="export" title="Export this song" style="padding:7px 9px">⤴</button><button class="preset-load-btn" data-act="load">Load</button><button class="preset-del-btn" data-act="del">✕</button></div>';});}
     h+='<div style="margin-top:14px"><button class="preset-action-btn" data-act="import" style="margin-top:0">Import</button></div>';
     h+='<div id="importPanel" style="display:none;margin-top:10px"><textarea id="importJson" placeholder="Paste setlist JSON here…" style="width:100%;min-height:120px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:10px;color:rgba(255,255,255,0.85);font-family:monospace;font-size:11px;resize:vertical;outline:none"></textarea><div style="display:flex;gap:8px;margin-top:8px"><button class="preset-action-btn" data-act="import-confirm" style="flex:1;margin-top:0;border-color:rgba(196,145,94,0.35);background:rgba(196,145,94,0.1);color:#c4915e">Import</button><button class="preset-action-btn" data-act="import-cancel" style="flex:1;margin-top:0">Cancel</button></div><div id="importStatus" style="font-size:10px;color:rgba(255,255,255,0.45);margin-top:6px;min-height:14px"></div></div>';
     h+='</div><div class="edit-bottom-pad"></div>';
@@ -1817,20 +1832,20 @@ function toggleSlope(type){
   }
   saveSettings();buildEditSheet();
 }
-function saveSettings(){try{const s={_v:1,homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,lpfQ,hpfQ,lpfSlope,hpfSlope,eqLowGain,eqLoMidGain,eqHiMidGain,eqHighGain,chorusMix,widthMod,reverbMix,reverbSize,reverbMod,delayMixVal,delayFeedback,delayTone,delaySync,delaySyncDiv,delayTimeVal,shimmerVol,masterVol,satAmt,textureOctUp,foundationSubOct,arpVol,arpRate,arpOct,arpVoice,movementVol,movementPattern,clickBPM,clickRateX2,clickAccent,timeSig,evolveOnBeat,evolveBars,easyMode,customChordSemis:[...customChordSemis],customSeqGrid:JSON.parse(JSON.stringify(customSeqGrid)),enabledEvolveIdx:[...enabledEvolveIdx],layers:{}};PAD_LAYERS.forEach(l=>{s.layers[l.id]={volume:layerState[l.id].volume}});localStorage.setItem('norcoast_v1',JSON.stringify(s))}catch(e){console.warn('saveSettings:',e)}}
+function saveSettings(){try{const s={_v:1,homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,lpfQ,hpfQ,lpfSlope,hpfSlope,eqLowGain,eqLoMidGain,eqHiMidGain,eqHighGain,chorusMix,widthMod,reverbMix,reverbSize,reverbMod,delayMixVal,delayFeedback,delayTone,delaySync,delaySyncDiv,delayTimeVal,shimmerVol,masterVol,satAmt,textureOctUp,foundationSubOct,arpVol,arpRate,arpOct,arpVoice,movementVol,movementPattern,clickBPM,clickRateX2,clickAccent,timeSig,evolveOnBeat,evolveBars,easyMode,customChordSemis:[...customChordSemis],customSeqGrid:JSON.parse(JSON.stringify(customSeqGrid)),enabledEvolveNames:namesFromIdxSet(enabledEvolveIdx),layers:{}};PAD_LAYERS.forEach(l=>{s.layers[l.id]={volume:layerState[l.id].volume}});localStorage.setItem('norcoast_v1',JSON.stringify(s))}catch(e){console.warn('saveSettings:',e)}}
 function loadSettings(){try{const raw=localStorage.getItem('norcoast_v1');if(!raw)return;const s=JSON.parse(raw);
   // Schema-version check. Today every reader is v1 so anything else is from
   // a future build that may have fields we don't understand — log it but
   // continue with whatever fields we do recognise.
   if(s._v!=null&&s._v>1)console.warn('loadSettings: settings written by newer schema v'+s._v+', some fields may be ignored.');
-  if(s.homeRoot)homeRoot=s.homeRoot;if(s.evolving!=null)evolving=s.evolving;if(s.evolveSpeed!=null)evolveSpeed=s.evolveSpeed;if(s.lpfValue!=null)lpfValue=s.lpfValue;if(s.hpfValue!=null)hpfValue=s.hpfValue;if(s.lpfQ!=null)lpfQ=s.lpfQ;if(s.hpfQ!=null)hpfQ=s.hpfQ;if(s.lpfSlope!=null)lpfSlope=s.lpfSlope;if(s.hpfSlope!=null)hpfSlope=s.hpfSlope;if(s.eqLowGain!=null)eqLowGain=s.eqLowGain;if(s.eqLoMidGain!=null)eqLoMidGain=s.eqLoMidGain;if(s.eqHiMidGain!=null)eqHiMidGain=s.eqHiMidGain;if(s.eqHighGain!=null)eqHighGain=s.eqHighGain;if(s.chorusMix!=null)chorusMix=s.chorusMix;if(s.widthMod!=null)widthMod=s.widthMod;if(s.shimmerVol!=null)shimmerVol=Math.min(s.shimmerVol,0.5);if(s.reverbMix!=null)reverbMix=s.reverbMix;if(s.reverbSize!=null)reverbSize=s.reverbSize;if(s.reverbMod!=null)reverbMod=s.reverbMod;if(s.delayMixVal!=null)delayMixVal=s.delayMixVal;if(s.delayFeedback!=null)delayFeedback=s.delayFeedback;if(s.delayTone!=null)delayTone=s.delayTone;if(s.delaySync!=null)delaySync=s.delaySync;if(s.delaySyncDiv)delaySyncDiv=s.delaySyncDiv;if(s.delayTimeVal!=null)delayTimeVal=s.delayTimeVal;if(s.masterVol!=null)masterVol=s.masterVol;if(s.satAmt!=null){satAmt=s.satAmt;if(satWS)satWS.curve=buildSatCurve(satAmt);if(satCompNode)satCompNode.gain.value=1-satAmt*0.3;}if(s.textureOctUp!=null)textureOctUp=s.textureOctUp;if(s.foundationSubOct!=null)foundationSubOct=s.foundationSubOct;if(s.clickBPM!=null)clickBPM=s.clickBPM;if(s.evolveOnBeat!=null)evolveOnBeat=s.evolveOnBeat;if(s.evolveBars!=null)evolveBars=s.evolveBars;if(s.arpVol!=null)arpVol=s.arpVol;if(s.arpRate!=null)arpRate=s.arpRate;if(s.arpOct!=null)arpOct=s.arpOct;if(s.arpVoice)arpVoice=s.arpVoice;if(s.movementVol!=null)movementVol=s.movementVol;if(s.movementPattern!=null)movementPattern=s.movementPattern;if(s.clickRateX2!=null)clickRateX2=s.clickRateX2;if(s.clickAccent!=null)clickAccent=s.clickAccent;if(s.timeSig)timeSig=s.timeSig;if(s.easyMode!=null)easyMode=s.easyMode;if(Array.isArray(s.customChordSemis)&&s.customChordSemis.length>0){customChordSemis=s.customChordSemis;CHORD_TYPES[CUSTOM_CHORD_IDX].semis=[...customChordSemis];}if(s.customSeqGrid){customSeqGrid=s.customSeqGrid;rebuildCustomPattern();}if(Array.isArray(s.enabledEvolveIdx))enabledEvolveIdx=new Set(s.enabledEvolveIdx);if(s.layers)PAD_LAYERS.forEach(l=>{if(s.layers[l.id]!=null)layerState[l.id].volume=s.layers[l.id].volume??0})}catch(e){}}
+  if(s.homeRoot)homeRoot=s.homeRoot;if(s.evolving!=null)evolving=s.evolving;if(s.evolveSpeed!=null)evolveSpeed=s.evolveSpeed;if(s.lpfValue!=null)lpfValue=s.lpfValue;if(s.hpfValue!=null)hpfValue=s.hpfValue;if(s.lpfQ!=null)lpfQ=s.lpfQ;if(s.hpfQ!=null)hpfQ=s.hpfQ;if(s.lpfSlope!=null)lpfSlope=s.lpfSlope;if(s.hpfSlope!=null)hpfSlope=s.hpfSlope;if(s.eqLowGain!=null)eqLowGain=s.eqLowGain;if(s.eqLoMidGain!=null)eqLoMidGain=s.eqLoMidGain;if(s.eqHiMidGain!=null)eqHiMidGain=s.eqHiMidGain;if(s.eqHighGain!=null)eqHighGain=s.eqHighGain;if(s.chorusMix!=null)chorusMix=s.chorusMix;if(s.widthMod!=null)widthMod=s.widthMod;if(s.shimmerVol!=null)shimmerVol=Math.min(s.shimmerVol,0.5);if(s.reverbMix!=null)reverbMix=s.reverbMix;if(s.reverbSize!=null)reverbSize=s.reverbSize;if(s.reverbMod!=null)reverbMod=s.reverbMod;if(s.delayMixVal!=null)delayMixVal=s.delayMixVal;if(s.delayFeedback!=null)delayFeedback=s.delayFeedback;if(s.delayTone!=null)delayTone=s.delayTone;if(s.delaySync!=null)delaySync=s.delaySync;if(s.delaySyncDiv)delaySyncDiv=s.delaySyncDiv;if(s.delayTimeVal!=null)delayTimeVal=s.delayTimeVal;if(s.masterVol!=null)masterVol=s.masterVol;if(s.satAmt!=null){satAmt=s.satAmt;if(satWS)satWS.curve=buildSatCurve(satAmt);if(satCompNode)satCompNode.gain.value=1-satAmt*0.3;}if(s.textureOctUp!=null)textureOctUp=s.textureOctUp;if(s.foundationSubOct!=null)foundationSubOct=s.foundationSubOct;if(s.clickBPM!=null)clickBPM=s.clickBPM;if(s.evolveOnBeat!=null)evolveOnBeat=s.evolveOnBeat;if(s.evolveBars!=null)evolveBars=s.evolveBars;if(s.arpVol!=null)arpVol=s.arpVol;if(s.arpRate!=null)arpRate=s.arpRate;if(s.arpOct!=null)arpOct=s.arpOct;if(s.arpVoice)arpVoice=s.arpVoice;if(s.movementVol!=null)movementVol=s.movementVol;if(s.movementPattern!=null)movementPattern=s.movementPattern;if(s.clickRateX2!=null)clickRateX2=s.clickRateX2;if(s.clickAccent!=null)clickAccent=s.clickAccent;if(s.timeSig)timeSig=s.timeSig;if(s.easyMode!=null)easyMode=s.easyMode;if(Array.isArray(s.customChordSemis)&&s.customChordSemis.length>0){customChordSemis=s.customChordSemis;CHORD_TYPES[CUSTOM_CHORD_IDX].semis=[...customChordSemis];}if(s.customSeqGrid){customSeqGrid=s.customSeqGrid;rebuildCustomPattern();}{const set=idxSetFromAny(s.enabledEvolveNames)||idxSetFromAny(s.enabledEvolveIdx);if(set&&set.size>0)enabledEvolveIdx=set;}if(s.layers)PAD_LAYERS.forEach(l=>{if(s.layers[l.id]!=null)layerState[l.id].volume=s.layers[l.id].volume??0})}catch(e){}}
 let _saveT=null;function queueSave(){clearTimeout(_saveT);_saveT=setTimeout(saveSettings,500)}
 
 // ─── PRESETS ───
 function escapeHTML(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
 function getPresets(){try{return JSON.parse(localStorage.getItem('norcoast_presets')||'{}')}catch(e){return{}}}
 function captureState(){
-  const s={homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,lpfQ,hpfQ,lpfSlope,hpfSlope,eqLowGain,eqLoMidGain,eqHiMidGain,eqHighGain,chorusMix,widthMod,reverbMix,reverbSize,reverbMod,delayMixVal,delayFeedback,delayTone,delaySync,delaySyncDiv,delayTimeVal,shimmerVol,masterVol,satAmt,textureOctUp,foundationSubOct,arpVol,arpRate,arpOct,arpVoice,movementVol,movementPattern,clickBPM,evolveOnBeat,evolveBars,enabledEvolveIdx:[...enabledEvolveIdx],layers:{}};
+  const s={homeRoot,evolving,evolveSpeed,lpfValue,hpfValue,lpfQ,hpfQ,lpfSlope,hpfSlope,eqLowGain,eqLoMidGain,eqHiMidGain,eqHighGain,chorusMix,widthMod,reverbMix,reverbSize,reverbMod,delayMixVal,delayFeedback,delayTone,delaySync,delaySyncDiv,delayTimeVal,shimmerVol,masterVol,satAmt,textureOctUp,foundationSubOct,arpVol,arpRate,arpOct,arpVoice,movementVol,movementPattern,clickBPM,evolveOnBeat,evolveBars,enabledEvolveNames:namesFromIdxSet(enabledEvolveIdx),layers:{}};
   PAD_LAYERS.forEach(l=>{s.layers[l.id]={volume:layerState[l.id].volume}});return s;
 }
 function savePreset(name){
@@ -1902,7 +1917,7 @@ function loadPreset(name){try{
     }else{movementVol=newM;}
   }
   if(s.clickBPM!=null){clickBPM=s.clickBPM;if(clickActive){stopClick();startClick()}}
-  if(Array.isArray(s.enabledEvolveIdx)&&s.enabledEvolveIdx.length>0)enabledEvolveIdx=new Set(s.enabledEvolveIdx);
+  {const set=idxSetFromAny(s.enabledEvolveNames)||idxSetFromAny(s.enabledEvolveIdx);if(set&&set.size>0)enabledEvolveIdx=set;}
   if(s.layers)PAD_LAYERS.forEach(l=>{if(s.layers[l.id]!=null)layerState[l.id].volume=s.layers[l.id].volume??0});
   // Apply audio nodes
   if(s.lpfSlope!=null)lpfSlope=s.lpfSlope;
@@ -1978,7 +1993,7 @@ function exportSinglePreset(name,btn){
 }
 // Whitelist of fields we trust to pull from imported JSON. Any unknown field
 // is dropped so a malicious or malformed import can't smuggle in surprises.
-const PRESET_FIELDS=['homeRoot','evolving','evolveSpeed','lpfValue','hpfValue','lpfQ','hpfQ','lpfSlope','hpfSlope','eqLowGain','eqLoMidGain','eqHiMidGain','eqHighGain','chorusMix','widthMod','reverbMix','reverbSize','reverbMod','delayMixVal','delayFeedback','delayTone','delaySync','delaySyncDiv','delayTimeVal','shimmerVol','satAmt','textureOctUp','foundationSubOct','arpVol','arpRate','arpOct','arpVoice','movementVol','movementPattern','clickBPM','evolveOnBeat','evolveBars','enabledEvolveIdx','layers'];
+const PRESET_FIELDS=['homeRoot','evolving','evolveSpeed','lpfValue','hpfValue','lpfQ','hpfQ','lpfSlope','hpfSlope','eqLowGain','eqLoMidGain','eqHiMidGain','eqHighGain','chorusMix','widthMod','reverbMix','reverbSize','reverbMod','delayMixVal','delayFeedback','delayTone','delaySync','delaySyncDiv','delayTimeVal','shimmerVol','satAmt','textureOctUp','foundationSubOct','arpVol','arpRate','arpOct','arpVoice','movementVol','movementPattern','clickBPM','evolveOnBeat','evolveBars','enabledEvolveNames','enabledEvolveIdx','layers'];
 function sanitizePreset(p){
   if(!p||typeof p!=='object')return null;
   const out={};
@@ -2324,7 +2339,7 @@ function updatePerfSetlist(){
   keys.forEach(n=>{
     const pd=ps[n];
     const active=(currentPresetName===n);
-    const cn=pd.enabledEvolveIdx&&pd.enabledEvolveIdx.length>0?CHORD_TYPES[pd.enabledEvolveIdx[0]]?.name:'';
+    const cn=firstChordName(pd);
     const meta=[pd.homeRoot||'',cn,pd.clickBPM?pd.clickBPM+' bpm':''].filter(Boolean).join(' · ');
     const btn=document.createElement('button');
     btn.className='setlist-item'+(active?' active':'');
