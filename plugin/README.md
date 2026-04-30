@@ -7,7 +7,7 @@ C++ codebase.
 This lives alongside the standalone web app in this repo as a **fully
 parallel experiment**. The web app under `/public/` is unaffected.
 
-## Status: phase 5 — + Shimmer reverb (octave-up feedback)
+## Status: phase 6 — + master HPF/LPF (pre-FX, log fader curves)
 
 All FX have been moved off hard-coded constants and onto host-visible
 `AudioParameterFloat`s, exposed both to the host (for automation) and

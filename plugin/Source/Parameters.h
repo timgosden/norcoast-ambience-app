@@ -21,6 +21,8 @@ namespace ParamID
     inline constexpr const char* reverbSize    = "reverbSize";
     inline constexpr const char* reverbMod     = "reverbMod";
 
+    inline constexpr const char* lpfFreq       = "lpfFreq";
+    inline constexpr const char* hpfFreq       = "hpfFreq";
     inline constexpr const char* shimmerVol    = "shimmerVol";
     inline constexpr const char* widthMod      = "widthMod";
     inline constexpr const char* satAmt        = "satAmt";
@@ -78,6 +80,16 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
     add (std::make_unique<FloatParam> (juce::ParameterID { ParamID::reverbMod, 1 },
                                         "Reverb Mod",
                                         NormRange { 0.0f, 1.0f, 0.001f }, 0.74f));
+
+    // Filter fader values are 0..1; the processor maps them through
+    // lpfFaderToHz / hpfFaderToHz (port of the standalone helpers) to
+    // get a logarithmic frequency curve.
+    add (std::make_unique<FloatParam> (juce::ParameterID { ParamID::lpfFreq, 1 },
+                                        "Low Pass",
+                                        NormRange { 0.0f, 1.0f, 0.001f }, 0.897f));
+    add (std::make_unique<FloatParam> (juce::ParameterID { ParamID::hpfFreq, 1 },
+                                        "High Pass",
+                                        NormRange { 0.0f, 1.0f, 0.001f }, 0.0f));
 
     add (std::make_unique<FloatParam> (juce::ParameterID { ParamID::shimmerVol, 1 },
                                         "Shimmer",

@@ -47,8 +47,8 @@ private:
     // EQ column
     ParamControl eqLow, eqLoMid, eqHiMid, eqHigh;
 
-    // Master column
-    ParamControl shimmerVol, widthMod, satAmt, masterVol;
+    // Master column (filters first, then output)
+    ParamControl hpfFreq, lpfFreq, shimmerVol, widthMod, satAmt, masterVol;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (NorcoastAmbienceEditor)
 };

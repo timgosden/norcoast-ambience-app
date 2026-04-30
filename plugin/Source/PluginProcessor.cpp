@@ -77,6 +77,8 @@ NorcoastAmbienceProcessor::NorcoastAmbienceProcessor()
     reverbMixParam     = apvts.getRawParameterValue (ParamID::reverbMix);
     reverbSizeParam    = apvts.getRawParameterValue (ParamID::reverbSize);
     reverbModParam     = apvts.getRawParameterValue (ParamID::reverbMod);
+    lpfFreqParam       = apvts.getRawParameterValue (ParamID::lpfFreq);
+    hpfFreqParam       = apvts.getRawParameterValue (ParamID::hpfFreq);
     shimmerVolParam    = apvts.getRawParameterValue (ParamID::shimmerVol);
     widthModParam      = apvts.getRawParameterValue (ParamID::widthMod);
     satAmtParam        = apvts.getRawParameterValue (ParamID::satAmt);
@@ -138,6 +140,10 @@ void NorcoastAmbienceProcessor::prepareToPlay (double sampleRate, int samplesPer
     widthPhase    = 0.0;
     widthPhaseInc = 0.3 / sampleRate;   // 0.3 Hz width LFO, matches standalone
 
+    masterLpf.prepare (spec); masterLpf.reset();
+    masterHpf.prepare (spec); masterHpf.reset();
+    lastLpfHz = lastHpfHz = -1.0f;
+
     eqLow.prepare (spec);   eqLow.reset();
     eqLoMid.prepare (spec); eqLoMid.reset();
     eqHiMid.prepare (spec); eqHiMid.reset();
@@ -189,6 +195,8 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     const float reverbMix   = reverbMixParam ->load();
     const float reverbSize  = reverbSizeParam->load();
     const float reverbMod   = reverbModParam ->load();
+    const float lpfFader    = lpfFreqParam   ->load();
+    const float hpfFader    = hpfFreqParam   ->load();
     const float shimmerVol  = shimmerVolParam->load();
     const float widthMod    = widthModParam  ->load();
     const float satAmt      = satAmtParam    ->load();
@@ -219,6 +227,25 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
     delayLine.setDelay ((float) (sr * delayTimeMs * 0.001));
 
+    // Master HPF / LPF — log fader curves match the standalone helpers
+    // lpfFaderToHz / hpfFaderToHz in public/index.html.
+    const float lpfHz = std::exp (4.6051702f + lpfFader * lpfFader * 5.298375f);   // ln(100)..ln(20000)
+    const float hpfHz = hpfFader < 0.01f
+        ? 20.0f
+        : std::exp (2.9957323f + hpfFader * 3.218876f);                            // ln(20)..ln(500)
+    if (std::abs (lpfHz - lastLpfHz) > 0.5f)
+    {
+        *masterLpf.state = *juce::dsp::IIR::Coefficients<float>::makeLowPass (
+            sr, juce::jmin (lpfHz, (float) (sr * 0.49)), 0.7071f);
+        lastLpfHz = lpfHz;
+    }
+    if (std::abs (hpfHz - lastHpfHz) > 0.1f)
+    {
+        *masterHpf.state = *juce::dsp::IIR::Coefficients<float>::makeHighPass (
+            sr, hpfHz, 0.7071f);
+        lastHpfHz = hpfHz;
+    }
+
     auto refreshEQ = [&] (StereoIIR& band, float& last, float db,
                           auto&& factory)
     {
@@ -248,6 +275,14 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
                    return juce::dsp::IIR::Coefficients<float>::makeHighShelf (
                        sr, 8000.0f, 0.7071f, juce::Decibels::decibelsToGain (db));
                });
+
+    // ─── Master HPF / LPF (pre-FX, matches standalone topology) ──────
+    {
+        juce::dsp::AudioBlock<float> block (buffer);
+        juce::dsp::ProcessContextReplacing<float> ctx (block);
+        masterHpf.process (ctx);
+        masterLpf.process (ctx);
+    }
 
     auto* L = buffer.getWritePointer (0);
     auto* R = buffer.getNumChannels() > 1 ? buffer.getWritePointer (1) : L;

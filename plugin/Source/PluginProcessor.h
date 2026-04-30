@@ -58,6 +58,8 @@ private:
     std::atomic<float>* reverbMixParam     = nullptr;
     std::atomic<float>* reverbSizeParam    = nullptr;
     std::atomic<float>* reverbModParam     = nullptr;
+    std::atomic<float>* lpfFreqParam       = nullptr;
+    std::atomic<float>* hpfFreqParam       = nullptr;
     std::atomic<float>* shimmerVolParam    = nullptr;
     std::atomic<float>* widthModParam      = nullptr;
     std::atomic<float>* satAmtParam        = nullptr;
@@ -97,6 +99,9 @@ private:
 
     using StereoIIR = juce::dsp::ProcessorDuplicator<juce::dsp::IIR::Filter<float>,
                                                      juce::dsp::IIR::Coefficients<float>>;
+    StereoIIR masterLpf, masterHpf;
+    float lastLpfHz = -1.0f, lastHpfHz = -1.0f;
+
     StereoIIR eqLow, eqLoMid, eqHiMid, eqHigh;
     float lastEqLowDb = -1000.0f, lastEqLoMidDb = -1000.0f,
           lastEqHiMidDb = -1000.0f, lastEqHighDb = -1000.0f;
