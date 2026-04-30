@@ -19,7 +19,9 @@
 class PadVoice : public juce::SynthesiserVoice
 {
 public:
-    explicit PadVoice (const LayerConfig& cfg);
+    // `gainParam` must outlive the voice — it points into the APVTS atomic
+    // float store owned by the AudioProcessor.
+    PadVoice (const LayerConfig& cfg, std::atomic<float>* gainParam);
     ~PadVoice() override = default;
 
     bool canPlaySound (juce::SynthesiserSound* s) override
@@ -83,7 +85,8 @@ public:
 
 private:
     const LayerConfig& cfg;
-    std::vector<Osc>   oscs;
+    std::atomic<float>* layerGainParam = nullptr;
+    std::vector<Osc>    oscs;
     OnePoleLP filterL, filterR;
     LFO filterLFO1, filterLFO2, ampLFO, breathLFO;
     float filterBaseHz = 0.0f;

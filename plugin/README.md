@@ -7,7 +7,27 @@ C++ codebase.
 This lives alongside the standalone web app in this repo as a **fully
 parallel experiment**. The web app under `/public/` is unaffected.
 
-## Status: phase 3g — Foundation + Pads + chorus + delay + Dattorro plate + EQ
+## Status: phase 4 — APVTS + slider GUI + width LFO / saturation / master vol
+
+All FX have been moved off hard-coded constants and onto host-visible
+`AudioParameterFloat`s, exposed both to the host (for automation) and
+to a slider grid in the editor. The processor caches atom pointers
+(`std::atomic<float>*`) for realtime-safe reads, recomputes IIR
+coefficients only when the underlying dB value changes, and uses a
+`SmoothedValue` master gain to avoid pops on big fader moves.
+
+New master DSP added in this phase:
+  - **Width LFO** (0.3 Hz, depth `widthMod * 0.5`) — pans the master
+    image left/right via the same equation as Web Audio's
+    StereoPanner.
+  - **Saturation** — `tanh(x * amt*3.5) / tanh(amt*3.5)` with a
+    `1 - amt*0.3` makeup-gain compensation. Verbatim port of the
+    standalone's `buildSatCurve`.
+  - **Master volume** — `juce::SmoothedValue` ramped over 50 ms.
+
+GUI is a 4-column slider grid (Layers / FX / EQ / Master) with the
+existing on-screen keyboard + Latch + All-Off + MIDI/Audio settings
+buttons below.
 
 Both pad layers from `PAD_LAYERS` in the standalone now run in
 parallel as separate `juce::Synthesiser`s sharing the same MIDI

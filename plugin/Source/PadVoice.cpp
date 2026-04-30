@@ -22,8 +22,8 @@ namespace
     }
 }
 
-PadVoice::PadVoice (const LayerConfig& c)
-    : cfg (c)
+PadVoice::PadVoice (const LayerConfig& c, std::atomic<float>* gainParam)
+    : cfg (c), layerGainParam (gainParam)
 {
     oscs.resize ((size_t) cfg.totalOscCount());
 }
@@ -133,7 +133,8 @@ void PadVoice::renderNextBlock (juce::AudioBuffer<float>& outputBuffer,
         o.phaseInc = detunedHz (o.baseHz, o.staticCents + lfoCents) / sr;
     }
 
-    const float layerScale = cfg.layerGain * (1.0f + ampMod + breathMod);
+    const float gainParam = layerGainParam != nullptr ? layerGainParam->load() : 1.0f;
+    const float layerScale = gainParam * (1.0f + ampMod + breathMod);
 
     auto* const left  = outputBuffer.getWritePointer (0) + startSample;
     auto* const right = outputBuffer.getNumChannels() > 1

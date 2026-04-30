@@ -36,6 +36,7 @@ public:
     bool isBusesLayoutSupported (const BusesLayout&) const override;
 
     juce::MidiKeyboardState& getKeyboardState() noexcept { return keyboardState; }
+    juce::AudioProcessorValueTreeState& getAPVTS() noexcept { return apvts; }
 
 private:
     static constexpr int kVoicesPerLayer = 8;
@@ -43,35 +44,61 @@ private:
     LayerConfig foundationConfig;
     LayerConfig padsConfig;
 
+    juce::AudioProcessorValueTreeState apvts;
+
+    // Cached parameter atom pointers — read once per block in processBlock.
+    std::atomic<float>* foundationVolParam = nullptr;
+    std::atomic<float>* padsVolParam       = nullptr;
+    std::atomic<float>* chorusMixParam     = nullptr;
+    std::atomic<float>* delayMixParam      = nullptr;
+    std::atomic<float>* delayFbParam       = nullptr;
+    std::atomic<float>* delayTimeMsParam   = nullptr;
+    std::atomic<float>* delayToneParam     = nullptr;
+    std::atomic<float>* reverbMixParam     = nullptr;
+    std::atomic<float>* reverbSizeParam    = nullptr;
+    std::atomic<float>* reverbModParam     = nullptr;
+    std::atomic<float>* widthModParam      = nullptr;
+    std::atomic<float>* satAmtParam        = nullptr;
+    std::atomic<float>* masterVolParam     = nullptr;
+    std::atomic<float>* eqLowParam         = nullptr;
+    std::atomic<float>* eqLoMidParam       = nullptr;
+    std::atomic<float>* eqHiMidParam       = nullptr;
+    std::atomic<float>* eqHighParam        = nullptr;
+
     juce::Synthesiser foundationSynth;
     juce::Synthesiser padsSynth;
     juce::MidiKeyboardState keyboardState;
 
     // ─── Master FX chain ──────────────────────────────────────────────
-    // Order: synth → chorus → delay → reverb. Mirrors the standalone's
-    // signal flow (`globalLPF2 → _chorBus → reverb / delay / dry sum`).
+    // Order: synth → chorus → delay → reverb → width LFO → saturation
+    //              → EQ → master gain.
 
-    // Juno-style stereo chorus: two short modulated delays panned L/R.
     juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Linear> chorusDelayL { 4096 };
     juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Linear> chorusDelayR { 4096 };
     double chorusPhaseL = 0.0, chorusPhaseIncL = 0.0;
     double chorusPhaseR = 0.0, chorusPhaseIncR = 0.0;
 
     juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Linear> delayLine { 1 << 18 };
-    juce::dsp::IIR::Filter<float> delayFbLpfL, delayFbLpfR;   // 3 kHz LPF in feedback path
-    juce::dsp::IIR::Filter<float> delayWetShelfL, delayWetShelfR; // +12 dB high-shelf on wet send
+    juce::dsp::IIR::Filter<float> delayFbLpfL, delayFbLpfR;
+    juce::dsp::IIR::Filter<float> delayWetShelfL, delayWetShelfR;
+    float lastDelayToneDb = -1000.0f;
 
     DattorroReverb reverb;
-    juce::AudioBuffer<float> reverbBuffer; // wet-only scratch
+    juce::AudioBuffer<float> reverbBuffer;
+    float lastReverbSize = -1.0f;
+    float lastReverbMod  = -1.0f;
 
-    // 4-band master EQ (post-reverb, matches the standalone tail):
-    //   lowshelf   100 Hz  +0   dB
-    //   peaking    350 Hz  -0.6 dB  Q 0.7
-    //   peaking   2500 Hz  -2.0 dB  Q 0.9
-    //   highshelf 8000 Hz  +1.4 dB
+    double widthPhase = 0.0;
+    double widthPhaseInc = 0.0;
+
     using StereoIIR = juce::dsp::ProcessorDuplicator<juce::dsp::IIR::Filter<float>,
                                                      juce::dsp::IIR::Coefficients<float>>;
     StereoIIR eqLow, eqLoMid, eqHiMid, eqHigh;
+    float lastEqLowDb = -1000.0f, lastEqLoMidDb = -1000.0f,
+          lastEqHiMidDb = -1000.0f, lastEqHighDb = -1000.0f;
+
+    // Smoothed master gain so big fader moves don't pop.
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> masterGain;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (NorcoastAmbienceProcessor)
 };
