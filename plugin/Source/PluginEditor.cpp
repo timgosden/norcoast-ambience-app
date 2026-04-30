@@ -2,8 +2,8 @@
 
 NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     : juce::AudioProcessorEditor (&p),
-      processor (p),
-      keyboard  (p.getKeyboardState(), juce::MidiKeyboardComponent::horizontalKeyboard)
+      owner    (p),
+      keyboard (p.getKeyboardState(), juce::MidiKeyboardComponent::horizontalKeyboard)
 {
     addAndMakeVisible (keyboard);
     keyboard.setLowestVisibleKey (48); // C3

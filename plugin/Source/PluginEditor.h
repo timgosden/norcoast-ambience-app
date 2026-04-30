@@ -1,5 +1,6 @@
 #pragma once
 
+#include <juce_audio_utils/juce_audio_utils.h>
 #include "PluginProcessor.h"
 
 class NorcoastAmbienceEditor : public juce::AudioProcessorEditor
@@ -12,7 +13,7 @@ public:
     void resized()                  override;
 
 private:
-    NorcoastAmbienceProcessor& processor;
+    NorcoastAmbienceProcessor& owner;
     juce::MidiKeyboardComponent keyboard;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (NorcoastAmbienceEditor)

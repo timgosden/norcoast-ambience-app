@@ -38,9 +38,6 @@ public:
     void renderNextBlock (juce::AudioBuffer<float>& outputBuffer,
                           int startSample, int numSamples) override;
 
-private:
-    static Wavetable subTable, warmTable;
-
     // Slow LFO with arbitrary depth and start phase.
     struct LFO
     {
@@ -90,6 +87,9 @@ private:
         float process (float in) noexcept { z += a * (in - z); return z; }
         void  reset()             noexcept { z = 0.0f; }
     };
+
+private:
+    static Wavetable subTable, warmTable;
 
     std::array<Osc, 5> oscs;
     OnePoleLP filterL, filterR;
