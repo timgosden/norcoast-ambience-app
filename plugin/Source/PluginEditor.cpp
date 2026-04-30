@@ -29,7 +29,7 @@ void NorcoastAmbienceEditor::paint (juce::Graphics& g)
 
     g.setColour (juce::Colour::fromRGBA (0xff, 0xff, 0xff, 0x55));
     g.setFont (juce::FontOptions (11.0f));
-    g.drawText ("plugin · v0.8 · phase 3d (+ Juno chorus)",
+    g.drawText ("plugin · v0.9 · phase 3e (+ master EQ)",
                 getLocalBounds().removeFromBottom (24).reduced (8),
                 juce::Justification::centred);
 }

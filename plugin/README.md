@@ -7,7 +7,7 @@ C++ codebase.
 This lives alongside the standalone web app in this repo as a **fully
 parallel experiment**. The web app under `/public/` is unaffected.
 
-## Status: phase 3d — Foundation + Pads + chorus + delay + reverb
+## Status: phase 3e — Foundation + Pads + chorus + delay + reverb + EQ
 
 Both pad layers from `PAD_LAYERS` in the standalone now run in
 parallel as separate `juce::Synthesiser`s sharing the same MIDI
@@ -23,7 +23,7 @@ interchangeable with the web app's first two layers.
 LFOs run at block rate (one tick per `processBlock`) — at sub-Hz
 rates the per-block step is sub-percent so audio stays smooth.
 
-Master FX chain (signal flow): synth → chorus → delay → reverb.
+Master FX chain (signal flow): synth → chorus → delay → reverb → EQ.
 
 - **Chorus**: Juno-style stereo. Two modulated delays — dL at
   7 ms ± 2.5 ms @ 0.55 Hz panned −0.65, dR at 9 ms ± 3 ms @ 0.73 Hz
@@ -36,8 +36,11 @@ Master FX chain (signal flow): synth → chorus → delay → reverb.
 - **Reverb**: `juce::dsp::Reverb` (Schroeder-style) with
   `roomSize 0.92`, `wetLevel 0.71`, `dryLevel 0.29`. Will be
   replaced by a Dattorro port for full fidelity.
+- **EQ**: 4-band master, lowshelf 100 Hz / peak 350 Hz Q 0.7 / peak
+  2.5 kHz Q 0.9 / highshelf 8 kHz at the standalone's default gains
+  (0, −0.6, −2.0, +1.4 dB).
 
-Texture (granular), shimmer, EQ in phase 3e+.
+Texture (granular) and shimmer in phase 3f+.
 
 Test: open the Standalone, click a chord on the on-screen
 keyboard. Compare against the standalone with Texture muted. Should

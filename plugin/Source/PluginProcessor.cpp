@@ -128,6 +128,20 @@ void NorcoastAmbienceProcessor::prepareToPlay (double sampleRate, int samplesPer
     // Reverb
     reverb.prepare (spec);
     reverb.reset();
+
+    // EQ — coefficients in dB → linear via Decibels::decibelsToGain.
+    *eqLow.state   = *juce::dsp::IIR::Coefficients<float>::makeLowShelf (
+                         sampleRate, 100.0f,  0.7071f, juce::Decibels::decibelsToGain ( 0.0f));
+    *eqLoMid.state = *juce::dsp::IIR::Coefficients<float>::makePeakFilter (
+                         sampleRate, 350.0f,  0.7f,    juce::Decibels::decibelsToGain (-0.6f));
+    *eqHiMid.state = *juce::dsp::IIR::Coefficients<float>::makePeakFilter (
+                         sampleRate, 2500.0f, 0.9f,    juce::Decibels::decibelsToGain (-2.0f));
+    *eqHigh.state  = *juce::dsp::IIR::Coefficients<float>::makeHighShelf (
+                         sampleRate, 8000.0f, 0.7071f, juce::Decibels::decibelsToGain ( 1.4f));
+    eqLow.prepare (spec);   eqLow.reset();
+    eqLoMid.prepare (spec); eqLoMid.reset();
+    eqHiMid.prepare (spec); eqHiMid.reset();
+    eqHigh.prepare (spec);  eqHigh.reset();
 }
 
 void NorcoastAmbienceProcessor::releaseResources()
@@ -137,6 +151,7 @@ void NorcoastAmbienceProcessor::releaseResources()
     delayFbLpfL.reset(); delayFbLpfR.reset();
     delayWetShelfL.reset(); delayWetShelfR.reset();
     reverb.reset();
+    eqLow.reset(); eqLoMid.reset(); eqHiMid.reset(); eqHigh.reset();
 }
 
 bool NorcoastAmbienceProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
@@ -236,10 +251,14 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         R[s] = dryR + wetR;
     }
 
-    // ─── Master reverb ────────────────────────────────────────────────
+    // ─── Master reverb + EQ ───────────────────────────────────────────
     juce::dsp::AudioBlock<float> block (buffer);
     juce::dsp::ProcessContextReplacing<float> ctx (block);
     reverb.process (ctx);
+    eqLow.process   (ctx);
+    eqLoMid.process (ctx);
+    eqHiMid.process (ctx);
+    eqHigh.process  (ctx);
 }
 
 juce::AudioProcessorEditor* NorcoastAmbienceProcessor::createEditor()

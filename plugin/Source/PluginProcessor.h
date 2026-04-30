@@ -62,5 +62,14 @@ private:
 
     juce::dsp::Reverb reverb;
 
+    // 4-band master EQ (post-reverb, matches the standalone tail):
+    //   lowshelf   100 Hz  +0   dB
+    //   peaking    350 Hz  -0.6 dB  Q 0.7
+    //   peaking   2500 Hz  -2.0 dB  Q 0.9
+    //   highshelf 8000 Hz  +1.4 dB
+    using StereoIIR = juce::dsp::ProcessorDuplicator<juce::dsp::IIR::Filter<float>,
+                                                     juce::dsp::IIR::Coefficients<float>>;
+    StereoIIR eqLow, eqLoMid, eqHiMid, eqHigh;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (NorcoastAmbienceProcessor)
 };
