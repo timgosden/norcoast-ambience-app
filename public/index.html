@@ -44,6 +44,9 @@
   .edit-btn{border-radius:10px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.18);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:7px 12px;cursor:pointer;color:rgba(255,255,255,0.75);transition:all 0.2s;flex-shrink:0;gap:3px}
   .edit-btn:active{background:rgba(255,255,255,0.15)}
   .edit-btn:active{background:rgba(255,255,255,0.12)}
+  /* Focus mode is iPhone-only — hide unless either viewport dimension fits a phone. */
+  #compactBtn{display:none}
+  @media (max-width:480px),(max-height:480px){#compactBtn{display:flex}}
   /* ── Visualiser ── */
   .perf-vis-wrap{height:54px;padding:6px 16px;flex-shrink:0;display:flex;align-items:center;overflow:hidden;transition:height 0.3s ease,padding 0.3s ease}
   #visualiser{width:100%;border-radius:6px;display:block;height:42px}
@@ -197,7 +200,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.56</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.57</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -229,7 +232,7 @@
       </button>
       <button class="edit-btn" id="createTabBtn" onclick="openCreate()">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-        <span style="font-size:9px;letter-spacing:0.5px;margin-top:1px">Create</span>
+        <span style="font-size:9px;letter-spacing:0.5px;margin-top:1px">Tweak</span>
       </button>
     </div>
   </div>
@@ -258,7 +261,7 @@
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
       <button id="clickX2Btn" class="evolve-pill off" onclick="toggleClickX2()" style="padding:8px 10px;font-size:9px;letter-spacing:1px">x2</button>
     </div>
-    <div class="app-version">v1.56</div>
+    <div class="app-version">v1.57</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -329,11 +332,15 @@ const PAD_LAYERS=[
     fBase:200,fMod:30,fRate:0.1,aMod:0.03,aRate:0.12,octaves:[-1],rootOnly:true},
   {id:"pads",name:"Pads",color:"#c4915e",type:"synth",
     timbres:[{wave:"lush",count:6,ds:10,gain:0.03,pan:0.6},{wave:"warm",count:4,ds:7,gain:0.022,pan:0.4},{wave:"choir",count:3,ds:14,gain:0.014,pan:0.75},{wave:"celestial",count:2,ds:18,gain:0.012,pan:0.9}],
-    fBase:1200,fMod:450,fRate:0.042,aMod:0.1,aRate:0.08,octaves:[0,1]},
+    fBase:1200,fMod:450,fRate:0.042,aMod:0.1,aRate:0.08,octaves:[0,1],evolveOnly:true},
   {id:"texture",name:"Texture",color:"#a08060",type:"granular"},
 ];
 
 const ATTACK=7,RELEASE=7,XFADE=7,ROOT_OCT=3,DELAY_Q=60/70,PRESET_FADE=3;
+// Granular texture is summed from several streams that overlap, so its
+// effective gain is lower than the synth pads. TEX_GAIN compensates so the
+// Texture slider sits in the same perceptual range as Foundation / Pads.
+const TEX_GAIN=1.3;
 
 // ─── STATE ───
 let ctx,waves,master,reverb,reverbGain,dryGain,delayNode,delayGainN,delayFB,dToneNode,analyser;
@@ -458,7 +465,7 @@ function startGranular(vol,atk){
 
   granularGain=ctx.createGain();
   granularGain.gain.setValueAtTime(0,ctx.currentTime);
-  granularGain.gain.linearRampToValueAtTime(vol*0.8,ctx.currentTime+atk);
+  granularGain.gain.linearRampToValueAtTime(vol*TEX_GAIN,ctx.currentTime+atk);
   granularGain.connect(master);
 
   // 5 streams: root, 5th, evolve voice, root+oct, 5th+oct
@@ -741,7 +748,10 @@ function fadeOut(nodes,time){
 }
 
 function getStaticFreqs(root,def){const r=noteFreq(root,ROOT_OCT);return def.rootOnly?[r]:[r,semiFreq(r,7)]}
-function getEvolveFreq(root,ei){const r=noteFreq(root,ROOT_OCT);return CHORD_TYPES[ei].semis.map(s=>semiFreq(r,s))}
+// Evolve voicing always includes the root so the chord stands on its own —
+// otherwise chords whose semis don't include 0 (e.g. Maj7th=[11]) sound
+// rootless when they're the only thing playing in their register.
+function getEvolveFreq(root,ei){const r=noteFreq(root,ROOT_OCT);return [r,...CHORD_TYPES[ei].semis.map(s=>semiFreq(r,s))]}
 
 // True shimmer: Dattorro plate with pitch-shifted feedback loop. Each pass
 // through the loop is raised an octave, producing an ascending halo cascade
@@ -837,8 +847,13 @@ function startPad(def,vol,root,ei,atk,xfo){
   const sxfo=(oldS&&oldS._atkUntil>now)?0.3:xfo;
   const exfo=(oldE&&oldE._atkUntil>now)?0.3:xfo;
   fadeOut(oldS,sxfo);fadeOut(oldE,exfo);
-  staticNodes[def.id]=buildGroup(def,getStaticFreqs(root,def),vol,atk);
-  staticNodes[def.id]._atkUntil=now+atk;
+  // evolveOnly layers (e.g. Pads) skip the static drone group — their
+  // entire sound rebuilds on each chord change so the chord movement
+  // is audible. Foundation provides the sustained root drone instead.
+  if(!def.evolveOnly){
+    staticNodes[def.id]=buildGroup(def,getStaticFreqs(root,def),vol,atk);
+    staticNodes[def.id]._atkUntil=now+atk;
+  }
   if(!def.rootOnly){
     evolveNodes[def.id]=buildGroup(def,getEvolveFreq(root,ei),vol,atk);
     evolveNodes[def.id]._atkUntil=now+atk;
@@ -1357,7 +1372,7 @@ function randomise(){
   const rV=(a,b)=>a+Math.random()*(b-a);
   const applyL=(l,v)=>{
     const wasZ=layerState[l.id].volume<=0;layerState[l.id].volume=v;
-    if(l.type==='granular'){if(v>0&&wasZ)startGranular(v);else if(v<=0)stopGranular();else if(granularGain)granularGain.gain.linearRampToValueAtTime(v*0.8,ctx.currentTime+ATTACK);}
+    if(l.type==='granular'){if(v>0&&wasZ)startGranular(v);else if(v<=0)stopGranular();else if(granularGain)granularGain.gain.linearRampToValueAtTime(v*TEX_GAIN,ctx.currentTime+ATTACK);}
     else{if(v>0&&wasZ)startPad(l,v,homeRoot,currentEvolve);else if(v<=0)stopPad(l.id);else{const rt=ctx.currentTime+ATTACK;if(staticNodes[l.id]){staticNodes[l.id].gain.gain.linearRampToValueAtTime(v,rt);if(staticNodes[l.id].ampMod)staticNodes[l.id].ampMod.gain.linearRampToValueAtTime(l.aMod*v,rt);}if(evolveNodes[l.id]){evolveNodes[l.id].gain.gain.linearRampToValueAtTime(v,rt);if(evolveNodes[l.id].ampMod)evolveNodes[l.id].ampMod.gain.linearRampToValueAtTime(l.aMod*v,rt);}}}
   };
   let vF=Math.random()<0.65?rV(0.25,0.85):0;
@@ -1645,7 +1660,7 @@ function buildEditSheet(){
       const raw=parseFloat(e.target.value),vol=faderToVol(raw),wasZero=layerState[l.id].volume===0;
       layerState[l.id].volume=vol;queueSave();
       inp.style.background='linear-gradient(to right,'+l.color+'55 '+raw*100+'%,rgba(255,255,255,0.06) '+raw*100+'%)';
-      if(l.type==="granular"){if(vol>0&&wasZero)startGranular(vol);else if(vol<=0)stopGranular();else if(granularGain)granularGain.gain.linearRampToValueAtTime(vol*0.8,ctx.currentTime+0.1)}
+      if(l.type==="granular"){if(vol>0&&wasZero)startGranular(vol);else if(vol<=0)stopGranular();else if(granularGain)granularGain.gain.linearRampToValueAtTime(vol*TEX_GAIN,ctx.currentTime+0.1)}
       else{if(vol>0&&wasZero&&!staticNodes[l.id])startPad(l,vol,homeRoot,currentEvolve);else{const t=ctx.currentTime+0.4;if(staticNodes[l.id]){staticNodes[l.id].gain.gain.linearRampToValueAtTime(vol,t);if(staticNodes[l.id].ampMod)staticNodes[l.id].ampMod.gain.linearRampToValueAtTime(l.aMod*vol,t);if(staticNodes[l.id].breathMod)staticNodes[l.id].breathMod.gain.linearRampToValueAtTime(vol*0.03,t);}if(evolveNodes[l.id]){evolveNodes[l.id].gain.gain.linearRampToValueAtTime(vol,t);if(evolveNodes[l.id].ampMod)evolveNodes[l.id].ampMod.gain.linearRampToValueAtTime(l.aMod*vol,t);if(evolveNodes[l.id].breathMod)evolveNodes[l.id].breathMod.gain.linearRampToValueAtTime(vol*0.03,t);}}}
       const row=inp.closest('.edit-layer'),on=vol>0;
       const db=row.querySelector('.layer-dot-btn');db.style.borderColor=on?l.color+'55':'rgba(255,255,255,0.1)';db.style.background=on?l.color+'15':'transparent';
@@ -2197,17 +2212,23 @@ let _tapTimes=[];
 let _bpmPressTimer=null,_bpmLongPressed=false;
 function onBpmPointerDown(){
   _bpmLongPressed=false;
-  _bpmPressTimer=setTimeout(()=>{_bpmLongPressed=true;showBpmTypeInput();},600);
+  // Just flag the long press — the input swap + focus must happen in the
+  // pointerup handler so it counts as a user gesture. iOS WKWebView refuses
+  // to show the keyboard for focus() calls fired from a setTimeout chain.
+  _bpmPressTimer=setTimeout(()=>{_bpmLongPressed=true;},600);
 }
 function onBpmPointerUp(){
   if(_bpmPressTimer){clearTimeout(_bpmPressTimer);_bpmPressTimer=null;}
+  if(_bpmLongPressed)showBpmTypeInput();
 }
 function showBpmTypeInput(){
   const btn=document.getElementById('bpmTapMain');
   btn.innerHTML='<input id="bpmTypeInp" type="number" min="50" max="250" value="'+clickBPM+'" style="width:52px;background:transparent;border:none;outline:none;color:#c4915e;font-size:18px;font-weight:700;font-family:Open Sans,sans-serif;text-align:center;-moz-appearance:textfield;-webkit-appearance:none" onclick="event.stopPropagation()" /><span class="bpm-tap-label">TYPE BPM</span>';
   btn.onclick=null;
   const inp=document.getElementById('bpmTypeInp');
-  setTimeout(()=>{const i=document.getElementById('bpmTypeInp');if(i){i.select();i.focus();}},50);
+  if(!inp)return;
+  // Synchronous focus inside the user-gesture handler so iOS shows the keyboard.
+  inp.focus();inp.select();
   inp.addEventListener('keydown',e=>{if(e.key==='Enter'){confirmBpmType();}if(e.key==='Escape'){restoreBpmButton();}e.stopPropagation();});
   inp.addEventListener('blur',()=>setTimeout(confirmBpmType,100));
 }
