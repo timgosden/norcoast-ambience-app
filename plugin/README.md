@@ -7,27 +7,28 @@ C++ codebase.
 This lives alongside the standalone web app in this repo as a **fully
 parallel experiment**. The web app under `/public/` is unaffected.
 
-## Status: phase 2c — Foundation with full LFO modulation
+## Status: phase 3a — Foundation + Pads layer
 
-`PadVoice` now matches the standalone Foundation layer including
-modulation:
+Both pad layers from `PAD_LAYERS` in the standalone now run in
+parallel as separate `juce::Synthesiser`s sharing the same MIDI
+input. `PadVoice` is layer-agnostic — driven by a `LayerConfig`
+struct (`Source/LayerConfig.h`) so adding more layers later is just
+a matter of defining another config.
 
-- Filter LFO 1: `fRate = 0.1 Hz`, depth `fMod = 30 Hz` modulates LP cutoff
-- Filter LFO 2: ~0.027–0.040 Hz incommensurate, depth `fMod * 0.45`, random phase
-- Amp LFO: `aRate = 0.12 Hz`, depth `aMod = 0.03` (±3% gain)
-- Breath LFO: ~0.011–0.017 Hz, depth 0.03 (~80 s breathing period)
-- Per-voice detune LFOs: 0.01–0.06 Hz, depth ~0.1–0.94 cents
+Foundation (15 oscs/voice, octave −1, `fBase 200`, `fRate 0.1`) and
+Pads (30 oscs/voice across two octaves, `fBase 1200`, `fRate 0.042`,
+4 timbres: lush + warm + choir + celestial) are sonically
+interchangeable with the web app's first two layers.
 
 LFOs run at block rate (one tick per `processBlock`) — at sub-Hz
 rates the per-block step is sub-percent so audio stays smooth.
 
-Pads / Texture / FX in phase 3.
+Texture (granular) and FX in phase 3b+.
 
-Test: open the Standalone, click a low key on the on-screen
-keyboard. Compare against the standalone Foundation layer (load the
-web app, mute Pads + Texture, raise Foundation). Should now feel
-alive — subtle filter movement, gentle amp wobble, slow breathing
-in the background.
+Test: open the Standalone, click a chord on the on-screen
+keyboard. Compare against the standalone with Texture muted. Should
+sound nearly identical — the FX chain (reverb / delay / chorus /
+shimmer) is the remaining gap.
 
 ## Phases
 

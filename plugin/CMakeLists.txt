@@ -44,6 +44,7 @@ target_sources(NorcoastAmbience PRIVATE
     Source/PluginProcessor.cpp
     Source/PluginEditor.cpp
     Source/PadVoice.cpp
+    Source/Waves.cpp
 )
 
 target_compile_definitions(NorcoastAmbience PUBLIC

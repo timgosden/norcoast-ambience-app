@@ -1,6 +1,7 @@
 #pragma once
 
 #include <juce_audio_processors/juce_audio_processors.h>
+#include "LayerConfig.h"
 
 class NorcoastAmbienceProcessor : public juce::AudioProcessor
 {
@@ -19,7 +20,7 @@ public:
     bool acceptsMidi()   const override { return true; }
     bool producesMidi()  const override { return false; }
     bool isMidiEffect()  const override { return false; }
-    double getTailLengthSeconds() const override { return 8.0; } // matches longest release
+    double getTailLengthSeconds() const override { return 8.0; }
 
     int  getNumPrograms()              override { return 1; }
     int  getCurrentProgram()           override { return 0; }
@@ -32,14 +33,16 @@ public:
 
     bool isBusesLayoutSupported (const BusesLayout&) const override;
 
-    // Exposed so the editor can render an on-screen MidiKeyboardComponent
-    // that injects notes into the same MIDI stream the synth consumes.
     juce::MidiKeyboardState& getKeyboardState() noexcept { return keyboardState; }
 
 private:
-    static constexpr int kMaxVoices = 8;
+    static constexpr int kVoicesPerLayer = 8;
 
-    juce::Synthesiser synth;
+    LayerConfig foundationConfig;
+    LayerConfig padsConfig;
+
+    juce::Synthesiser foundationSynth;
+    juce::Synthesiser padsSynth;
     juce::MidiKeyboardState keyboardState;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (NorcoastAmbienceProcessor)

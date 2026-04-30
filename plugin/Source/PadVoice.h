@@ -1,26 +1,26 @@
 #pragma once
 
-#include <array>
+#include <vector>
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "PadSound.h"
+#include "LayerConfig.h"
 #include "Wavetable.h"
 
-// Phase 2c voice: Foundation pad layer with full LFO modulation.
-//   - 5 oscillators (3 sub + 2 warm) with detune spread + stereo pan.
-//   - 1-pole lowpass at fBase * 1.5 = 300 Hz, modulated by two filter LFOs.
+// Generic pad voice — driven entirely by a LayerConfig so a single class
+// covers Foundation, Pads, and any future synth layers. Same DSP topology
+// as phase 2c:
+//   - N oscillators (timbres × counts × octaves) with detune spread + stereo pan.
+//   - 1-pole lowpass per channel at fBase * 1.5, modulated by two filter LFOs.
 //   - Amp LFO + breath LFO modulating output level.
 //   - Per-voice detune LFOs for slow chorus-y movement between oscillators.
-//   - Slow ADSR (7 s / 7 s).
+//   - Slow ADSR (per-layer parameters).
 //
-// Block-rate modulation (LFOs ticked once per processBlock) — at 0.01-0.5 Hz
-// the per-block step is sub-percent so the audio is smooth.
+// Block-rate modulation (LFOs ticked once per processBlock).
 class PadVoice : public juce::SynthesiserVoice
 {
 public:
-    PadVoice() = default;
+    explicit PadVoice (const LayerConfig& cfg);
     ~PadVoice() override = default;
-
-    static void initWavetables();
 
     bool canPlaySound (juce::SynthesiserSound* s) override
     {
@@ -29,16 +29,12 @@ public:
 
     void startNote (int midiNoteNumber, float velocity,
                     juce::SynthesiserSound*, int /*pitchWheelPosition*/) override;
-
     void stopNote (float velocity, bool allowTailOff) override;
-
     void pitchWheelMoved (int) override {}
     void controllerMoved (int, int) override {}
-
     void renderNextBlock (juce::AudioBuffer<float>& outputBuffer,
                           int startSample, int numSamples) override;
 
-    // Slow LFO with arbitrary depth and start phase.
     struct LFO
     {
         double phase    = 0.0;
@@ -52,7 +48,6 @@ public:
             depth    = depthVal;
         }
 
-        // Advance `samples` audio frames and return the LFO output (sine * depth).
         float advance (int samples) noexcept
         {
             phase += phaseInc * (double) samples;
@@ -66,8 +61,8 @@ public:
         const Wavetable* table        = nullptr;
         double           phase        = 0.0;
         double           phaseInc     = 0.0;
-        double           baseHz       = 0.0;   // freq before detune
-        float            staticCents  = 0.0f;  // constant per-voice detune offset
+        double           baseHz       = 0.0;
+        float            staticCents  = 0.0f;
         float            gain         = 0.0f;
         float            panL         = 1.0f / std::sqrt (2.0f);
         float            panR         = 1.0f / std::sqrt (2.0f);
@@ -79,8 +74,6 @@ public:
         float a = 0.0f, z = 0.0f;
         void  setCutoff (double sr, float hz)
         {
-            // Clamp cutoff to a sane band — LFO mod can briefly drag it below
-            // 1 Hz in extreme cases which would NaN the coefficient.
             hz = juce::jlimit (10.0f, (float) (sr * 0.45), hz);
             a  = 1.0f - std::exp (-juce::MathConstants<float>::twoPi * hz / (float) sr);
         }
@@ -89,17 +82,12 @@ public:
     };
 
 private:
-    static Wavetable subTable, warmTable;
-
-    std::array<Osc, 5> oscs;
+    const LayerConfig& cfg;
+    std::vector<Osc>   oscs;
     OnePoleLP filterL, filterR;
-
-    // Master modulators
     LFO filterLFO1, filterLFO2, ampLFO, breathLFO;
-    float filterBaseHz = 300.0f;
-
+    float filterBaseHz = 0.0f;
     juce::ADSR adsr;
-    juce::ADSR::Parameters adsrParams { 7.0f, 0.5f, 1.0f, 7.0f };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PadVoice)
 };
