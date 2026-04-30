@@ -44,6 +44,14 @@ of `public/` as the Pages artefact.
 
 The app caches fully after first load and works offline.
 
+## Plugin (parallel experiment)
+
+A separate JUCE-based port lives under `plugin/`. It builds to AU,
+VST3, CLAP, and Standalone from one C++ codebase. Currently a
+phase-1 skeleton; see `plugin/README.md` for build instructions
+and roadmap. The standalone web app is unaffected by anything in
+that directory.
+
 ## iOS app (App Store)
 
 The Xcode project lives in `ios/`. It wraps the web app in a `WKWebView`
