@@ -1,14 +1,17 @@
 #include "PluginEditor.h"
 
 NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
-    : juce::AudioProcessorEditor (&p), processor (p)
+    : juce::AudioProcessorEditor (&p),
+      processor (p),
+      keyboard  (p.getKeyboardState(), juce::MidiKeyboardComponent::horizontalKeyboard)
 {
-    setSize (500, 320);
+    addAndMakeVisible (keyboard);
+    keyboard.setLowestVisibleKey (48); // C3
+    setSize (640, 380);
 }
 
 void NorcoastAmbienceEditor::paint (juce::Graphics& g)
 {
-    // Mirror the standalone app's background gradient.
     juce::ColourGradient bg (juce::Colour::fromRGB (0x07, 0x09, 0x0e), 0.0f, 0.0f,
                              juce::Colour::fromRGB (0x06, 0x08, 0x0d),
                              (float) getWidth(), (float) getHeight(), false);
@@ -26,9 +29,13 @@ void NorcoastAmbienceEditor::paint (juce::Graphics& g)
 
     g.setColour (juce::Colour::fromRGBA (0xff, 0xff, 0xff, 0x55));
     g.setFont (juce::FontOptions (11.0f));
-    g.drawText ("plugin · v0.1 · phase 1 skeleton",
-                getLocalBounds().removeFromBottom (28).reduced (8),
+    g.drawText ("plugin · v0.2 · phase 2a (MIDI sine voice)",
+                getLocalBounds().removeFromBottom (24).reduced (8),
                 juce::Justification::centred);
 }
 
-void NorcoastAmbienceEditor::resized() {}
+void NorcoastAmbienceEditor::resized()
+{
+    auto bounds = getLocalBounds();
+    keyboard.setBounds (bounds.removeFromBottom (110).reduced (12, 12));
+}

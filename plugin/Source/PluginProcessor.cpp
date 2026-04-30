@@ -1,13 +1,22 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include "PadSound.h"
+#include "PadVoice.h"
 
 NorcoastAmbienceProcessor::NorcoastAmbienceProcessor()
     : juce::AudioProcessor (BusesProperties()
         .withOutput ("Output", juce::AudioChannelSet::stereo(), true))
 {
+    synth.addSound (new PadSound());
+    for (int i = 0; i < kMaxVoices; ++i)
+        synth.addVoice (new PadVoice());
 }
 
-void NorcoastAmbienceProcessor::prepareToPlay (double, int) {}
+void NorcoastAmbienceProcessor::prepareToPlay (double sampleRate, int /*samplesPerBlock*/)
+{
+    synth.setCurrentPlaybackSampleRate (sampleRate);
+}
+
 void NorcoastAmbienceProcessor::releaseResources() {}
 
 bool NorcoastAmbienceProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
@@ -18,11 +27,16 @@ bool NorcoastAmbienceProcessor::isBusesLayoutSupported (const BusesLayout& layou
 }
 
 void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
-                                              juce::MidiBuffer&)
+                                              juce::MidiBuffer& midi)
 {
     juce::ScopedNoDenormals noDenormals;
-    // Phase 1 skeleton — silent output. DSP arrives in phase 2 (Foundation pad layer).
     buffer.clear();
+
+    // Inject notes from the on-screen keyboard into the same buffer so host
+    // MIDI and editor MIDI both reach the synth.
+    keyboardState.processNextMidiBuffer (midi, 0, buffer.getNumSamples(), true);
+
+    synth.renderNextBlock (buffer, midi, 0, buffer.getNumSamples());
 }
 
 juce::AudioProcessorEditor* NorcoastAmbienceProcessor::createEditor()
@@ -33,7 +47,6 @@ juce::AudioProcessorEditor* NorcoastAmbienceProcessor::createEditor()
 void NorcoastAmbienceProcessor::getStateInformation (juce::MemoryBlock&) {}
 void NorcoastAmbienceProcessor::setStateInformation (const void*, int) {}
 
-// JUCE plugin entry point — invoked by every wrapper format.
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 {
     return new NorcoastAmbienceProcessor();

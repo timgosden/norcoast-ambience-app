@@ -7,10 +7,16 @@ C++ codebase.
 This lives alongside the standalone web app in this repo as a **fully
 parallel experiment**. The web app under `/public/` is unaffected.
 
-## Status: phase 1 skeleton
+## Status: phase 2a — first DSP
 
-Empty plugin that loads in any host and outputs silence. Verifies the
-build pipeline before any DSP work.
+Single-sine voice driven by `juce::Synthesiser`, 8-voice polyphonic,
+slow ADSR (7 s attack / 7 s release to match the standalone's pad
+fade). The editor includes a `MidiKeyboardComponent` so you can
+audition the plugin in the Standalone without external MIDI.
+
+Test: open the Standalone, click any key on the on-screen keyboard,
+hear a slow-rising sine drone. Release the key, hear the slow fade
+out.
 
 ## Phases
 

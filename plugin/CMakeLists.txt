@@ -43,6 +43,7 @@ juce_add_plugin(NorcoastAmbience
 target_sources(NorcoastAmbience PRIVATE
     Source/PluginProcessor.cpp
     Source/PluginEditor.cpp
+    Source/PadVoice.cpp
 )
 
 target_compile_definitions(NorcoastAmbience PUBLIC
