@@ -7,6 +7,7 @@ NorcoastAmbienceProcessor::NorcoastAmbienceProcessor()
     : juce::AudioProcessor (BusesProperties()
         .withOutput ("Output", juce::AudioChannelSet::stereo(), true))
 {
+    PadVoice::initWavetables(); // build the static sub/warm tables once
     synth.addSound (new PadSound());
     for (int i = 0; i < kMaxVoices; ++i)
         synth.addVoice (new PadVoice());

@@ -7,16 +7,24 @@ C++ codebase.
 This lives alongside the standalone web app in this repo as a **fully
 parallel experiment**. The web app under `/public/` is unaffected.
 
-## Status: phase 2a — first DSP
+## Status: phase 2b — Foundation timbres
 
-Single-sine voice driven by `juce::Synthesiser`, 8-voice polyphonic,
-slow ADSR (7 s attack / 7 s release to match the standalone's pad
-fade). The editor includes a `MidiKeyboardComponent` so you can
-audition the plugin in the Standalone without external MIDI.
+`PadVoice` now mirrors the standalone's Foundation pad layer: 5
+oscillators (3 "sub" + 2 "warm") with the same harmonic recipes,
+detune spread, stereo pan, and a 1-pole lowpass at `fBase * 1.5 =
+300 Hz`. Plays one octave below the MIDI note (Foundation's
+`octaves: [-1]`). Slow ADSR (7 s / 7 s) matching the standalone's
+pad fades.
 
-Test: open the Standalone, click any key on the on-screen keyboard,
-hear a slow-rising sine drone. Release the key, hear the slow fade
-out.
+LFO modulation (filter LFO ×2, amp LFO, breath LFO, per-voice
+detune LFOs) lands in phase 2c. Pads / Texture / FX in phase 3.
+
+Test: open the Standalone, click a low key on the on-screen
+keyboard. Compare against the standalone Foundation layer (load the
+web app, mute Pads + Texture, raise Foundation). Should sound
+roughly the same — slowly-rising drone with subtle stereo width and
+a soft, dark character. LFOs not in yet so the sound will be more
+static than the web app.
 
 ## Phases
 
