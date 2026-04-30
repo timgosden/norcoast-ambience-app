@@ -7,24 +7,27 @@ C++ codebase.
 This lives alongside the standalone web app in this repo as a **fully
 parallel experiment**. The web app under `/public/` is unaffected.
 
-## Status: phase 2b — Foundation timbres
+## Status: phase 2c — Foundation with full LFO modulation
 
-`PadVoice` now mirrors the standalone's Foundation pad layer: 5
-oscillators (3 "sub" + 2 "warm") with the same harmonic recipes,
-detune spread, stereo pan, and a 1-pole lowpass at `fBase * 1.5 =
-300 Hz`. Plays one octave below the MIDI note (Foundation's
-`octaves: [-1]`). Slow ADSR (7 s / 7 s) matching the standalone's
-pad fades.
+`PadVoice` now matches the standalone Foundation layer including
+modulation:
 
-LFO modulation (filter LFO ×2, amp LFO, breath LFO, per-voice
-detune LFOs) lands in phase 2c. Pads / Texture / FX in phase 3.
+- Filter LFO 1: `fRate = 0.1 Hz`, depth `fMod = 30 Hz` modulates LP cutoff
+- Filter LFO 2: ~0.027–0.040 Hz incommensurate, depth `fMod * 0.45`, random phase
+- Amp LFO: `aRate = 0.12 Hz`, depth `aMod = 0.03` (±3% gain)
+- Breath LFO: ~0.011–0.017 Hz, depth 0.03 (~80 s breathing period)
+- Per-voice detune LFOs: 0.01–0.06 Hz, depth ~0.1–0.94 cents
+
+LFOs run at block rate (one tick per `processBlock`) — at sub-Hz
+rates the per-block step is sub-percent so audio stays smooth.
+
+Pads / Texture / FX in phase 3.
 
 Test: open the Standalone, click a low key on the on-screen
 keyboard. Compare against the standalone Foundation layer (load the
-web app, mute Pads + Texture, raise Foundation). Should sound
-roughly the same — slowly-rising drone with subtle stereo width and
-a soft, dark character. LFOs not in yet so the sound will be more
-static than the web app.
+web app, mute Pads + Texture, raise Foundation). Should now feel
+alive — subtle filter movement, gentle amp wobble, slow breathing
+in the background.
 
 ## Phases
 
