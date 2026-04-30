@@ -47,9 +47,15 @@ private:
     juce::MidiKeyboardState keyboardState;
 
     // ─── Master FX chain ──────────────────────────────────────────────
-    // Order: synth → delay (parallel send/return) → reverb (wet/dry mix).
-    // Matches the standalone where the delay output also feeds the
-    // reverb tail.
+    // Order: synth → chorus → delay → reverb. Mirrors the standalone's
+    // signal flow (`globalLPF2 → _chorBus → reverb / delay / dry sum`).
+
+    // Juno-style stereo chorus: two short modulated delays panned L/R.
+    juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Linear> chorusDelayL { 4096 };
+    juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Linear> chorusDelayR { 4096 };
+    double chorusPhaseL = 0.0, chorusPhaseIncL = 0.0;
+    double chorusPhaseR = 0.0, chorusPhaseIncR = 0.0;
+
     juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Linear> delayLine { 1 << 18 };
     juce::dsp::IIR::Filter<float> delayFbLpfL, delayFbLpfR;   // 3 kHz LPF in feedback path
     juce::dsp::IIR::Filter<float> delayWetShelfL, delayWetShelfR; // +12 dB high-shelf on wet send

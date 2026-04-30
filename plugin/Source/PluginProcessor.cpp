@@ -98,6 +98,15 @@ void NorcoastAmbienceProcessor::prepareToPlay (double sampleRate, int samplesPer
     spec.maximumBlockSize = (juce::uint32) samplesPerBlock;
     spec.numChannels      = 2;
 
+    // Chorus delays are mono each — fed a mono sum of L+R.
+    juce::dsp::ProcessSpec monoSpec { sampleRate, (juce::uint32) samplesPerBlock, 1 };
+    chorusDelayL.prepare (monoSpec);
+    chorusDelayR.prepare (monoSpec);
+    chorusDelayL.reset();
+    chorusDelayR.reset();
+    chorusPhaseIncL = 0.55 / sampleRate;
+    chorusPhaseIncR = 0.73 / sampleRate;
+
     // Delay
     delayLine.prepare (spec);
     delayLine.setDelay ((float) (sampleRate * (60.0 / 70.0))); // DELAY_Q
@@ -123,6 +132,7 @@ void NorcoastAmbienceProcessor::prepareToPlay (double sampleRate, int samplesPer
 
 void NorcoastAmbienceProcessor::releaseResources()
 {
+    chorusDelayL.reset(); chorusDelayR.reset();
     delayLine.reset();
     delayFbLpfL.reset(); delayFbLpfR.reset();
     delayWetShelfL.reset(); delayWetShelfR.reset();
@@ -146,6 +156,53 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
     foundationSynth.renderNextBlock (buffer, midi, 0, buffer.getNumSamples());
     padsSynth      .renderNextBlock (buffer, midi, 0, buffer.getNumSamples());
+
+    const auto sr = getSampleRate();
+
+    // ─── Juno-style stereo chorus ─────────────────────────────────────
+    // Two modulated delays:
+    //   dL: 7 ms ± 2.5 ms @ 0.55 Hz, panned -0.65
+    //   dR: 9 ms ± 3   ms @ 0.73 Hz, panned +0.65
+    // Wet send = chorusMix * 0.5 = 0.175 (chorusMix = 0.35 default).
+    {
+        const float chBaseL  = 0.007f  * (float) sr;
+        const float chBaseR  = 0.009f  * (float) sr;
+        const float chDepthL = 0.0025f * (float) sr;
+        const float chDepthR = 0.003f  * (float) sr;
+        constexpr float chMix = 0.35f * 0.5f;
+
+        constexpr float panAngL = (-0.65f + 1.0f) * 0.25f * juce::MathConstants<float>::pi;
+        constexpr float panAngR = ( 0.65f + 1.0f) * 0.25f * juce::MathConstants<float>::pi;
+        const float panL_L = std::cos (panAngL), panL_R = std::sin (panAngL);
+        const float panR_L = std::cos (panAngR), panR_R = std::sin (panAngR);
+        constexpr float twoPi = juce::MathConstants<float>::twoPi;
+
+        const int n = buffer.getNumSamples();
+        auto* L = buffer.getWritePointer (0);
+        auto* R = buffer.getNumChannels() > 1 ? buffer.getWritePointer (1) : L;
+
+        for (int s = 0; s < n; ++s)
+        {
+            chorusPhaseL += chorusPhaseIncL; chorusPhaseL -= std::floor (chorusPhaseL);
+            chorusPhaseR += chorusPhaseIncR; chorusPhaseR -= std::floor (chorusPhaseR);
+            const float modL = std::sin ((float) chorusPhaseL * twoPi);
+            const float modR = std::sin ((float) chorusPhaseR * twoPi);
+
+            const float dryL = L[s];
+            const float dryR = R[s];
+            const float monoIn = (dryL + dryR) * 0.5f;
+
+            chorusDelayL.pushSample (0, monoIn);
+            chorusDelayR.pushSample (0, monoIn);
+            chorusDelayL.setDelay (chBaseL + modL * chDepthL);
+            chorusDelayR.setDelay (chBaseR + modR * chDepthR);
+            const float chL = chorusDelayL.popSample (0);
+            const float chR = chorusDelayR.popSample (0);
+
+            L[s] = dryL + (chL * panL_L + chR * panR_L) * chMix;
+            R[s] = dryR + (chL * panL_R + chR * panR_R) * chMix;
+        }
+    }
 
     // ─── Master delay ─────────────────────────────────────────────────
     // Matches the standalone topology exactly:
