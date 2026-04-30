@@ -64,28 +64,6 @@ NorcoastAmbienceProcessor::NorcoastAmbienceProcessor()
         foundationSynth.addVoice (new PadVoice (foundationConfig));
         padsSynth      .addVoice (new PadVoice (padsConfig));
     }
-
-    // Master delay — defaults match the standalone:
-    //   delayTimeVal = 60/70 s (quarter @ 70 BPM, DELAY_Q in the standalone)
-    //   delayMixVal  = 0.46  (wet send, internally scaled ×0.7 like the standalone)
-    //   delayFeedback = 0.57
-    //   feedback path is low-passed at 3 kHz, Q 0.5
-    //   wet send is run through a +12 dB high-shelf at 1200 Hz
-    //     (standalone's `dToneNode` at delayTone = 1.0)
-
-    // Master plate reverb — defaults match the standalone:
-    //   reverbMix=0.71, reverbSize=0.92.
-    // juce::dsp::Reverb is Schroeder-style (not Dattorro), so this is a
-    // close-enough approximation for now; a Dattorro port can replace it
-    // later without changing the surrounding plumbing.
-    juce::dsp::Reverb::Parameters p;
-    p.roomSize   = 0.92f;
-    p.damping    = 0.3f;     // plate-ish — relatively bright tail
-    p.wetLevel   = 0.71f;
-    p.dryLevel   = 1.0f - 0.71f;
-    p.width      = 1.0f;
-    p.freezeMode = 0.0f;
-    reverb.setParameters (p);
 }
 
 void NorcoastAmbienceProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
@@ -125,9 +103,14 @@ void NorcoastAmbienceProcessor::prepareToPlay (double sampleRate, int samplesPer
     delayWetShelfL.reset();
     delayWetShelfR.reset();
 
-    // Reverb
-    reverb.prepare (spec);
+    // Reverb — Dattorro plate, defaults from the standalone.
+    //   reverbSize 0.92 → reverbSizeToFB → decay ≈ 0.829
+    //   reverbMod  0.74 → excursionRate 0.3 + 0.74*1.7 ≈ 1.558 Hz
+    //                   → excursionDepth 0.74 * 1.5 ≈ 1.11 ms
+    reverb.prepare (sampleRate, samplesPerBlock);
+    reverb.setExcursionDepthMs (1.11f);
     reverb.reset();
+    reverbBuffer.setSize (2, samplesPerBlock, false, false, true);
 
     // EQ — coefficients in dB → linear via Decibels::decibelsToGain.
     *eqLow.state   = *juce::dsp::IIR::Coefficients<float>::makeLowShelf (
@@ -251,10 +234,34 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         R[s] = dryR + wetR;
     }
 
-    // ─── Master reverb + EQ ───────────────────────────────────────────
+    // ─── Master reverb (Dattorro, parallel wet/dry) ───────────────────
+    constexpr float kReverbMix = 0.71f;
+    {
+        const int n2 = buffer.getNumSamples();
+        const int nch = buffer.getNumChannels();
+        if (reverbBuffer.getNumSamples() < n2)
+            reverbBuffer.setSize (2, n2, false, false, true);
+
+        // Copy dry → wet scratch, run Dattorro on it, then mix.
+        for (int ch = 0; ch < juce::jmin (nch, 2); ++ch)
+            reverbBuffer.copyFrom (ch, 0, buffer, ch, 0, n2);
+        if (nch == 1)
+            reverbBuffer.copyFrom (1, 0, buffer, 0, 0, n2);
+
+        reverb.processWet (reverbBuffer);
+
+        for (int ch = 0; ch < nch; ++ch)
+        {
+            auto* dst = buffer.getWritePointer (ch);
+            auto* wet = reverbBuffer.getReadPointer (juce::jmin (ch, 1));
+            for (int i = 0; i < n2; ++i)
+                dst[i] = dst[i] * (1.0f - kReverbMix) + wet[i] * kReverbMix;
+        }
+    }
+
+    // ─── Master EQ ────────────────────────────────────────────────────
     juce::dsp::AudioBlock<float> block (buffer);
     juce::dsp::ProcessContextReplacing<float> ctx (block);
-    reverb.process (ctx);
     eqLow.process   (ctx);
     eqLoMid.process (ctx);
     eqHiMid.process (ctx);

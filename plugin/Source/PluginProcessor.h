@@ -3,6 +3,7 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_dsp/juce_dsp.h>
 #include "LayerConfig.h"
+#include "DattorroReverb.h"
 
 class NorcoastAmbienceProcessor : public juce::AudioProcessor
 {
@@ -60,7 +61,8 @@ private:
     juce::dsp::IIR::Filter<float> delayFbLpfL, delayFbLpfR;   // 3 kHz LPF in feedback path
     juce::dsp::IIR::Filter<float> delayWetShelfL, delayWetShelfR; // +12 dB high-shelf on wet send
 
-    juce::dsp::Reverb reverb;
+    DattorroReverb reverb;
+    juce::AudioBuffer<float> reverbBuffer; // wet-only scratch
 
     // 4-band master EQ (post-reverb, matches the standalone tail):
     //   lowshelf   100 Hz  +0   dB

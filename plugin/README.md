@@ -7,7 +7,7 @@ C++ codebase.
 This lives alongside the standalone web app in this repo as a **fully
 parallel experiment**. The web app under `/public/` is unaffected.
 
-## Status: phase 3e — Foundation + Pads + chorus + delay + reverb + EQ
+## Status: phase 3g — Foundation + Pads + chorus + delay + Dattorro plate + EQ
 
 Both pad layers from `PAD_LAYERS` in the standalone now run in
 parallel as separate `juce::Synthesiser`s sharing the same MIDI
@@ -33,9 +33,12 @@ Master FX chain (signal flow): synth → chorus → delay → reverb → EQ.
   brightened with a +12 dB high-shelf at 1200 Hz. Matches the
   standalone's `delayNode → dLP → delayFB / delayGainN → dToneNode`
   topology.
-- **Reverb**: `juce::dsp::Reverb` (Schroeder-style) with
-  `roomSize 0.92`, `wetLevel 0.71`, `dryLevel 0.29`. Will be
-  replaced by a Dattorro port for full fidelity.
+- **Reverb**: Dattorro plate (`Source/DattorroReverb.h`) — direct
+  C++ port of `public/dattorro-reverb-worklet.js`. 12 delay lines,
+  pre-delay buffer, 3 one-pole LPFs, two cubic-interpolated
+  excursion taps, 14 stereo output taps. Defaults match the
+  standalone (`reverbSize 0.92` → decay 0.829, `reverbMod 0.74`
+  → excursion 1.558 Hz / 1.11 ms). Wet/dry mix at 0.71/0.29.
 - **EQ**: 4-band master, lowshelf 100 Hz / peak 350 Hz Q 0.7 / peak
   2.5 kHz Q 0.9 / highshelf 8 kHz at the standalone's default gains
   (0, −0.6, −2.0, +1.4 dB).
