@@ -4,6 +4,7 @@
 #include <juce_dsp/juce_dsp.h>
 #include "LayerConfig.h"
 #include "DattorroReverb.h"
+#include "Shimmer.h"
 
 class NorcoastAmbienceProcessor : public juce::AudioProcessor
 {
@@ -57,6 +58,7 @@ private:
     std::atomic<float>* reverbMixParam     = nullptr;
     std::atomic<float>* reverbSizeParam    = nullptr;
     std::atomic<float>* reverbModParam     = nullptr;
+    std::atomic<float>* shimmerVolParam    = nullptr;
     std::atomic<float>* widthModParam      = nullptr;
     std::atomic<float>* satAmtParam        = nullptr;
     std::atomic<float>* masterVolParam     = nullptr;
@@ -85,6 +87,8 @@ private:
 
     DattorroReverb reverb;
     juce::AudioBuffer<float> reverbBuffer;
+
+    Shimmer shimmer;
     float lastReverbSize = -1.0f;
     float lastReverbMod  = -1.0f;
 

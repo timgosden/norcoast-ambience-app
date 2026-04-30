@@ -77,6 +77,7 @@ NorcoastAmbienceProcessor::NorcoastAmbienceProcessor()
     reverbMixParam     = apvts.getRawParameterValue (ParamID::reverbMix);
     reverbSizeParam    = apvts.getRawParameterValue (ParamID::reverbSize);
     reverbModParam     = apvts.getRawParameterValue (ParamID::reverbMod);
+    shimmerVolParam    = apvts.getRawParameterValue (ParamID::shimmerVol);
     widthModParam      = apvts.getRawParameterValue (ParamID::widthMod);
     satAmtParam        = apvts.getRawParameterValue (ParamID::satAmt);
     masterVolParam     = apvts.getRawParameterValue (ParamID::masterVol);
@@ -131,6 +132,9 @@ void NorcoastAmbienceProcessor::prepareToPlay (double sampleRate, int samplesPer
     lastReverbSize = -1.0f;
     lastReverbMod  = -1.0f;
 
+    shimmer.prepare (sampleRate, samplesPerBlock);
+    shimmer.reset();
+
     widthPhase    = 0.0;
     widthPhaseInc = 0.3 / sampleRate;   // 0.3 Hz width LFO, matches standalone
 
@@ -151,6 +155,7 @@ void NorcoastAmbienceProcessor::releaseResources()
     delayFbLpfL.reset(); delayFbLpfR.reset();
     delayWetShelfL.reset(); delayWetShelfR.reset();
     reverb.reset();
+    shimmer.reset();
     eqLow.reset(); eqLoMid.reset(); eqHiMid.reset(); eqHigh.reset();
 }
 
@@ -184,6 +189,7 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     const float reverbMix   = reverbMixParam ->load();
     const float reverbSize  = reverbSizeParam->load();
     const float reverbMod   = reverbModParam ->load();
+    const float shimmerVol  = shimmerVolParam->load();
     const float widthMod    = widthModParam  ->load();
     const float satAmt      = satAmtParam    ->load();
     const float masterVol   = masterVolParam ->load();
@@ -329,6 +335,14 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
                 dst[i] = dst[i] * (1.0f - reverbMix) + wet[i] * reverbMix;
         }
     }
+
+    // ─── Shimmer (parallel add — pitched feedback Dattorro) ───────────
+    // Placed after the main reverb so the shimmer's tail isn't dunked
+    // back through the reverb's wet/dry mixer (which would attenuate
+    // it by 1-reverbMix). Slightly different topology to the
+    // standalone (which sums shimmer + main-reverb in parallel) but
+    // sonically equivalent for this preset's mix balance.
+    shimmer.processAdd (buffer, shimmerVol * 1.5f);
 
     // ─── Width LFO (master pan modulation, 0.3 Hz) ────────────────────
     if (widthMod > 1e-4f)

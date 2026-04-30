@@ -21,6 +21,7 @@ namespace ParamID
     inline constexpr const char* reverbSize    = "reverbSize";
     inline constexpr const char* reverbMod     = "reverbMod";
 
+    inline constexpr const char* shimmerVol    = "shimmerVol";
     inline constexpr const char* widthMod      = "widthMod";
     inline constexpr const char* satAmt        = "satAmt";
     inline constexpr const char* masterVol     = "masterVol";
@@ -77,6 +78,10 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
     add (std::make_unique<FloatParam> (juce::ParameterID { ParamID::reverbMod, 1 },
                                         "Reverb Mod",
                                         NormRange { 0.0f, 1.0f, 0.001f }, 0.74f));
+
+    add (std::make_unique<FloatParam> (juce::ParameterID { ParamID::shimmerVol, 1 },
+                                        "Shimmer",
+                                        NormRange { 0.0f, 1.0f, 0.001f }, 0.07f));
 
     // ─── Master ───────────────────────────────────────────────────────
     add (std::make_unique<FloatParam> (juce::ParameterID { ParamID::widthMod, 1 },

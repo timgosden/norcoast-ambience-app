@@ -78,6 +78,67 @@ public:
     }
     void setPreDelaySamples  (int n) { preDelaySamples = n; }
 
+    // Single-sample stereo output for a mono input — wet only, scaled
+    // by the worklet's internal 0.6 factor. Used by both processWet and
+    // by external feedback loops (e.g. shimmer reverb).
+    inline void processSampleStereo (float monoIn, float& outL, float& outR) noexcept
+    {
+        preDelay[(size_t) preDelayWrite] = monoIn;
+
+        const int pdRead = (preDelayLen + preDelayWrite - preDelaySamples)
+                           % preDelayLen;
+        preDelayWrite = (preDelayWrite + 1) % preDelayLen;
+
+        lp1 += bandwidth * (preDelay[(size_t) pdRead] - lp1);
+
+        float pre = writeDelay (0, lp1 - diff1 * readDelay (0));
+        pre       = writeDelay (1, diff1 * (pre - readDelay (1)) + readDelay (0));
+        pre       = writeDelay (2, diff1 * pre + readDelay (1) - diff2 * readDelay (2));
+        pre       = writeDelay (3, diff2 * (pre - readDelay (3)) + readDelay (2));
+        const float split = diff2 * pre + readDelay (3);
+
+        const float exc  = excursionDepthSamp
+                         * (1.0f + std::cos ((float) excPhase * 6.2800f));
+        const float exc2 = excursionDepthSamp
+                         * (1.0f + std::sin ((float) excPhase * 6.2847f));
+
+        float temp = writeDelay (4, split + decay * readDelay (11)
+                                 + decayDiff1 * readDelayCubic (4, exc));
+        writeDelay (5, readDelayCubic (4, exc) - decayDiff1 * temp);
+        lp2 += dampingInv * (readDelay (5) - lp2);
+        temp = writeDelay (6, decay * lp2 - decayDiff2 * readDelay (6));
+        writeDelay (7, readDelay (6) + decayDiff2 * temp);
+
+        temp = writeDelay (8, split + decay * readDelay (7)
+                            + decayDiff1 * readDelayCubic (8, exc2));
+        writeDelay (9, readDelayCubic (8, exc2) - decayDiff1 * temp);
+        lp3 += dampingInv * (readDelay (9) - lp3);
+        temp = writeDelay (10, decay * lp3 - decayDiff2 * readDelay (10));
+        writeDelay (11, readDelay (10) + decayDiff2 * temp);
+
+        const float lo = readDelayAt (9,  taps[0])  + readDelayAt (9,  taps[1])
+                       - readDelayAt (10, taps[2])  + readDelayAt (11, taps[3])
+                       - readDelayAt (5,  taps[4])  - readDelayAt (6,  taps[5])
+                       - readDelayAt (7,  taps[6]);
+        const float ro = readDelayAt (5,  taps[7])  + readDelayAt (5,  taps[8])
+                       - readDelayAt (6,  taps[9])  + readDelayAt (7,  taps[10])
+                       - readDelayAt (9,  taps[11]) - readDelayAt (10, taps[12])
+                       - readDelayAt (11, taps[13]);
+
+        outL = lo * 0.6f;
+        outR = ro * 0.6f;
+
+        excPhase += (double) excursionRate / sampleRate;
+        if (excPhase > 1024.0)
+            excPhase -= 1024.0;
+
+        for (auto& d : delays)
+        {
+            d.writeIdx = (d.writeIdx + 1) & d.mask;
+            d.readIdx  = (d.readIdx  + 1) & d.mask;
+        }
+    }
+
     // Replaces buffer contents with the wet-only reverb output.
     // Caller is responsible for any wet/dry mixing.
     void processWet (juce::AudioBuffer<float>& buffer)
@@ -89,66 +150,8 @@ public:
 
         for (int i = 0; i < n; ++i)
         {
-            // Mono sum into the pre-delay buffer.
-            preDelay[(size_t) preDelayWrite] = (L[i] + R[i]) * 0.5f;
-
-            const int pdRead = (preDelayLen + preDelayWrite - preDelaySamples)
-                               % preDelayLen;
-            preDelayWrite = (preDelayWrite + 1) % preDelayLen;
-
-            lp1 += bandwidth * (preDelay[(size_t) pdRead] - lp1);
-
-            // Input diffusion: 4 allpasses chained.
-            float pre = writeDelay (0, lp1 - diff1 * readDelay (0));
-            pre       = writeDelay (1, diff1 * (pre - readDelay (1)) + readDelay (0));
-            pre       = writeDelay (2, diff1 * pre + readDelay (1) - diff2 * readDelay (2));
-            pre       = writeDelay (3, diff2 * (pre - readDelay (3)) + readDelay (2));
-            const float split = diff2 * pre + readDelay (3);
-
-            // Modulated decay loop: two parallel "tanks" cross-coupled
-            // via the decay coefficient. Excursion uses cubic interp to
-            // dodge zipper artefacts on the fractional read.
-            const float exc  = excursionDepthSamp
-                             * (1.0f + std::cos ((float) excPhase * 6.2800f));
-            const float exc2 = excursionDepthSamp
-                             * (1.0f + std::sin ((float) excPhase * 6.2847f));
-
-            float temp = writeDelay (4, split + decay * readDelay (11)
-                                     + decayDiff1 * readDelayCubic (4, exc));
-            writeDelay (5, readDelayCubic (4, exc) - decayDiff1 * temp);
-            lp2 += dampingInv * (readDelay (5) - lp2);
-            temp = writeDelay (6, decay * lp2 - decayDiff2 * readDelay (6));
-            writeDelay (7, readDelay (6) + decayDiff2 * temp);
-
-            temp = writeDelay (8, split + decay * readDelay (7)
-                                + decayDiff1 * readDelayCubic (8, exc2));
-            writeDelay (9, readDelayCubic (8, exc2) - decayDiff1 * temp);
-            lp3 += dampingInv * (readDelay (9) - lp3);
-            temp = writeDelay (10, decay * lp3 - decayDiff2 * readDelay (10));
-            writeDelay (11, readDelay (10) + decayDiff2 * temp);
-
-            const float lo = readDelayAt (9,  taps[0])  + readDelayAt (9,  taps[1])
-                           - readDelayAt (10, taps[2])  + readDelayAt (11, taps[3])
-                           - readDelayAt (5,  taps[4])  - readDelayAt (6,  taps[5])
-                           - readDelayAt (7,  taps[6]);
-            const float ro = readDelayAt (5,  taps[7])  + readDelayAt (5,  taps[8])
-                           - readDelayAt (6,  taps[9])  + readDelayAt (7,  taps[10])
-                           - readDelayAt (9,  taps[11]) - readDelayAt (10, taps[12])
-                           - readDelayAt (11, taps[13]);
-
-            // Worklet's internal *0.6 wet scale — keeps headroom.
-            L[i] = lo * 0.6f;
-            R[i] = ro * 0.6f;
-
-            excPhase += (double) excursionRate / sampleRate;
-            if (excPhase > 1024.0)
-                excPhase -= 1024.0;
-
-            for (auto& d : delays)
-            {
-                d.writeIdx = (d.writeIdx + 1) & d.mask;
-                d.readIdx  = (d.readIdx  + 1) & d.mask;
-            }
+            const float monoIn = (L[i] + R[i]) * 0.5f;
+            processSampleStereo (monoIn, L[i], R[i]);
         }
     }
 

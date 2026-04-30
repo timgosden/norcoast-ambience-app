@@ -102,6 +102,7 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     addControl (eqHiMid,       "Hi-Mid (2.5k)",  ParamID::eqHiMid);
     addControl (eqHigh,        "High (8k)",      ParamID::eqHigh);
 
+    addControl (shimmerVol,    "Shimmer",        ParamID::shimmerVol);
     addControl (widthMod,      "Width LFO",      ParamID::widthMod);
     addControl (satAmt,        "Saturation",     ParamID::satAmt);
     addControl (masterVol,     "Master",         ParamID::masterVol);
@@ -128,7 +129,7 @@ void NorcoastAmbienceEditor::paint (juce::Graphics& g)
 
     g.setColour (juce::Colour (0x33ffffff));
     g.setFont (juce::FontOptions (11.0f));
-    g.drawText ("plugin · v1.0 · phase 4 (APVTS + sliders)",
+    g.drawText ("plugin · v1.1 · phase 5 (+ shimmer)",
                 getLocalBounds().removeFromBottom (24).reduced (12, 4),
                 juce::Justification::centredRight);
 }
@@ -175,7 +176,7 @@ void NorcoastAmbienceEditor::resized()
     layoutColumn (grid.removeFromLeft (colW), eqHeader,
                   { &eqLow, &eqLoMid, &eqHiMid, &eqHigh });
     layoutColumn (grid,                       masterHeader,
-                  { &widthMod, &satAmt, &masterVol });
+                  { &shimmerVol, &widthMod, &satAmt, &masterVol });
 
     // Latch + All Off buttons row
     auto buttons = bounds.removeFromBottom (160).removeFromTop (32);

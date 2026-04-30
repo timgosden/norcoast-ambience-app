@@ -48,7 +48,7 @@ private:
     ParamControl eqLow, eqLoMid, eqHiMid, eqHigh;
 
     // Master column
-    ParamControl widthMod, satAmt, masterVol;
+    ParamControl shimmerVol, widthMod, satAmt, masterVol;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (NorcoastAmbienceEditor)
 };
