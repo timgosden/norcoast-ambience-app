@@ -1,6 +1,7 @@
 #pragma once
 
 #include <juce_audio_processors/juce_audio_processors.h>
+#include <juce_dsp/juce_dsp.h>
 #include "LayerConfig.h"
 
 class NorcoastAmbienceProcessor : public juce::AudioProcessor
@@ -44,6 +45,8 @@ private:
     juce::Synthesiser foundationSynth;
     juce::Synthesiser padsSynth;
     juce::MidiKeyboardState keyboardState;
+
+    juce::dsp::Reverb reverb;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (NorcoastAmbienceProcessor)
 };

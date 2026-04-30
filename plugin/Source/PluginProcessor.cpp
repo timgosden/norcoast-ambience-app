@@ -64,15 +64,39 @@ NorcoastAmbienceProcessor::NorcoastAmbienceProcessor()
         foundationSynth.addVoice (new PadVoice (foundationConfig));
         padsSynth      .addVoice (new PadVoice (padsConfig));
     }
+
+    // Master plate reverb — defaults match the standalone:
+    //   reverbMix=0.71, reverbSize=0.92.
+    // juce::dsp::Reverb is Schroeder-style (not Dattorro), so this is a
+    // close-enough approximation for now; a Dattorro port can replace it
+    // later without changing the surrounding plumbing.
+    juce::dsp::Reverb::Parameters p;
+    p.roomSize   = 0.92f;
+    p.damping    = 0.3f;     // plate-ish — relatively bright tail
+    p.wetLevel   = 0.71f;
+    p.dryLevel   = 1.0f - 0.71f;
+    p.width      = 1.0f;
+    p.freezeMode = 0.0f;
+    reverb.setParameters (p);
 }
 
-void NorcoastAmbienceProcessor::prepareToPlay (double sampleRate, int /*samplesPerBlock*/)
+void NorcoastAmbienceProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
     foundationSynth.setCurrentPlaybackSampleRate (sampleRate);
     padsSynth      .setCurrentPlaybackSampleRate (sampleRate);
+
+    juce::dsp::ProcessSpec spec;
+    spec.sampleRate       = sampleRate;
+    spec.maximumBlockSize = (juce::uint32) samplesPerBlock;
+    spec.numChannels      = 2;
+    reverb.prepare (spec);
+    reverb.reset();
 }
 
-void NorcoastAmbienceProcessor::releaseResources() {}
+void NorcoastAmbienceProcessor::releaseResources()
+{
+    reverb.reset();
+}
 
 bool NorcoastAmbienceProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
 {
@@ -91,6 +115,11 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
     foundationSynth.renderNextBlock (buffer, midi, 0, buffer.getNumSamples());
     padsSynth      .renderNextBlock (buffer, midi, 0, buffer.getNumSamples());
+
+    // Master reverb — wet/dry handled internally by juce::dsp::Reverb.
+    juce::dsp::AudioBlock<float> block (buffer);
+    juce::dsp::ProcessContextReplacing<float> ctx (block);
+    reverb.process (ctx);
 }
 
 juce::AudioProcessorEditor* NorcoastAmbienceProcessor::createEditor()
