@@ -8,12 +8,18 @@ Live at [norcoastaudio.com](https://norcoastaudio.com) (linked from the main sit
 
 ```
 public/
-  index.html        ← Ambience synth (self-contained, ~2MB)
-  manifest.json     ← PWA manifest (install to home screen)
-  sw.js             ← Service worker (offline support)
+  index.html                   ← Ambience synth (self-contained, ~2MB)
+  manifest.json                ← PWA manifest (install to home screen)
+  sw.js                        ← Service worker (offline support)
+  dattorro-reverb-worklet.js   ← AudioWorklet for the plate reverb
+  phase-vocoder-worklet.js     ← AudioWorklet for shimmer pitch shift
   icons/
     icon.svg
     icon-maskable.svg
+ios/
+  project.yml                  ← xcodegen spec for the WKWebView wrapper
+  setup.sh                     ← Generates the Xcode project from project.yml
+  NorcoastAmbience/            ← Swift sources, Info.plist, entitlements
 ```
 
 ## Local dev
@@ -24,23 +30,43 @@ npm run dev
 # → http://localhost:3000
 ```
 
-## Deploy (Railway)
+## Deploy
 
-1. Push to GitHub
-2. Connect repo in Railway dashboard
-3. Railway auto-detects Node, runs `npm start`
-4. Add custom domain in Railway settings
+GitHub Actions auto-deploys to GitHub Pages on every push to `main`. The
+workflow lives at `.github/workflows/deploy.yml` and uploads the contents
+of `public/` as the Pages artefact.
 
-The `start` script uses `serve` to host the `public/` directory. Railway provides `$PORT` automatically.
-
-## Install on phone
+## Install as a PWA
 
 **Android:** Open in Chrome → three-dot menu → Add to Home Screen
 
-**iPhone:** Open in Safari → Share → Add to Home Screen
+**iPhone / iPad:** Open in Safari → Share → Add to Home Screen
 
 The app caches fully after first load and works offline.
 
-## iOS app
+## Plugin (parallel experiment)
 
-The Xcode project wrapping the synth in a WKWebView lives in this repo alongside the web app. See `ios/` (coming).
+A separate JUCE-based port lives under `plugin/`. It builds to AU,
+VST3, CLAP, and Standalone from one C++ codebase. Currently a
+phase-1 skeleton; see `plugin/README.md` for build instructions
+and roadmap. The standalone web app is unaffected by anything in
+that directory.
+
+## iOS app (App Store)
+
+The Xcode project lives in `ios/`. It wraps the web app in a `WKWebView`
+with `AVAudioSession` configured for `.playback` so audio runs in the
+background and routes through the lock screen.
+
+```bash
+cd ios
+./setup.sh                # generates NorcoastAmbience.xcodeproj
+open NorcoastAmbience.xcodeproj
+```
+
+Before building:
+
+1. Set your Team in Signing & Capabilities
+2. Bump `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` in `project.yml`
+3. Add a 1024×1024 app icon PNG under `NorcoastAmbience/Resources/Assets.xcassets/AppIcon.appiconset/`
+4. Product → Archive → submit

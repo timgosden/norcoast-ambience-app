@@ -11,3 +11,11 @@ DerivedData/
 *.ipa
 public/index.html.bak-*
 package-lock.json
+
+# Plugin build artefacts (CMake + JUCE)
+plugin/build/
+plugin/_deps/
+plugin/cmake-build-*/
+*.vst3/Contents/
+*.component/Contents/
+*.clap/
