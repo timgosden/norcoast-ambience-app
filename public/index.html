@@ -79,7 +79,8 @@
   #perf.compact .perf-vis-wrap{height:0;padding-top:0;padding-bottom:0}
   #perf.compact .perf-bottom{max-height:0;padding-top:0;padding-bottom:0}
   #perf.compact .perf-quickstrip{display:none}
-  .app-version{position:absolute;bottom:calc(4px + env(safe-area-inset-bottom, 0px));right:10px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none;font-variant-numeric:tabular-nums}
+  .app-version{position:absolute;bottom:calc(4px + env(safe-area-inset-bottom, 0px));right:10px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;font-variant-numeric:tabular-nums;cursor:pointer;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;user-select:none}
+  #perfHud{position:fixed;top:calc(8px + env(safe-area-inset-top, 0px));left:8px;background:rgba(0,0,0,0.65);color:#5eb88a;font:10px/1.3 ui-monospace,Menlo,monospace;padding:5px 8px;border-radius:6px;z-index:9999;pointer-events:none;display:none;letter-spacing:0.3px;white-space:nowrap}
   .bpm-click-group{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:14px;padding:4px 6px}
   .evolve-pill{padding:8px 13px;border-radius:20px;font-size:10px;letter-spacing:2px;text-transform:uppercase;font-weight:500;cursor:pointer;transition:all 0.3s;border:1px solid transparent}
   .fade-btn{display:flex;align-items:center;justify-content:center;padding:8px 13px;border-radius:20px;font-size:10px;letter-spacing:2px;text-transform:uppercase;font-weight:500;cursor:pointer;transition:border-color 0.3s,color 0.3s,box-shadow 0.3s;border:1px solid rgba(212,107,138,0.35);background:rgba(212,107,138,0.08);color:rgba(212,107,138,0.7);touch-action:manipulation;position:relative;overflow:hidden}
@@ -187,6 +188,7 @@
 </style>
 </head>
 <body>
+<div id="perfHud"></div>
 <!-- Tap-to-start -->
 <div id="audioPrompt" onclick="initAndStart()" style="position:fixed;top:0;left:0;right:0;bottom:0;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#080b14;cursor:pointer;transition:opacity 0.8s;padding:40px">
   <svg width="84" height="84" viewBox="0 0 100 100" fill="none" style="margin-bottom:28px">
@@ -200,7 +202,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.59</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.60</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -261,7 +263,7 @@
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
       <button id="clickX2Btn" class="evolve-pill off" onclick="toggleClickX2()" style="padding:8px 10px;font-size:9px;letter-spacing:1px">x2</button>
     </div>
-    <div class="app-version">v1.59</div>
+    <div class="app-version">v1.60</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -2335,6 +2337,44 @@ const _midiClkTimes=[];
 let midiPulseNext=0;
 const _midiHeldNotes=new Set();
 const MIDI_NOTE_NAMES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+// ─── PERF HUD ───
+// Toggle: long-press (700ms) the version label, or load with ?perf=1.
+// State persists in localStorage. Renders fps, oscillator count, audio
+// output latency, JS heap (Chromium only), and audio context state.
+let _perfHudOn=new URLSearchParams(location.search).get('perf')==='1'||localStorage.getItem('norcoast_perf')==='1';
+let _perfFrames=0,_perfLast=0,_perfFPS=0,_perfTickerOn=false;
+function togglePerfHud(){_perfHudOn=!_perfHudOn;try{localStorage.setItem('norcoast_perf',_perfHudOn?'1':'0')}catch(e){}applyPerfHud();}
+function applyPerfHud(){
+  const el=document.getElementById('perfHud');if(!el)return;
+  el.style.display=_perfHudOn?'block':'none';
+  if(_perfHudOn&&!_perfTickerOn){_perfTickerOn=true;_perfLast=performance.now();_perfFrames=0;requestAnimationFrame(_perfTick);}
+}
+function _perfTick(now){
+  if(!_perfHudOn){_perfTickerOn=false;return;}
+  _perfFrames++;
+  const dt=now-_perfLast;
+  if(dt>=500){_perfFPS=Math.round(_perfFrames*1000/dt);_perfFrames=0;_perfLast=now;_perfRender();}
+  requestAnimationFrame(_perfTick);
+}
+function _perfRender(){
+  const el=document.getElementById('perfHud');if(!el)return;
+  let oscs=0;
+  for(const k in staticNodes){if(staticNodes[k]&&staticNodes[k].oscs)oscs+=staticNodes[k].oscs.length;}
+  for(const k in evolveNodes){if(evolveNodes[k]&&evolveNodes[k].oscs)oscs+=evolveNodes[k].oscs.length;}
+  const lat=ctx&&ctx.outputLatency!=null?Math.round(ctx.outputLatency*1000):'?';
+  const mem=performance.memory?Math.round(performance.memory.usedJSHeapSize/1048576)+'M':'—';
+  el.textContent='fps '+_perfFPS+'  osc '+oscs+'  lat '+lat+'ms  heap '+mem+'  '+(ctx?ctx.state:'no-ctx');
+}
+function initPerfHud(){
+  applyPerfHud();
+  // Long-press version label to toggle. 700ms threshold matches BPM type.
+  const v=document.querySelector('.app-version');
+  if(!v)return;
+  let _t=null;
+  v.addEventListener('pointerdown',()=>{_t=setTimeout(togglePerfHud,700);});
+  ['pointerup','pointerleave','pointercancel'].forEach(e=>v.addEventListener(e,()=>{if(_t){clearTimeout(_t);_t=null;}}));
+}
+
 function loadMidiMappings(){try{midiMappings=JSON.parse(localStorage.getItem('norcoast_midi')||'{}')}catch(e){midiMappings={}}}
 function saveMidiMappings(){localStorage.setItem('norcoast_midi',JSON.stringify(midiMappings))}
 function toggleMIDILearn(){midiLearnMode=!midiLearnMode;midiLearnPending=null;if(document.getElementById('editSheet').classList.contains('open'))buildEditSheet()}
@@ -2599,6 +2639,7 @@ async function initAndStart(){
       });
     }
     loadMidiMappings();buildKeys();startVis();scheduleEvolve();initMIDI();updatePerfSetlist();initQuickStrips();
+    initPerfHud();
     if(compactMode)toggleCompact();
     // Swipe down to close edit sheet
     {const sheet=document.getElementById('editSheet');let _sy=0,_sw=false;
