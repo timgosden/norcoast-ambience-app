@@ -97,7 +97,8 @@ NorcoastAmbienceProcessor::NorcoastAmbienceProcessor()
     arpVoiceParam      = apvts.getRawParameterValue (ParamID::arpVoice);
     drumVolParam       = apvts.getRawParameterValue (ParamID::drumVol);
     drumPatternParam   = apvts.getRawParameterValue (ParamID::drumPattern);
-    chordTypeParam     = apvts.getRawParameterValue (ParamID::chordType);
+    chordTypeParam       = apvts.getRawParameterValue (ParamID::chordType);
+    customChordMaskParam = apvts.getRawParameterValue (ParamID::customChordMask);
     evolveOnParam      = apvts.getRawParameterValue (ParamID::evolveOn);
     evolveBarsParam    = apvts.getRawParameterValue (ParamID::evolveBars);
     droneOnParam       = apvts.getRawParameterValue (ParamID::droneOn);
@@ -276,6 +277,7 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     {
         const int targetType  = juce::jlimit (0, (int) ChordEvolver::NumTypes - 1,
                                               (int) chordTypeParam->load());
+        const int customMask  = (int) customChordMaskParam->load();
         const bool evolveOn   = evolveOnParam->load() > 0.5f;
 
         // Evolve in bars (musical), 4/4 assumed → beats = bars * 4.
@@ -284,7 +286,7 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         const float beatsPerEvolve = (float) (kBars[(size_t) barsIdx] * 4);
 
         chordEvolver.process (midi, n, /*channel*/ 1,
-                              targetType, evolveOn, beatsPerEvolve, bpm,
+                              targetType, customMask, evolveOn, beatsPerEvolve, bpm,
                               [this] (int newType)
                               {
                                   if (auto* p = apvts.getParameter (ParamID::chordType))

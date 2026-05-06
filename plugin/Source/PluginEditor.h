@@ -49,6 +49,17 @@ private:
     // Choice button rows — replace knobs for discrete pickers.
     std::unique_ptr<ChoiceButtonRow> arpVoiceRow;
     std::unique_ptr<ChoiceButtonRow> drumPatternRow;
+    std::unique_ptr<ChoiceButtonRow> chordTypeRow;     // EVOLVE chord pills
+    std::unique_ptr<ChoiceButtonRow> rootKeyRow;       // bottom 12-key grid
+
+    // Custom-chord builder (7 toggle pills for major-scale degrees).
+    std::array<juce::TextButton, 7> degreeButtons {{
+        juce::TextButton ("1"), juce::TextButton ("2"), juce::TextButton ("3"),
+        juce::TextButton ("4"), juce::TextButton ("5"), juce::TextButton ("6"),
+        juce::TextButton ("7")
+    }};
+    void refreshDegreeButtons();
+    void setDegreeBit (int bitIndex, bool on);
 
     juce::TextButton  subOctButton     { "Sub Oct" };
     juce::TextButton  textureOctButton { "Tex +Oct" };
@@ -81,7 +92,7 @@ private:
 
     // Knobs (allocated as members so their lifetime matches the editor)
     ParamKnob foundationVol, padsVol, textureVol;
-    ParamKnob chordType, evolveRate, homeRoot;
+    ParamKnob evolveRate;
     ParamKnob chorusMix, delayMix, delayFb, delayTimeMs, delayTone;
     ParamKnob reverbMix, reverbSize, reverbMod, shimmerVol;
     ParamKnob hpfFreq, lpfFreq;

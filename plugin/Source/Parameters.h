@@ -44,8 +44,9 @@ namespace ParamID
     inline constexpr const char* drumVol       = "drumVol";
     inline constexpr const char* drumPattern   = "drumPattern";
 
-    inline constexpr const char* chordType     = "chordType";
-    inline constexpr const char* evolveOn      = "evolveOn";
+    inline constexpr const char* chordType        = "chordType";
+    inline constexpr const char* customChordMask  = "customChordMask";
+    inline constexpr const char* evolveOn         = "evolveOn";
     inline constexpr const char* evolveBars    = "evolveBars";
     inline constexpr const char* droneOn       = "droneOn";
     inline constexpr const char* homeRoot      = "homeRoot";
@@ -183,7 +184,12 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
     // single held root) works inside the plugin too.
     layout.add (std::make_unique<juce::AudioParameterChoice> (
         juce::ParameterID { ParamID::chordType, 1 }, "Chord Type",
-        juce::StringArray { "5th", "Sus2", "Sus4", "Maj7th", "9th" }, 1));
+        juce::StringArray { "5th", "Sus2", "Sus4", "Maj7th", "9th", "Custom" }, 1));
+    // Bitmask of major-scale degrees for the Custom chord (bit 0 = root,
+    // always implicit; bits 1..6 = 2nd…7th of the major scale).
+    layout.add (std::make_unique<juce::AudioParameterInt> (
+        juce::ParameterID { ParamID::customChordMask, 1 },
+        "Custom Chord Mask", 0, 127, 0b1010100));   // 2nd + 4th + 7th — sus-y default
     layout.add (std::make_unique<juce::AudioParameterBool> (
         juce::ParameterID { ParamID::evolveOn, 1 }, "Evolve", true));
     // Evolve in BARS so the chord changes line up with the arp + drum

@@ -94,18 +94,18 @@ public:
     }
 
     void drawButtonBackground (juce::Graphics& g, juce::Button& button,
-                               const juce::Colour& bg, bool over, bool down) override
+                               const juce::Colour& /*bg*/, bool over, bool down) override
     {
         const auto bounds = button.getLocalBounds().toFloat().reduced (1.0f);
+        const auto onColour  = button.findColour (juce::TextButton::buttonOnColourId);
+        const auto offColour = button.findColour (juce::TextButton::buttonColourId);
         const auto base = button.getToggleState()
-            ? juce::Colour (kAccent)
-            : (down ? juce::Colour (kPanelBg).brighter (0.1f)
-                    : (over ? juce::Colour (kPanelBg).brighter (0.05f)
-                            : juce::Colour (kPanelBg)));
+            ? onColour
+            : (down ? offColour.brighter (0.1f)
+                    : (over ? offColour.brighter (0.05f) : offColour));
         g.setColour (base);
         g.fillRoundedRectangle (bounds, 4.0f);
         g.setColour (juce::Colour (kPanelEdge));
         g.drawRoundedRectangle (bounds, 4.0f, 1.0f);
-        juce::ignoreUnused (bg);
     }
 };

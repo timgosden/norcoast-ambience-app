@@ -160,10 +160,7 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     setupKnob (padsVol,       "Pads",         ParamID::padsVol);
     setupKnob (textureVol,    "Texture",      ParamID::textureVol);
 
-    setupKnob (chordType,     "Chord",        ParamID::chordType);
     setupKnob (evolveRate,    "Bars",         ParamID::evolveBars);
-    setupKnob (homeRoot,      "Root",         ParamID::homeRoot);
-
     {
         static const juce::StringArray barChoices { "1", "2", "4", "8", "16", "32" };
         evolveRate.knob.textFromValueFunction = [] (double v) -> juce::String
@@ -174,25 +171,42 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
         evolveRate.knob.updateText();
     }
 
+    // Chord type pill row (replaces the Chord knob).
+    chordTypeRow = std::make_unique<ChoiceButtonRow> (
+        owner.getAPVTS(), ParamID::chordType,
+        juce::Colour (NorcoastLookAndFeel::kAccent));
+    addAndMakeVisible (*chordTypeRow);
+
+    // 12-key root grid (full-width row at the bottom of the editor).
+    rootKeyRow = std::make_unique<ChoiceButtonRow> (
+        owner.getAPVTS(), ParamID::homeRoot,
+        juce::Colour (NorcoastLookAndFeel::kAccent));
+    addAndMakeVisible (*rootKeyRow);
+
+    // Custom-chord degree buttons (1..7). Bit 0 (root) is implicit and
+    // always on; bits 1..6 toggle the 2nd…7th of the major scale.
+    for (int i = 0; i < 7; ++i)
     {
-        const auto names = ChordEvolver::getChordNames();
-        chordType.knob.textFromValueFunction = [names] (double v) -> juce::String
+        auto& b = degreeButtons[(size_t) i];
+        b.setClickingTogglesState (false);
+        b.setColour (juce::TextButton::buttonColourId,
+                     juce::Colour (NorcoastLookAndFeel::kPanelBg));
+        b.setColour (juce::TextButton::buttonOnColourId,
+                     juce::Colour (NorcoastLookAndFeel::kAccent));
+        b.setColour (juce::TextButton::textColourOnId,
+                     juce::Colour (NorcoastLookAndFeel::kBg));
+        b.setColour (juce::TextButton::textColourOffId,
+                     juce::Colour (NorcoastLookAndFeel::kAccent).withAlpha (0.55f));
+        b.onClick = [this, i]
         {
-            const int idx = juce::jlimit (0, names.size() - 1, (int) std::round (v));
-            return names[idx];
+            if (i == 0) return;          // root always on
+            const int currentMask = (int) owner.getAPVTS()
+                .getRawParameterValue (ParamID::customChordMask)->load();
+            setDegreeBit (i, ! ((currentMask & (1 << i)) != 0));
         };
-        chordType.knob.updateText();
+        addAndMakeVisible (b);
     }
-    {
-        static const juce::StringArray noteNames
-            { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
-        homeRoot.knob.textFromValueFunction = [] (double v) -> juce::String
-        {
-            const int idx = juce::jlimit (0, noteNames.size() - 1, (int) std::round (v));
-            return noteNames[idx];
-        };
-        homeRoot.knob.updateText();
-    }
+    refreshDegreeButtons();
 
     setupKnob (chorusMix,     "Chorus",       ParamID::chorusMix);
     setupKnob (delayMix,      "Delay",        ParamID::delayMix);
@@ -265,7 +279,7 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     sections =
     {{
         { "LAYERS",     kColLayers,   {}, { &foundationVol, &padsVol, &textureVol } },
-        { "EVOLVE",     kColEvolve,   {}, { &homeRoot, &chordType, &evolveRate } },
+        { "EVOLVE",     kColEvolve,   {}, { &evolveRate } },
         { "CHORUS",     kColModFx,    {}, { &chorusMix } },
         { "DELAY",      kColModFx,    {}, { &delayMix, &delayFb, &delayTimeMs, &delayTone } },
         { "REVERB",     kColReverbFx, {}, { &reverbMix, &reverbSize, &reverbMod, &shimmerVol } },
@@ -276,7 +290,7 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
         { "MASTER",     kColMaster,   {}, { &widthMod, &satAmt, &masterVol } }
     }};
 
-    setSize (980, 580);
+    setSize (980, 640);
 
     // Give the qwerty keyboard focus so computer-keyboard keys map to MIDI.
     juce::MessageManager::callAsync ([safeThis = juce::Component::SafePointer (&qwertyKeyboard)]
@@ -292,6 +306,30 @@ NorcoastAmbienceEditor::~NorcoastAmbienceEditor()
     for (auto& s : sections)
         for (auto* k : s.knobs)
             clearLF (*k);
+}
+
+void NorcoastAmbienceEditor::refreshDegreeButtons()
+{
+    const int mask = (int) owner.getAPVTS()
+        .getRawParameterValue (ParamID::customChordMask)->load();
+    for (int i = 0; i < 7; ++i)
+        degreeButtons[(size_t) i].setToggleState (
+            i == 0 || (mask & (1 << i)) != 0,
+            juce::dontSendNotification);
+}
+
+void NorcoastAmbienceEditor::setDegreeBit (int bitIndex, bool on)
+{
+    if (auto* p = owner.getAPVTS().getParameter (ParamID::customChordMask))
+    {
+        const int mask = (int) owner.getAPVTS()
+            .getRawParameterValue (ParamID::customChordMask)->load();
+        const int newMask = on ? (mask | (1 << bitIndex))
+                               : (mask & ~(1 << bitIndex));
+        const auto range = p->getNormalisableRange();
+        p->setValueNotifyingHost (range.convertTo0to1 ((float) newMask));
+        refreshDegreeButtons();
+    }
 }
 
 void NorcoastAmbienceEditor::applyFactoryPreset (int idx)
@@ -461,12 +499,18 @@ void NorcoastAmbienceEditor::resized()
             auto row = inner.removeFromBottom (24).reduced (4, 0);
             drumPatternRow->setBounds (row);
         }
-        else if (&s == &sections[1])      // EVOLVE — Drone + Evolve toggles
+        else if (&s == &sections[1])      // EVOLVE — pill row, knob, then toggles
         {
-            auto row = inner.removeFromBottom (24).reduced (4, 0);
-            const int half = row.getWidth() / 2;
-            droneButton .setBounds (row.removeFromLeft (half).reduced (2, 0));
-            evolveButton.setBounds (row.reduced (2, 0));
+            // Chord type pill row at the top of the content area.
+            auto pillRow = inner.removeFromTop (28).reduced (2, 0);
+            if (chordTypeRow != nullptr) chordTypeRow->setBounds (pillRow);
+            inner.removeFromTop (4);
+
+            // Drone + Evolve toggles docked at the bottom.
+            auto buttonRow = inner.removeFromBottom (24).reduced (4, 0);
+            const int half = buttonRow.getWidth() / 2;
+            droneButton .setBounds (buttonRow.removeFromLeft (half).reduced (2, 0));
+            evolveButton.setBounds (buttonRow.reduced (2, 0));
         }
 
         const int kW = inner.getWidth() / (int) s.knobs.size();
@@ -477,6 +521,22 @@ void NorcoastAmbienceEditor::resized()
             k->knob .setBounds (col.reduced (4, 2));
         }
     }
+
+    // ─── Bottom rows: custom-chord degrees + 12-key root grid ────────
+    bounds.removeFromTop (8);
+
+    auto degreesRow = bounds.removeFromTop (28);
+    {
+        const int n = (int) degreeButtons.size();
+        const int w = degreesRow.getWidth() / n;
+        for (int i = 0; i < n; ++i)
+            degreeButtons[(size_t) i].setBounds (
+                degreesRow.removeFromLeft (w).reduced (2, 0));
+    }
+    bounds.removeFromTop (4);
+
+    auto keyRow = bounds.removeFromTop (44);
+    if (rootKeyRow != nullptr) rootKeyRow->setBounds (keyRow);
 
     // Park the invisible qwerty-keyboard 1×1 in the bottom-right corner.
     qwertyKeyboard.setBounds (getWidth() - 2, getHeight() - 2, 1, 1);

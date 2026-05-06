@@ -19,17 +19,39 @@ class ChordEvolver
 public:
     // Chord types match the standalone web app's CHORD_TYPES exactly.
     // No major/minor triads — the standalone is intentionally about
-    // open / sus / sparse voicings for ambient pads.
-    enum ChordType { Fifth, Sus2, Sus4, Maj7, Ninth, NumTypes };
+    // open / sus / sparse voicings for ambient pads. Custom is a
+    // bitmask over the 7 major-scale degrees (1=root is implicit).
+    enum ChordType { Fifth, Sus2, Sus4, Maj7, Ninth, Custom, NumTypes };
 
     static juce::StringArray getChordNames()
     {
-        return { "5th", "Sus2", "Sus4", "Maj7th", "9th" };
+        return { "5th", "Sus2", "Sus4", "Maj7th", "9th", "Custom" };
+    }
+
+    // Major-scale degree → semitones from root: 1, 2, 3, 4, 5, 6, 7
+    static constexpr std::array<int, 7> kMajorScaleDegrees { 0, 2, 4, 5, 7, 9, 11 };
+
+    // For Custom chord, the bitmask must be passed in (a static
+    // intervalsFor() can't see it). Mask bit i (1..6) = include
+    // major-scale degree (i+1). Bit 0 = root, always implicit.
+    std::vector<int> intervalsForCurrent (int type, int customMask) const
+    {
+        if (type == Custom)
+        {
+            std::vector<int> ivs;
+            for (int i = 1; i < 7; ++i)
+                if (customMask & (1 << i))
+                    ivs.push_back (kMajorScaleDegrees[(size_t) i]);
+            if (ivs.empty()) ivs.push_back (7);   // safety: at least the 5th
+            return ivs;
+        }
+        return intervalsFor (type);
     }
 
     static const std::vector<int>& intervalsFor (int type)
     {
-        static const std::array<std::vector<int>, (size_t) NumTypes> data
+        static const std::vector<int> empty;
+        static const std::array<std::vector<int>, 5> data
         {{
             { 7 },          // 5th
             { 2, 7 },       // Sus2
@@ -37,7 +59,8 @@ public:
             { 11 },         // Maj7th — sparse (root + maj7 only)
             { 7, 14 }       // 9th
         }};
-        return data[(size_t) juce::jlimit (0, (int) NumTypes - 1, type)];
+        if (type < 0 || type >= (int) data.size()) return empty;
+        return data[(size_t) type];
     }
 
     void prepare (double sr)
@@ -68,7 +91,7 @@ public:
     //                        can be updated to reflect the change
     template <typename AdvanceFn>
     void process (juce::MidiBuffer& midi, int numSamples, int channel,
-                  int targetType, bool evolveOn,
+                  int targetType, int customMask, bool evolveOn,
                   float rateBeats, double bpm,
                   AdvanceFn&& advanceTargetParam)
     {
@@ -103,10 +126,10 @@ public:
 
         // ─── Chord-type transition ────────────────────────────────────
         // Off the old intervals on every active root, then on the new.
-        if (targetType != activeChordType)
+        if (targetType != activeChordType || customMask != activeCustomMask)
         {
-            const auto& oldIv = intervalsFor (activeChordType);
-            const auto& newIv = intervalsFor (targetType);
+            const auto oldIv = intervalsForCurrent (activeChordType, activeCustomMask);
+            const auto newIv = intervalsForCurrent (targetType,      customMask);
             for (int root = 0; root < 128; ++root)
             {
                 if (! activeRoots[(size_t) root]) continue;
@@ -123,11 +146,12 @@ public:
                         midi.addEvent (juce::MidiMessage::noteOn (channel, n, 0.7f), 0);
                 }
             }
-            activeChordType = targetType;
+            activeChordType   = targetType;
+            activeCustomMask  = customMask;
         }
 
         // ─── User events + augmentation ───────────────────────────────
-        const auto& iv = intervalsFor (activeChordType);
+        const auto iv = intervalsForCurrent (activeChordType, activeCustomMask);
         for (const auto meta : userEvents)
         {
             const auto msg = meta.getMessage();
@@ -171,6 +195,7 @@ public:
 private:
     double sampleRate     = 44100.0;
     double sampleCounter  = 0.0;
-    int    activeChordType = 0;
+    int    activeChordType  = 0;
+    int    activeCustomMask = 0;
     std::array<bool, 128> activeRoots {};
 };
