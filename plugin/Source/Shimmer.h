@@ -45,8 +45,8 @@ public:
 
         // Granular pitch shifter buffer
         pitchBuf.assign (kPitchBufSize, 0.0f);
-        readPos1 = 0.0;
-        readPos2 = (double) (kGrainSize / 2);
+        for (int g = 0; g < kNumGrains; ++g)
+            readPos[(size_t) g] = (double) (g * (kGrainSize / kNumGrains));
         writePos = 0;
 
         // Feedback chorus (single modulated delay, dry+wet parallel)
@@ -74,8 +74,8 @@ public:
         haasL.reset();
         haasR.reset();
         std::fill (pitchBuf.begin(), pitchBuf.end(), 0.0f);
-        readPos1 = 0.0;
-        readPos2 = (double) (kGrainSize / 2);
+        for (int g = 0; g < kNumGrains; ++g)
+            readPos[(size_t) g] = (double) (g * (kGrainSize / kNumGrains));
         writePos = 0;
         chPhase = 0.0;
         prevReverbMono = 0.0f;
@@ -150,35 +150,45 @@ public:
     }
 
 private:
-    static constexpr int kPitchBufSize = 8192;   // ~186 ms @ 44.1k
-    static constexpr int kGrainSize    = 2048;
+    // Smaller grains and more overlap = smoother artefacts.
+    // 4 Hann-windowed grains at 75% overlap (each offset by N/4): the four
+    // staggered Hann functions sum to exactly 2.0 across the cycle, so
+    // dividing the output by 2 gives unity gain with no amplitude ripple.
+    static constexpr int kPitchBufSize = 4096;   // ~93 ms @ 44.1k
+    static constexpr int kGrainSize    = 1024;
+    static constexpr int kNumGrains    = 4;
 
-    // 50%-overlap two-grain pitch shifter @ 2× rate (octave up).
     inline float pitchShiftStep (float in) noexcept
     {
         pitchBuf[(size_t) writePos] = in;
 
-        const float w1 = 0.5f * (1.0f - std::cos (juce::MathConstants<float>::twoPi
-                                                  * (float) readPos1 / (float) kGrainSize));
-        const float w2 = 0.5f * (1.0f - std::cos (juce::MathConstants<float>::twoPi
-                                                  * (float) readPos2 / (float) kGrainSize));
+        constexpr float twoPi = juce::MathConstants<float>::twoPi;
+        const float invGrain = 1.0f / (float) kGrainSize;
 
-        // Each grain reads from (writePos - kGrainSize + readPos), wrapped.
-        const int rIdx1 = (writePos - kGrainSize + (int) readPos1
-                           + kPitchBufSize * 2) % kPitchBufSize;
-        const int rIdx2 = (writePos - kGrainSize + (int) readPos2
-                           + kPitchBufSize * 2) % kPitchBufSize;
+        float out = 0.0f;
+        for (int g = 0; g < kNumGrains; ++g)
+        {
+            const float w = 0.5f * (1.0f - std::cos (twoPi * (float) readPos[g] * invGrain));
 
-        const float out = pitchBuf[(size_t) rIdx1] * w1
-                        + pitchBuf[(size_t) rIdx2] * w2;
+            // Linear-interpolated read at fractional position behind the write head.
+            const double exact = (double) writePos - (double) kGrainSize + readPos[g];
+            const double exactWrapped = exact - std::floor (exact / (double) kPitchBufSize)
+                                              * (double) kPitchBufSize;
+            const int   idx0 = (int) exactWrapped;
+            const int   idx1 = (idx0 + 1) % kPitchBufSize;
+            const float frac = (float) (exactWrapped - (double) idx0);
+            const float s    = pitchBuf[(size_t) idx0] * (1.0f - frac)
+                             + pitchBuf[(size_t) idx1] * frac;
 
-        readPos1 += 2.0;       // 2× rate ⇒ +12 semitones
-        readPos2 += 2.0;
-        if (readPos1 >= (double) kGrainSize) readPos1 -= (double) kGrainSize;
-        if (readPos2 >= (double) kGrainSize) readPos2 -= (double) kGrainSize;
+            out += s * w;
+
+            readPos[g] += 2.0;       // 2× rate ⇒ +12 semitones
+            if (readPos[g] >= (double) kGrainSize)
+                readPos[g] -= (double) kGrainSize;
+        }
 
         writePos = (writePos + 1) % kPitchBufSize;
-        return out;
+        return out * 0.5f;           // normalise sum-of-Hann at 75% overlap
     }
 
     double sampleRate = 44100.0;
@@ -187,7 +197,7 @@ private:
     juce::dsp::IIR::Filter<float> fbHpf, fbLpf;
 
     std::vector<float> pitchBuf;
-    double readPos1 = 0.0, readPos2 = 0.0;
+    std::array<double, 4> readPos { 0.0, 256.0, 512.0, 768.0 };
     int writePos = 0;
 
     juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Linear> chorusDelay { 4096 };
