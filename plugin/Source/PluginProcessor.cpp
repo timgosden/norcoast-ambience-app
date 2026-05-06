@@ -77,7 +77,7 @@ NorcoastAmbienceProcessor::NorcoastAmbienceProcessor()
     chorusMixParam     = apvts.getRawParameterValue (ParamID::chorusMix);
     delayMixParam      = apvts.getRawParameterValue (ParamID::delayMix);
     delayFbParam       = apvts.getRawParameterValue (ParamID::delayFb);
-    delayTimeMsParam   = apvts.getRawParameterValue (ParamID::delayTimeMs);
+    delayDivParam      = apvts.getRawParameterValue (ParamID::delayDiv);
     delayToneParam     = apvts.getRawParameterValue (ParamID::delayTone);
     reverbMixParam     = apvts.getRawParameterValue (ParamID::reverbMix);
     reverbSizeParam    = apvts.getRawParameterValue (ParamID::reverbSize);
@@ -98,6 +98,9 @@ NorcoastAmbienceProcessor::NorcoastAmbienceProcessor()
     arpVoiceParam      = apvts.getRawParameterValue (ParamID::arpVoice);
     drumVolParam       = apvts.getRawParameterValue (ParamID::drumVol);
     drumPatternParam   = apvts.getRawParameterValue (ParamID::drumPattern);
+    chordTypeParam     = apvts.getRawParameterValue (ParamID::chordType);
+    evolveOnParam      = apvts.getRawParameterValue (ParamID::evolveOn);
+    evolveRateParam    = apvts.getRawParameterValue (ParamID::evolveRate);
 
     foundationSynth.addSound (new PadSound());
     padsSynth      .addSound (new PadSound());
@@ -164,6 +167,8 @@ void NorcoastAmbienceProcessor::prepareToPlay (double sampleRate, int samplesPer
     texture.prepare (sampleRate, samplesPerBlock);
     texture.reset();
 
+    chordEvolver.prepare (sampleRate);
+
     widthPhase    = 0.0;
     widthPhaseInc = 0.3 / sampleRate;   // 0.3 Hz width LFO, matches standalone
 
@@ -221,6 +226,30 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
                 filtered.addEvent (msg, meta.samplePosition);
         }
         midi.swapWith (filtered);
+    }
+
+    // ─── Chord Evolve: augment user note-ons with chord intervals,
+    // optionally cycle the chord type on a timer. This runs BEFORE
+    // keyboardState.processNextMidiBuffer so the augmented events get
+    // recorded in the keyboard state too — arp/texture/etc. will see
+    // them as held notes.
+    {
+        const int targetType  = juce::jlimit (0, (int) ChordEvolver::NumTypes - 1,
+                                              (int) chordTypeParam->load());
+        const bool evolveOn   = evolveOnParam->load() > 0.5f;
+        const float evolveRate = evolveRateParam->load();
+
+        chordEvolver.process (midi, n, /*channel*/ 1,
+                              targetType, evolveOn, evolveRate,
+                              [this] (int newType)
+                              {
+                                  if (auto* p = apvts.getParameter (ParamID::chordType))
+                                  {
+                                      const auto range = p->getNormalisableRange();
+                                      const float norm = range.convertTo0to1 ((float) newType);
+                                      p->setValueNotifyingHost (juce::jlimit (0.0f, 1.0f, norm));
+                                  }
+                              });
     }
 
     keyboardState.processNextMidiBuffer (midi, 0, n, true);
@@ -293,8 +322,19 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     const float chorusMix   = chorusMixParam ->load();
     const float delayMix    = delayMixParam  ->load();
     const float delayFb     = delayFbParam   ->load();
-    const float delayTimeMs = delayTimeMsParam->load();
+    const int   delayDivIdx = juce::jlimit (0, 6, (int) delayDivParam->load());
     const float delayTone   = delayToneParam ->load();
+
+    // BPM-locked delay time. Beat values for "1/32"…"1/4." (matches the
+    // standalone's tempo-sync divisions).
+    static constexpr std::array<float, 7> kDivBeats
+        { 0.125f, 0.25f, 0.375f, 0.5f, 0.75f, 1.0f, 1.5f };
+    double bpmForDelay = 120.0;
+    if (auto* ph = getPlayHead())
+        if (auto pos = ph->getPosition())
+            if (auto hostBpm = pos->getBpm())
+                bpmForDelay = *hostBpm;
+    const float delayTimeSec = (60.0f / (float) bpmForDelay) * kDivBeats[(size_t) delayDivIdx];
     const float reverbMix   = reverbMixParam ->load();
     const float reverbSize  = reverbSizeParam->load();
     const float reverbMod   = reverbModParam ->load();
@@ -328,7 +368,7 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         lastDelayToneDb = toneDb;
     }
 
-    delayLine.setDelay ((float) (sr * delayTimeMs * 0.001));
+    delayLine.setDelay ((float) (sr * delayTimeSec));
 
     // Master HPF / LPF — log fader curves match the standalone helpers
     // lpfFaderToHz / hpfFaderToHz in public/index.html.
@@ -544,8 +584,6 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         R[s] *= g;
     }
 
-    // ─── Tap output into the oscilloscope ─────────────────────────────
-    oscilloscope.pushBlock (L, R, n);
 }
 
 juce::AudioProcessorEditor* NorcoastAmbienceProcessor::createEditor()

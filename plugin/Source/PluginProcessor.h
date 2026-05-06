@@ -8,7 +8,7 @@
 #include "Arpeggiator.h"
 #include "DrumMachine.h"
 #include "Texture.h"
-#include "Oscilloscope.h"
+#include "ChordEvolver.h"
 
 class NorcoastAmbienceProcessor : public juce::AudioProcessor
 {
@@ -46,7 +46,6 @@ public:
 
     juce::MidiKeyboardState& getKeyboardState() noexcept { return keyboardState; }
     juce::AudioProcessorValueTreeState& getAPVTS() noexcept { return apvts; }
-    Oscilloscope& getOscilloscope() noexcept { return oscilloscope; }
 
     // Editor calls this when the Latch button toggles. While true, all
     // MIDI note-off events are dropped before reaching the synths so
@@ -73,7 +72,7 @@ private:
     std::atomic<float>* chorusMixParam     = nullptr;
     std::atomic<float>* delayMixParam      = nullptr;
     std::atomic<float>* delayFbParam       = nullptr;
-    std::atomic<float>* delayTimeMsParam   = nullptr;
+    std::atomic<float>* delayDivParam      = nullptr;
     std::atomic<float>* delayToneParam     = nullptr;
     std::atomic<float>* reverbMixParam     = nullptr;
     std::atomic<float>* reverbSizeParam    = nullptr;
@@ -94,6 +93,9 @@ private:
     std::atomic<float>* arpVoiceParam      = nullptr;
     std::atomic<float>* drumVolParam       = nullptr;
     std::atomic<float>* drumPatternParam   = nullptr;
+    std::atomic<float>* chordTypeParam     = nullptr;
+    std::atomic<float>* evolveOnParam      = nullptr;
+    std::atomic<float>* evolveRateParam    = nullptr;
 
     juce::Synthesiser foundationSynth;
     juce::Synthesiser padsSynth;
@@ -120,7 +122,7 @@ private:
     Arpeggiator arpeggiator;
     DrumMachine drumMachine;
     Texture     texture;
-    Oscilloscope oscilloscope;
+    ChordEvolver chordEvolver;
 
     std::atomic<bool> latchOn { false };
     std::vector<int> heldNotesScratch;   // reused across processBlock calls

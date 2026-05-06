@@ -32,7 +32,7 @@ namespace Presets
                     { ParamID::chorusMix,        0.35f },
                     { ParamID::delayMix,         0.46f },
                     { ParamID::delayFb,          0.57f },
-                    { ParamID::delayTimeMs,      857.0f },
+                    { ParamID::delayDiv,         5.0f },         // 1/4
                     { ParamID::delayTone,        1.0f  },
                     { ParamID::reverbMix,        0.71f },
                     { ParamID::reverbSize,       0.92f },

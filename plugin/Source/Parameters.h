@@ -18,7 +18,7 @@ namespace ParamID
 
     inline constexpr const char* delayMix      = "delayMix";
     inline constexpr const char* delayFb       = "delayFb";
-    inline constexpr const char* delayTimeMs   = "delayTimeMs";
+    inline constexpr const char* delayDiv      = "delayDiv";
     inline constexpr const char* delayTone     = "delayTone";
 
     inline constexpr const char* reverbMix     = "reverbMix";
@@ -44,6 +44,10 @@ namespace ParamID
 
     inline constexpr const char* drumVol       = "drumVol";
     inline constexpr const char* drumPattern   = "drumPattern";
+
+    inline constexpr const char* chordType     = "chordType";
+    inline constexpr const char* evolveOn      = "evolveOn";
+    inline constexpr const char* evolveRate    = "evolveRate";
 }
 
 inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout()
@@ -85,9 +89,10 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
     add (std::make_unique<FloatParam> (juce::ParameterID { ParamID::delayFb, 1 },
                                         "Delay Feedback",
                                         NormRange { 0.0f, 0.95f, 0.001f }, 0.57f));
-    add (std::make_unique<FloatParam> (juce::ParameterID { ParamID::delayTimeMs, 1 },
-                                        "Delay Time",
-                                        NormRange { 50.0f, 2000.0f, 0.1f, 0.4f }, 857.0f));
+    // Delay time is BPM-locked to a tempo division. Index 5 = 1/4 by default.
+    layout.add (std::make_unique<juce::AudioParameterChoice> (
+        juce::ParameterID { ParamID::delayDiv, 1 }, "Delay Div",
+        juce::StringArray { "1/32", "1/16", "1/16.", "1/8", "1/8.", "1/4", "1/4." }, 5));
     add (std::make_unique<FloatParam> (juce::ParameterID { ParamID::delayTone, 1 },
                                         "Delay Tone",
                                         NormRange { 0.0f, 1.0f, 0.001f }, 1.0f));
@@ -168,6 +173,20 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
     layout.add (std::make_unique<juce::AudioParameterChoice> (
         juce::ParameterID { ParamID::drumPattern, 1 }, "Drum Pattern",
         juce::StringArray { "Off", "Pulse", "Mist", "Stride", "Roam" }, 0));
+
+    // ─── Evolve / chord generator ─────────────────────────────────────
+    // Chord type names mirror the standalone's CHORD_TYPES table.
+    // evolveOn cycles chordType through the enabled set every evolveRate
+    // seconds, so the "ENTIRE POINT" (auto-changing chord shapes from a
+    // single held root) works inside the plugin too.
+    layout.add (std::make_unique<juce::AudioParameterChoice> (
+        juce::ParameterID { ParamID::chordType, 1 }, "Chord Type",
+        juce::StringArray { "5th", "Sus2", "Sus4", "Major", "Minor", "Maj7", "9th" }, 1));
+    layout.add (std::make_unique<juce::AudioParameterBool> (
+        juce::ParameterID { ParamID::evolveOn, 1 }, "Evolve", true));
+    add (std::make_unique<FloatParam> (juce::ParameterID { ParamID::evolveRate, 1 },
+                                        "Evolve Rate",
+                                        NormRange { 1.0f, 30.0f, 0.1f, 0.5f }, 8.0f));
 
     return layout;
 }

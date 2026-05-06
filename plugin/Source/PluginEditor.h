@@ -2,7 +2,6 @@
 
 #include <juce_audio_utils/juce_audio_utils.h>
 #include "PluginProcessor.h"
-#include "LatchableKeyboard.h"
 #include "NorcoastLookAndFeel.h"
 
 class NorcoastAmbienceEditor : public juce::AudioProcessorEditor
@@ -33,16 +32,24 @@ private:
     NorcoastLookAndFeel laf;
 
     NorcoastAmbienceProcessor& owner;
-    LatchableKeyboard keyboard;
+
+    // Invisible MidiKeyboardComponent — exists only to capture qwerty
+    // keys via JUCE's tested key-press → MIDI mapping. The user never
+    // sees it.
+    juce::MidiKeyboardComponent qwertyKeyboard;
+
     juce::TextButton  latchButton  { "Latch" };
     juce::TextButton  allOffButton { "All Off" };
 
     juce::TextButton  subOctButton     { "Sub Oct" };
     juce::TextButton  padsOctButton    { "Pads +Oct" };
     juce::TextButton  textureOctButton { "Tex +Oct" };
+    juce::TextButton  evolveButton     { "Evolve" };
     std::unique_ptr<ButtonAttach> subOctAttach;
     std::unique_ptr<ButtonAttach> padsOctAttach;
     std::unique_ptr<ButtonAttach> textureOctAttach;
+    std::unique_ptr<ButtonAttach> evolveAttach;
+
 
     juce::ComboBox    presetBox;
     juce::TextButton  saveButton  { "Save" };
@@ -65,6 +72,7 @@ private:
 
     // Knobs (allocated as members so their lifetime matches the editor)
     ParamKnob foundationVol, padsVol, textureVol;
+    ParamKnob chordType, evolveRate;
     ParamKnob chorusMix, delayMix, delayFb, delayTimeMs, delayTone;
     ParamKnob reverbMix, reverbSize, reverbMod, shimmerVol;
     ParamKnob hpfFreq, lpfFreq;
