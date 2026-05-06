@@ -44,9 +44,6 @@ namespace ParamID
 
     inline constexpr const char* drumVol       = "drumVol";
     inline constexpr const char* drumPattern   = "drumPattern";
-
-    inline constexpr const char* velocitySens  = "velocitySens";
-    inline constexpr const char* pitchBendRange = "pitchBendRange";
 }
 
 inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout()
@@ -171,18 +168,6 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
     layout.add (std::make_unique<juce::AudioParameterChoice> (
         juce::ParameterID { ParamID::drumPattern, 1 }, "Drum Pattern",
         juce::StringArray { "Off", "Pulse", "Mist", "Stride", "Roam" }, 0));
-
-    // ─── MIDI behaviour ───────────────────────────────────────────────
-    // velocitySens: 0 = velocity ignored (ambient mode), 1 = full velocity
-    //   curve (silent at vel=0, full at vel=127). Default 0.4 for a gentle
-    //   touch.
-    // pitchBendRange: max ± semitones the pitch wheel can bend (1..12).
-    add (std::make_unique<FloatParam> (juce::ParameterID { ParamID::velocitySens, 1 },
-                                        "Velocity Sens",
-                                        NormRange { 0.0f, 1.0f, 0.001f }, 0.4f));
-    add (std::make_unique<FloatParam> (juce::ParameterID { ParamID::pitchBendRange, 1 },
-                                        "Pitch Bend Range",
-                                        NormRange { 1.0f, 12.0f, 1.0f }, 2.0f));
 
     return layout;
 }

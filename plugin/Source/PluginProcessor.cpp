@@ -98,8 +98,6 @@ NorcoastAmbienceProcessor::NorcoastAmbienceProcessor()
     arpVoiceParam      = apvts.getRawParameterValue (ParamID::arpVoice);
     drumVolParam       = apvts.getRawParameterValue (ParamID::drumVol);
     drumPatternParam   = apvts.getRawParameterValue (ParamID::drumPattern);
-    velocitySensParam  = apvts.getRawParameterValue (ParamID::velocitySens);
-    pitchBendRangeParam= apvts.getRawParameterValue (ParamID::pitchBendRange);
 
     foundationSynth.addSound (new PadSound());
     padsSynth      .addSound (new PadSound());
@@ -108,11 +106,11 @@ NorcoastAmbienceProcessor::NorcoastAmbienceProcessor()
     {
         foundationSynth.addVoice (new PadVoice (foundationConfig, foundationVolParam,
                                                 foundationSubOctParam,
-                                                velocitySensParam, pitchBendRangeParam,
+                                                nullptr, nullptr,
                                                 nullptr));
         padsSynth      .addVoice (new PadVoice (padsConfig, padsVolParam,
                                                 nullptr,
-                                                velocitySensParam, pitchBendRangeParam,
+                                                nullptr, nullptr,
                                                 padsOctUpParam));
     }
 }
@@ -209,6 +207,21 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
     const auto sr = getSampleRate();
     const int  n  = buffer.getNumSamples();
+
+    // ─── Latch: drop all incoming note-off events before they reach
+    // the keyboard state or the synths. The on-screen keyboard's
+    // toggle behaviour is handled in LatchableKeyboard itself.
+    if (latchOn.load (std::memory_order_acquire))
+    {
+        juce::MidiBuffer filtered;
+        for (const auto meta : midi)
+        {
+            const auto msg = meta.getMessage();
+            if (! msg.isNoteOff() && ! (msg.isController() && msg.getControllerNumber() == 123))
+                filtered.addEvent (msg, meta.samplePosition);
+        }
+        midi.swapWith (filtered);
+    }
 
     keyboardState.processNextMidiBuffer (midi, 0, n, true);
 

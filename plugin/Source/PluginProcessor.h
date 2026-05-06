@@ -48,6 +48,12 @@ public:
     juce::AudioProcessorValueTreeState& getAPVTS() noexcept { return apvts; }
     Oscilloscope& getOscilloscope() noexcept { return oscilloscope; }
 
+    // Editor calls this when the Latch button toggles. While true, all
+    // MIDI note-off events are dropped before reaching the synths so
+    // hardware-keyboard releases stop releasing too.
+    void setLatchOn (bool b) noexcept { latchOn.store (b, std::memory_order_release); }
+    bool isLatchOn()    const noexcept { return latchOn.load (std::memory_order_acquire); }
+
 private:
     static constexpr int kVoicesPerLayer = 8;
 
@@ -88,8 +94,6 @@ private:
     std::atomic<float>* arpVoiceParam      = nullptr;
     std::atomic<float>* drumVolParam       = nullptr;
     std::atomic<float>* drumPatternParam   = nullptr;
-    std::atomic<float>* velocitySensParam  = nullptr;
-    std::atomic<float>* pitchBendRangeParam= nullptr;
 
     juce::Synthesiser foundationSynth;
     juce::Synthesiser padsSynth;
@@ -117,6 +121,8 @@ private:
     DrumMachine drumMachine;
     Texture     texture;
     Oscilloscope oscilloscope;
+
+    std::atomic<bool> latchOn { false };
     std::vector<int> heldNotesScratch;   // reused across processBlock calls
     float lastReverbSize = -1.0f;
     float lastReverbMod  = -1.0f;

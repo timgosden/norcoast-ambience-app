@@ -2,16 +2,26 @@
 
 #include <juce_audio_utils/juce_audio_utils.h>
 
-// MidiKeyboardComponent variant with a latch mode:
-//   - latch off: normal behaviour (note-on on press, note-off on release).
-//   - latch on : click toggles the note. mouse-up does nothing, so chords
-//                build up across multiple clicks.
+// MidiKeyboardComponent variant with:
+//   - latch mode: clicking a key toggles it. Mouse-up does nothing while
+//     latched, so chords build up across multiple clicks.
+//   - computer-keyboard input enabled: the home row (a/s/d/f...) plays
+//     notes from the configured base octave. Works whenever the editor
+//     has keyboard focus.
+//
+// The latch override replaces mouseDown/mouseUp directly rather than
+// going through mouseDownOnKey/mouseUpOnKey — the latter pair didn't
+// reliably suppress note-offs in JUCE 8.
 class LatchableKeyboard : public juce::MidiKeyboardComponent
 {
 public:
     LatchableKeyboard (juce::MidiKeyboardState& s)
         : juce::MidiKeyboardComponent (s, juce::MidiKeyboardComponent::horizontalKeyboard),
-          state (s) {}
+          state (s)
+    {
+        setWantsKeyboardFocus (true);
+        setKeyPressBaseOctave (4);          // home row plays C4 / D4 / E4 …
+    }
 
     void setLatched (bool shouldLatch)
     {
@@ -21,34 +31,35 @@ public:
     }
     bool isLatched() const noexcept { return latched; }
 
-protected:
-    bool mouseDownOnKey (int midiNoteNumber, const juce::MouseEvent& e) override
+    void mouseDown (const juce::MouseEvent& e) override
     {
-        if (latched)
+        if (! latched)
         {
-            const int ch = getMidiChannel();
-            if (state.isNoteOn (ch, midiNoteNumber))
-            {
-                state.noteOff (ch, midiNoteNumber, 0.0f);
-                return false; // suppress the default note-on
-            }
-            return true;      // let parent fire note-on; mouse-up won't release
+            juce::MidiKeyboardComponent::mouseDown (e);
+            return;
         }
-        return juce::MidiKeyboardComponent::mouseDownOnKey (midiNoteNumber, e);
+
+        float vel = 0.7f;
+        const int note = xyToNote (e.position, vel);
+        if (note < 0) return;
+
+        const int ch = getMidiChannel();
+        if (state.isNoteOn (ch, note))
+            state.noteOff (ch, note, 0.0f);
+        else
+            state.noteOn  (ch, note, juce::jmax (0.4f, vel));
     }
 
-    void mouseUpOnKey (int midiNoteNumber, const juce::MouseEvent& e) override
+    void mouseUp (const juce::MouseEvent& e) override
     {
-        if (latched) return;
-        juce::MidiKeyboardComponent::mouseUpOnKey (midiNoteNumber, e);
+        if (latched) return;                // notes never release while latched
+        juce::MidiKeyboardComponent::mouseUp (e);
     }
 
-    bool mouseDraggedToKey (int midiNoteNumber, const juce::MouseEvent& e) override
+    void mouseDrag (const juce::MouseEvent& e) override
     {
-        // In latch mode, dragging across keys would toggle each one in turn —
-        // that's almost never what the user wants. Suppress.
-        if (latched) return false;
-        return juce::MidiKeyboardComponent::mouseDraggedToKey (midiNoteNumber, e);
+        if (latched) return;                // drag-toggle disabled when latched
+        juce::MidiKeyboardComponent::mouseDrag (e);
     }
 
 private:

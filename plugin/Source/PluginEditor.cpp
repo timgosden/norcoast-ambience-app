@@ -69,10 +69,23 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
 
     addAndMakeVisible (latchButton);
     latchButton.setClickingTogglesState (true);
-    latchButton.onClick = [this] { keyboard.setLatched (latchButton.getToggleState()); };
+    latchButton.onClick = [this]
+    {
+        const bool on = latchButton.getToggleState();
+        keyboard.setLatched (on);
+        owner.setLatchOn (on);                           // also blocks hardware note-offs
+    };
 
     addAndMakeVisible (allOffButton);
-    allOffButton.onClick = [this] { owner.getKeyboardState().allNotesOff (1); };
+    allOffButton.onClick = [this]
+    {
+        owner.getKeyboardState().allNotesOff (1);
+        // Force latch off as a safety panic — re-engage manually if wanted.
+        if (latchButton.getToggleState())
+        {
+            latchButton.setToggleState (false, juce::sendNotification);
+        }
+    };
 
     // Live oscilloscope of the master output — sits between the buttons
     // row and the keyboard.
@@ -135,6 +148,26 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     setupKnob (hpfFreq,       "High Pass",    ParamID::hpfFreq);
     setupKnob (lpfFreq,       "Low Pass",     ParamID::lpfFreq);
 
+    // Filter knobs format the 0..1 fader value as Hz / kHz, mirroring the
+    // standalone helpers (lpfFaderToHz / hpfFaderToHz).
+    auto formatLpf = [] (double v) -> juce::String
+    {
+        const float hz = std::exp (4.6051702f + (float) (v * v) * 5.298375f);
+        return hz < 1000.0f ? juce::String ((int) hz) + " Hz"
+                            : juce::String (hz / 1000.0f, 1) + " kHz";
+    };
+    auto formatHpf = [] (double v) -> juce::String
+    {
+        if (v < 0.01) return "off";
+        const float hz = std::exp (2.9957323f + (float) v * 3.218876f);
+        return hz < 1000.0f ? juce::String ((int) hz) + " Hz"
+                            : juce::String (hz / 1000.0f, 1) + " kHz";
+    };
+    lpfFreq.knob.textFromValueFunction = formatLpf;
+    hpfFreq.knob.textFromValueFunction = formatHpf;
+    lpfFreq.knob.updateText();
+    hpfFreq.knob.updateText();
+
     setupKnob (eqLow,         "Low",          ParamID::eqLow,    " dB");
     setupKnob (eqLoMid,       "Lo-Mid",       ParamID::eqLoMid,  " dB");
     setupKnob (eqHiMid,       "Hi-Mid",       ParamID::eqHiMid,  " dB");
@@ -152,9 +185,6 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     setupKnob (drumVol,       "Vol",          ParamID::drumVol);
     setupKnob (drumPattern,   "Pattern",      ParamID::drumPattern);
 
-    setupKnob (velocitySens,  "Vel Sens",     ParamID::velocitySens);
-    setupKnob (pitchBendRange, "PB Range",    ParamID::pitchBendRange, " st");
-
     // Per-section accent colour and content. Layout in resized() arranges
     // them into a 4×2 grid (top row 4 sections, bottom row 3 sections).
     const juce::Colour kColArp   { 0xff7eb6d4 };  // arp blue
@@ -165,14 +195,14 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
         { "CHORUS",     kColModFx,    {}, { &chorusMix } },
         { "DELAY",      kColModFx,    {}, { &delayMix, &delayFb, &delayTimeMs, &delayTone } },
         { "REVERB",     kColReverbFx, {}, { &reverbMix, &reverbSize, &reverbMod, &shimmerVol } },
-        { "FILTER+EQ",  kColEq,       {}, { &hpfFreq, &lpfFreq, &eqLow, &eqLoMid, &eqHiMid, &eqHigh } },
+        { "FILTER",     kColFilter,   {}, { &hpfFreq, &lpfFreq } },
+        { "EQ",         kColEq,       {}, { &eqLow, &eqLoMid, &eqHiMid, &eqHigh } },
         { "ARP",        kColArp,      {}, { &arpVol, &arpRate, &arpOctaves, &arpVoice } },
         { "DRUMS",      kColDrums,    {}, { &drumVol, &drumPattern } },
-        { "MASTER",     kColMaster,   {}, { &velocitySens, &pitchBendRange,
-                                              &widthMod, &satAmt, &masterVol } }
+        { "MASTER",     kColMaster,   {}, { &widthMod, &satAmt, &masterVol } }
     }};
 
-    setSize (1020, 680);
+    setSize (1080, 680);
 }
 
 NorcoastAmbienceEditor::~NorcoastAmbienceEditor()
@@ -259,7 +289,7 @@ void NorcoastAmbienceEditor::paint (juce::Graphics& g)
 
     g.setColour (juce::Colour (NorcoastLookAndFeel::kTextDim));
     g.setFont (juce::FontOptions (10.5f));
-    g.drawText ("ambient synth · v2.0 · phase 17 · host-visible programs",
+    g.drawText ("ambient synth · v2.1 · phase 18 · latch fix · keyboard input · Hz display",
                 top.withTrimmedLeft (8),
                 juce::Justification::centredLeft);
 
@@ -331,16 +361,18 @@ void NorcoastAmbienceEditor::resized()
         sections[3].bounds = row1.reduced (4, 0);
     }
 
-    // Bottom row: FILTER+EQ (6), ARP (4), DRUMS (2), MASTER (5) → 17 cols
+    // Bottom row: FILTER (2), EQ (4), ARP (4), DRUMS (2), MASTER (3) → 15 cols
     {
         const int row2Width = row2.getWidth();
-        const int colA = (int)(row2Width * (6.0f / 17.0f));
-        const int colB = (int)(row2Width * (4.0f / 17.0f));
-        const int colC = (int)(row2Width * (2.0f / 17.0f));
+        const int colA = (int)(row2Width * (2.0f / 15.0f));
+        const int colB = (int)(row2Width * (4.0f / 15.0f));
+        const int colC = (int)(row2Width * (4.0f / 15.0f));
+        const int colD = (int)(row2Width * (2.0f / 15.0f));
         sections[4].bounds = row2.removeFromLeft (colA).reduced (4, 0);
         sections[5].bounds = row2.removeFromLeft (colB).reduced (4, 0);
         sections[6].bounds = row2.removeFromLeft (colC).reduced (4, 0);
-        sections[7].bounds = row2.reduced (4, 0);
+        sections[7].bounds = row2.removeFromLeft (colD).reduced (4, 0);
+        sections[8].bounds = row2.reduced (4, 0);
     }
 
     // Lay out knobs inside each section
