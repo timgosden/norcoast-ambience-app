@@ -1,5 +1,6 @@
 #include "PluginEditor.h"
 #include "Parameters.h"
+#include "Presets.h"
 
 namespace
 {
@@ -83,6 +84,30 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     textureOctAttach = std::make_unique<ButtonAttach> (
         owner.getAPVTS(), ParamID::textureOctUp, textureOctButton);
 
+    // ── Preset bar ──────────────────────────────────────────────────────
+    addAndMakeVisible (presetBox);
+    presetBox.setColour (juce::ComboBox::backgroundColourId,
+                         juce::Colour (NorcoastLookAndFeel::kPanelBg));
+    presetBox.setColour (juce::ComboBox::textColourId,
+                         juce::Colour (NorcoastLookAndFeel::kAccent));
+    presetBox.setColour (juce::ComboBox::arrowColourId,
+                         juce::Colour (NorcoastLookAndFeel::kAccent));
+    int id = 1;
+    for (const auto& p : Presets::factory())
+        presetBox.addItem (p.name, id++);
+    presetBox.setText ("Preset…", juce::dontSendNotification);
+    presetBox.onChange = [this]
+    {
+        const int idx = presetBox.getSelectedId() - 1;
+        if (idx >= 0)
+            applyFactoryPreset (idx);
+    };
+
+    addAndMakeVisible (saveButton);
+    saveButton.onClick = [this] { savePresetToFile(); };
+    addAndMakeVisible (loadButton);
+    loadButton.onClick = [this] { loadPresetFromFile(); };
+
     setupKnob (foundationVol, "Foundation",   ParamID::foundationVol);
     setupKnob (padsVol,       "Pads",         ParamID::padsVol);
     setupKnob (textureVol,    "Texture",      ParamID::textureVol);
@@ -144,6 +169,55 @@ NorcoastAmbienceEditor::~NorcoastAmbienceEditor()
     for (auto& s : sections)
         for (auto* k : s.knobs)
             clearLF (*k);
+}
+
+void NorcoastAmbienceEditor::applyFactoryPreset (int idx)
+{
+    const auto& list = Presets::factory();
+    if (idx < 0 || idx >= (int) list.size()) return;
+    Presets::apply (owner.getAPVTS(), list[(size_t) idx]);
+}
+
+void NorcoastAmbienceEditor::savePresetToFile()
+{
+    fileChooser = std::make_unique<juce::FileChooser> (
+        "Save preset",
+        juce::File::getSpecialLocation (juce::File::userDocumentsDirectory)
+            .getChildFile ("Norcoast Ambience"),
+        "*.ncpre");
+
+    fileChooser->launchAsync (juce::FileBrowserComponent::saveMode
+                              | juce::FileBrowserComponent::canSelectFiles,
+        [this] (const juce::FileChooser& fc)
+        {
+            const auto file = fc.getResult();
+            if (file == juce::File()) return;
+            file.getParentDirectory().createDirectory();
+
+            auto state = owner.getAPVTS().copyState();
+            if (auto xml = state.createXml())
+                file.withFileExtension ("ncpre").replaceWithText (xml->toString());
+        });
+}
+
+void NorcoastAmbienceEditor::loadPresetFromFile()
+{
+    fileChooser = std::make_unique<juce::FileChooser> (
+        "Load preset",
+        juce::File::getSpecialLocation (juce::File::userDocumentsDirectory)
+            .getChildFile ("Norcoast Ambience"),
+        "*.ncpre");
+
+    fileChooser->launchAsync (juce::FileBrowserComponent::openMode
+                              | juce::FileBrowserComponent::canSelectFiles,
+        [this] (const juce::FileChooser& fc)
+        {
+            const auto file = fc.getResult();
+            if (! file.existsAsFile()) return;
+            if (auto xml = juce::parseXML (file))
+                if (xml->hasTagName (owner.getAPVTS().state.getType()))
+                    owner.getAPVTS().replaceState (juce::ValueTree::fromXml (*xml));
+        });
 }
 
 void NorcoastAmbienceEditor::paint (juce::Graphics& g)
@@ -209,8 +283,16 @@ void NorcoastAmbienceEditor::resized()
 {
     auto bounds = getLocalBounds().reduced (16);
 
-    // Title strip
-    bounds.removeFromTop (52);
+    // Title strip — preset controls live on the right side.
+    {
+        auto title = bounds.removeFromTop (52);
+        auto right = title.removeFromRight (340).reduced (0, 8);
+        loadButton.setBounds  (right.removeFromRight (60));
+        right.removeFromRight (4);
+        saveButton.setBounds  (right.removeFromRight (60));
+        right.removeFromRight (8);
+        presetBox.setBounds   (right.reduced (0, 2));
+    }
     bounds.removeFromTop (8);
 
     // Knob area: 2 rows of section panels.

@@ -42,6 +42,14 @@ private:
     std::unique_ptr<ButtonAttach> subOctAttach;
     std::unique_ptr<ButtonAttach> textureOctAttach;
 
+    juce::ComboBox    presetBox;
+    juce::TextButton  saveButton  { "Save" };
+    juce::TextButton  loadButton  { "Load" };
+    std::unique_ptr<juce::FileChooser> fileChooser;
+    void applyFactoryPreset (int idx);
+    void savePresetToFile();
+    void loadPresetFromFile();
+
     // Six logical sections, drawn as rounded-rect panels with a header.
     // Each holds one or more knobs.
     struct Section
