@@ -22,10 +22,19 @@ namespace
     }
 }
 
-PadVoice::PadVoice (const LayerConfig& c, std::atomic<float>* gainParam)
-    : cfg (c), layerGainParam (gainParam)
+PadVoice::PadVoice (const LayerConfig& c,
+                    std::atomic<float>* gainParam,
+                    std::atomic<float>* extraOct)
+    : cfg (c), layerGainParam (gainParam), extraSubOctaveParam (extraOct)
 {
-    oscs.resize ((size_t) cfg.totalOscCount());
+    // When the optional extra-sub-octave param is wired up, allocate one
+    // extra octave's worth of oscillators so we never reallocate on the
+    // audio thread when the toggle flips.
+    int oscsPerOctave = 0;
+    for (auto& t : cfg.timbres) oscsPerOctave += t.count;
+    const int extraOctaves = (extraSubOctaveParam != nullptr) ? 1 : 0;
+    oscs.resize ((size_t) (oscsPerOctave * ((int) cfg.octaves.size() + extraOctaves)));
+    activeOscCount = (int) oscs.size();
 }
 
 void PadVoice::startNote (int midiNoteNumber, float velocity,
@@ -36,10 +45,26 @@ void PadVoice::startNote (int midiNoteNumber, float velocity,
 
     const double rootHz = juce::MidiMessage::getMidiNoteInHertz (midiNoteNumber);
 
-    int idx = 0;
-    for (size_t oi = 0; oi < cfg.octaves.size(); ++oi)
+    // Build the effective octave list — append an extra sub-octave when
+    // the optional toggle is on (only used for Foundation right now).
+    std::array<int, 8> effOcts {};
+    int numOcts = 0;
+    int lowest = cfg.octaves[0];
+    for (int oct : cfg.octaves)
     {
-        const double octHz = rootHz * std::pow (2.0, (double) cfg.octaves[oi]);
+        effOcts[(size_t) numOcts++] = oct;
+        lowest = juce::jmin (lowest, oct);
+    }
+    if (extraSubOctaveParam != nullptr && extraSubOctaveParam->load() > 0.5f
+        && numOcts < (int) effOcts.size())
+    {
+        effOcts[(size_t) numOcts++] = lowest - 1;
+    }
+
+    int idx = 0;
+    for (int oi = 0; oi < numOcts; ++oi)
+    {
+        const double octHz = rootHz * std::pow (2.0, (double) effOcts[(size_t) oi]);
 
         // Standalone alternates pan-flip per note index (`ni%2===0?1:-1`).
         // Within one voice we have one note, so we mirror that flip across
@@ -73,6 +98,8 @@ void PadVoice::startNote (int midiNoteNumber, float velocity,
             }
         }
     }
+
+    activeOscCount = idx;
 
     filterLFO1.setup (sr, cfg.fRate, cfg.fMod, rng.nextDouble());
 
@@ -127,8 +154,9 @@ void PadVoice::renderNextBlock (juce::AudioBuffer<float>& outputBuffer,
     filterL.setCutoff (sr, currentCutoff);
     filterR.setCutoff (sr, currentCutoff);
 
-    for (auto& o : oscs)
+    for (int i = 0; i < activeOscCount; ++i)
     {
+        auto& o = oscs[(size_t) i];
         const float lfoCents = o.detuneLFO.advance (numSamples);
         o.phaseInc = detunedHz (o.baseHz, o.staticCents + lfoCents) / sr;
     }
@@ -147,8 +175,9 @@ void PadVoice::renderNextBlock (juce::AudioBuffer<float>& outputBuffer,
         const float g   = env * layerScale;
 
         float sumL = 0.0f, sumR = 0.0f;
-        for (auto& o : oscs)
+        for (int i = 0; i < activeOscCount; ++i)
         {
+            auto& o = oscs[(size_t) i];
             const float sample = o.table->sample (o.phase) * o.gain;
             sumL += sample * o.panL;
             sumR += sample * o.panR;

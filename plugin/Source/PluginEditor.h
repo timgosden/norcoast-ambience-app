@@ -16,6 +16,7 @@ public:
 
 private:
     using SliderAttach = juce::AudioProcessorValueTreeState::SliderAttachment;
+    using ButtonAttach = juce::AudioProcessorValueTreeState::ButtonAttachment;
 
     // One rotary knob with a top label and APVTS attachment.
     struct ParamKnob
@@ -35,6 +36,9 @@ private:
     LatchableKeyboard keyboard;
     juce::TextButton  latchButton  { "Latch" };
     juce::TextButton  allOffButton { "All Off" };
+
+    juce::TextButton  subOctButton { "Sub Oct" };
+    std::unique_ptr<ButtonAttach> subOctAttach;
 
     // Six logical sections, drawn as rounded-rect panels with a header.
     // Each holds one or more knobs.

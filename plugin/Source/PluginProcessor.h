@@ -48,8 +48,9 @@ private:
     juce::AudioProcessorValueTreeState apvts;
 
     // Cached parameter atom pointers — read once per block in processBlock.
-    std::atomic<float>* foundationVolParam = nullptr;
-    std::atomic<float>* padsVolParam       = nullptr;
+    std::atomic<float>* foundationVolParam    = nullptr;
+    std::atomic<float>* padsVolParam          = nullptr;
+    std::atomic<float>* foundationSubOctParam = nullptr;
     std::atomic<float>* chorusMixParam     = nullptr;
     std::atomic<float>* delayMixParam      = nullptr;
     std::atomic<float>* delayFbParam       = nullptr;

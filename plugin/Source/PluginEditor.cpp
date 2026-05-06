@@ -73,6 +73,11 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     addAndMakeVisible (allOffButton);
     allOffButton.onClick = [this] { owner.getKeyboardState().allNotesOff (1); };
 
+    addAndMakeVisible (subOctButton);
+    subOctButton.setClickingTogglesState (true);
+    subOctAttach = std::make_unique<ButtonAttach> (
+        owner.getAPVTS(), ParamID::foundationSubOct, subOctButton);
+
     setupKnob (foundationVol, "Foundation",   ParamID::foundationVol);
     setupKnob (padsVol,       "Pads",         ParamID::padsVol);
 
@@ -218,6 +223,15 @@ void NorcoastAmbienceEditor::resized()
         if (s.knobs.empty()) continue;
         auto inner = s.bounds.reduced (kSectionPadX, kSectionPadY)
                              .withTrimmedTop (kSectionHeaderH);
+
+        // LAYERS section also gets the sub-oct toggle docked at the bottom.
+        const bool isLayers = (&s == &sections[0]);
+        if (isLayers)
+        {
+            auto buttonArea = inner.removeFromBottom (24).reduced (4, 0);
+            subOctButton.setBounds (buttonArea);
+        }
+
         const int kW = inner.getWidth() / (int) s.knobs.size();
         for (auto* k : s.knobs)
         {

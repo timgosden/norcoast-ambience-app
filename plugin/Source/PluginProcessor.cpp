@@ -67,8 +67,9 @@ NorcoastAmbienceProcessor::NorcoastAmbienceProcessor()
     Waves::init();
 
     // Cache atom pointers for realtime-safe param reads.
-    foundationVolParam = apvts.getRawParameterValue (ParamID::foundationVol);
-    padsVolParam       = apvts.getRawParameterValue (ParamID::padsVol);
+    foundationVolParam    = apvts.getRawParameterValue (ParamID::foundationVol);
+    padsVolParam          = apvts.getRawParameterValue (ParamID::padsVol);
+    foundationSubOctParam = apvts.getRawParameterValue (ParamID::foundationSubOct);
     chorusMixParam     = apvts.getRawParameterValue (ParamID::chorusMix);
     delayMixParam      = apvts.getRawParameterValue (ParamID::delayMix);
     delayFbParam       = apvts.getRawParameterValue (ParamID::delayFb);
@@ -93,7 +94,8 @@ NorcoastAmbienceProcessor::NorcoastAmbienceProcessor()
 
     for (int i = 0; i < kVoicesPerLayer; ++i)
     {
-        foundationSynth.addVoice (new PadVoice (foundationConfig, foundationVolParam));
+        foundationSynth.addVoice (new PadVoice (foundationConfig, foundationVolParam,
+                                                foundationSubOctParam));
         padsSynth      .addVoice (new PadVoice (padsConfig,       padsVolParam));
     }
 }
