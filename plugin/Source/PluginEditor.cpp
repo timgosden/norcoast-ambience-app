@@ -143,7 +143,7 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     int id = 1;
     for (const auto& preset : Presets::factory())
         presetBox.addItem (preset.name, id++);
-    presetBox.setText ("Preset…", juce::dontSendNotification);
+    presetBox.setText ("Preset", juce::dontSendNotification);
     presetBox.onChange = [this]
     {
         const int idx = presetBox.getSelectedId() - 1;
@@ -171,11 +171,22 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
         evolveRate.knob.updateText();
     }
 
-    // Chord type pill row (replaces the Chord knob).
-    chordTypeRow = std::make_unique<ChoiceButtonRow> (
-        owner.getAPVTS(), ParamID::chordType,
+    // EVOLVE chord pool — pills toggle which chord types the auto-evolve
+    // cycle picks from. Default = all six on.
+    chordPoolRow = std::make_unique<BitmaskPillRow> (
+        owner.getAPVTS(), ParamID::enabledChordsMask,
+        juce::StringArray { "5th", "Sus2", "Sus4", "Maj7", "9th", "Cust" },
         juce::Colour (NorcoastLookAndFeel::kAccent));
-    addAndMakeVisible (*chordTypeRow);
+    addAndMakeVisible (*chordPoolRow);
+
+    // Custom-chord degree pills — bit 0 (root) always on, 1..6 toggle the
+    // 2nd…7th of the major scale.
+    customDegreesRow = std::make_unique<BitmaskPillRow> (
+        owner.getAPVTS(), ParamID::customChordMask,
+        juce::StringArray { "1", "2", "3", "4", "5", "6", "7" },
+        juce::Colour (NorcoastLookAndFeel::kAccent),
+        /* alwaysOnBit = */ 0);
+    addAndMakeVisible (*customDegreesRow);
 
     // 12-key root grid (full-width row at the bottom of the editor).
     rootKeyRow = std::make_unique<ChoiceButtonRow> (
@@ -183,34 +194,9 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
         juce::Colour (NorcoastLookAndFeel::kAccent));
     addAndMakeVisible (*rootKeyRow);
 
-    // 16-step drum sequencer — sits below the key grid.
+    // 16-step drum sequencer.
     stepSequencer = std::make_unique<StepSequencerGrid> (owner.getAPVTS());
     addAndMakeVisible (*stepSequencer);
-
-    // Custom-chord degree buttons (1..7). Bit 0 (root) is implicit and
-    // always on; bits 1..6 toggle the 2nd…7th of the major scale.
-    for (int i = 0; i < 7; ++i)
-    {
-        auto& b = degreeButtons[(size_t) i];
-        b.setClickingTogglesState (false);
-        b.setColour (juce::TextButton::buttonColourId,
-                     juce::Colour (NorcoastLookAndFeel::kPanelBg));
-        b.setColour (juce::TextButton::buttonOnColourId,
-                     juce::Colour (NorcoastLookAndFeel::kAccent));
-        b.setColour (juce::TextButton::textColourOnId,
-                     juce::Colour (NorcoastLookAndFeel::kBg));
-        b.setColour (juce::TextButton::textColourOffId,
-                     juce::Colour (NorcoastLookAndFeel::kAccent).withAlpha (0.55f));
-        b.onClick = [this, i]
-        {
-            if (i == 0) return;          // root always on
-            const int currentMask = (int) owner.getAPVTS()
-                .getRawParameterValue (ParamID::customChordMask)->load();
-            setDegreeBit (i, ! ((currentMask & (1 << i)) != 0));
-        };
-        addAndMakeVisible (b);
-    }
-    refreshDegreeButtons();
 
     setupKnob (chorusMix,     "Chorus",       ParamID::chorusMix);
     setupKnob (delayMix,      "Delay",        ParamID::delayMix);
@@ -264,7 +250,16 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     setupKnob (masterVol,     "Master",       ParamID::masterVol);
 
     setupKnob (arpVol,        "Vol",          ParamID::arpVol);
-    setupKnob (arpRate,       "Rate",         ParamID::arpRate, " b");
+    setupKnob (arpRate,       "Rate",         ParamID::arpRate);
+    {
+        static const juce::StringArray rateChoices { "1/16", "1/8", "1/4", "1/2", "1 bar" };
+        arpRate.knob.textFromValueFunction = [] (double v) -> juce::String
+        {
+            const int idx = juce::jlimit (0, rateChoices.size() - 1, (int) std::round (v));
+            return rateChoices[idx];
+        };
+        arpRate.knob.updateText();
+    }
     setupKnob (arpOctaves,    "Octaves",      ParamID::arpOctaves);
 
     setupKnob (drumVol,       "Vol",          ParamID::drumVol);
@@ -310,30 +305,6 @@ NorcoastAmbienceEditor::~NorcoastAmbienceEditor()
     for (auto& s : sections)
         for (auto* k : s.knobs)
             clearLF (*k);
-}
-
-void NorcoastAmbienceEditor::refreshDegreeButtons()
-{
-    const int mask = (int) owner.getAPVTS()
-        .getRawParameterValue (ParamID::customChordMask)->load();
-    for (int i = 0; i < 7; ++i)
-        degreeButtons[(size_t) i].setToggleState (
-            i == 0 || (mask & (1 << i)) != 0,
-            juce::dontSendNotification);
-}
-
-void NorcoastAmbienceEditor::setDegreeBit (int bitIndex, bool on)
-{
-    if (auto* p = owner.getAPVTS().getParameter (ParamID::customChordMask))
-    {
-        const int mask = (int) owner.getAPVTS()
-            .getRawParameterValue (ParamID::customChordMask)->load();
-        const int newMask = on ? (mask | (1 << bitIndex))
-                               : (mask & ~(1 << bitIndex));
-        const auto range = p->getNormalisableRange();
-        p->setValueNotifyingHost (range.convertTo0to1 ((float) newMask));
-        refreshDegreeButtons();
-    }
 }
 
 void NorcoastAmbienceEditor::applyFactoryPreset (int idx)
@@ -394,9 +365,22 @@ void NorcoastAmbienceEditor::paint (juce::Graphics& g)
     g.setGradientFill (bg);
     g.fillAll();
 
-    // Title bar contents (chord header + preset bar + stop) live as
-    // child Components — they're laid out in resized() and draw
-    // themselves; nothing to paint here.
+    // Logo: small accent-orange circle with a sine wave arc through it,
+    // top-left. Drawn here rather than as a Component for simplicity.
+    {
+        const float cx = 36.0f, cy = 38.0f, r = 14.0f;
+        g.setColour (juce::Colour (NorcoastLookAndFeel::kAccent));
+        g.drawEllipse (cx - r, cy - r, r * 2.0f, r * 2.0f, 1.5f);
+
+        juce::Path wave;
+        const float w = r * 1.4f;
+        wave.startNewSubPath (cx - w, cy);
+        wave.cubicTo (cx - w * 0.4f, cy - w * 0.55f,
+                      cx + w * 0.4f, cy + w * 0.55f,
+                      cx + w,        cy);
+        g.setColour (juce::Colour (NorcoastLookAndFeel::kAccent).withAlpha (0.85f));
+        g.strokePath (wave, juce::PathStrokeType (1.6f));
+    }
 
     for (auto& s : sections)
     {
@@ -425,11 +409,12 @@ void NorcoastAmbienceEditor::resized()
 {
     auto bounds = getLocalBounds().reduced (16);
 
-    // Title strip — chord state header centred, preset bar + Stop on the right.
+    // Title strip — logo (drawn in paint), chord state header centred,
+    // preset bar + Stop on the right.
     {
         auto title = bounds.removeFromTop (52);
+        title.removeFromLeft (60);                  // leave room for logo
 
-        // Right side: Save / Load / Preset combo / Stop pill
         auto right = title.removeFromRight (300).reduced (0, 10);
         loadButton.setBounds (right.removeFromRight (44));
         right.removeFromRight (4);
@@ -439,7 +424,6 @@ void NorcoastAmbienceEditor::resized()
         right.removeFromRight (8);
         presetBox.setBounds  (right);
 
-        // Big chord state header fills what's left.
         chordHeader.setBounds (title);
     }
     bounds.removeFromTop (8);
@@ -451,13 +435,14 @@ void NorcoastAmbienceEditor::resized()
     knobArea.removeFromTop (8);
     auto row2 = knobArea;
 
-    // Top: LAYERS (3) · EVOLVE (3) · CHORUS (1) · DELAY (4) · REVERB (4) → 15 units
+    // Top: LAYERS (3) · EVOLVE (4) · CHORUS (2) · DELAY (4) · REVERB (4) → 17 units
+    // EVOLVE bumped 3→4 so the 6 chord-pool pills fit; CHORUS 1→2.
     {
         const int w = row1.getWidth();
-        const int colA = (int)(w * (3.0f / 15.0f));
-        const int colB = (int)(w * (3.0f / 15.0f));
-        const int colC = (int)(w * (1.0f / 15.0f));
-        const int colD = (int)(w * (4.0f / 15.0f));
+        const int colA = (int)(w * (3.0f / 17.0f));
+        const int colB = (int)(w * (4.0f / 17.0f));
+        const int colC = (int)(w * (2.0f / 17.0f));
+        const int colD = (int)(w * (4.0f / 17.0f));
         sections[0].bounds = row1.removeFromLeft (colA).reduced (4, 0);
         sections[1].bounds = row1.removeFromLeft (colB).reduced (4, 0);
         sections[2].bounds = row1.removeFromLeft (colC).reduced (4, 0);
@@ -465,13 +450,14 @@ void NorcoastAmbienceEditor::resized()
         sections[4].bounds = row1.reduced (4, 0);
     }
 
-    // Bottom: FILTER (2) · EQ (4) · ARP (3) · DRUMS (2) · MASTER (3) → 14 units
+    // Bottom: FILTER (2) · EQ (4) · ARP (3) · DRUMS (3) · MASTER (3) → 15 units
+    // DRUMS bumped 2→3 so its 6 pattern pills fit.
     {
         const int w = row2.getWidth();
-        const int colA = (int)(w * (2.0f / 14.0f));
-        const int colB = (int)(w * (4.0f / 14.0f));
-        const int colC = (int)(w * (3.0f / 14.0f));
-        const int colD = (int)(w * (2.0f / 14.0f));
+        const int colA = (int)(w * (2.0f / 15.0f));
+        const int colB = (int)(w * (4.0f / 15.0f));
+        const int colC = (int)(w * (3.0f / 15.0f));
+        const int colD = (int)(w * (3.0f / 15.0f));
         sections[5].bounds = row2.removeFromLeft (colA).reduced (4, 0);
         sections[6].bounds = row2.removeFromLeft (colB).reduced (4, 0);
         sections[7].bounds = row2.removeFromLeft (colC).reduced (4, 0);
@@ -507,7 +493,7 @@ void NorcoastAmbienceEditor::resized()
         {
             // Chord type pill row at the top of the content area.
             auto pillRow = inner.removeFromTop (28).reduced (2, 0);
-            if (chordTypeRow != nullptr) chordTypeRow->setBounds (pillRow);
+            if (chordPoolRow != nullptr) chordPoolRow->setBounds (pillRow);
             inner.removeFromTop (4);
 
             // Drone + Evolve toggles docked at the bottom.
@@ -530,13 +516,7 @@ void NorcoastAmbienceEditor::resized()
     bounds.removeFromTop (8);
 
     auto degreesRow = bounds.removeFromTop (28);
-    {
-        const int n = (int) degreeButtons.size();
-        const int w = degreesRow.getWidth() / n;
-        for (int i = 0; i < n; ++i)
-            degreeButtons[(size_t) i].setBounds (
-                degreesRow.removeFromLeft (w).reduced (2, 0));
-    }
+    if (customDegreesRow != nullptr) customDegreesRow->setBounds (degreesRow);
     bounds.removeFromTop (4);
 
     auto keyRow = bounds.removeFromTop (44);

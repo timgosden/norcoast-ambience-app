@@ -47,9 +47,10 @@ namespace ParamID
     inline constexpr const char* drumCustomMd    = "drumCustomMd";
     inline constexpr const char* drumCustomHh    = "drumCustomHh";
 
-    inline constexpr const char* chordType        = "chordType";
-    inline constexpr const char* customChordMask  = "customChordMask";
-    inline constexpr const char* evolveOn         = "evolveOn";
+    inline constexpr const char* chordType         = "chordType";
+    inline constexpr const char* customChordMask   = "customChordMask";
+    inline constexpr const char* enabledChordsMask = "enabledChordsMask";
+    inline constexpr const char* evolveOn          = "evolveOn";
     inline constexpr const char* evolveBars    = "evolveBars";
     inline constexpr const char* droneOn       = "droneOn";
     inline constexpr const char* homeRoot      = "homeRoot";
@@ -162,15 +163,18 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
     add (std::make_unique<FloatParam> (juce::ParameterID { ParamID::arpVol, 1 },
                                         "Arp Vol",
                                         NormRange { 0.0f, 1.0f, 0.001f }, 0.0f));
-    add (std::make_unique<FloatParam> (juce::ParameterID { ParamID::arpRate, 1 },
-                                        "Arp Rate",
-                                        NormRange { 0.0625f, 1.0f, 0.001f, 0.5f }, 0.25f));
+    // Arp rate is BPM-locked to a tempo subdivision (was a free float).
+    // Default 1/8 — gentle motion at 70 BPM.
+    layout.add (std::make_unique<juce::AudioParameterChoice> (
+        juce::ParameterID { ParamID::arpRate, 1 }, "Arp Rate",
+        juce::StringArray { "1/16", "1/8", "1/4", "1/2", "1 bar" }, 1));
     layout.add (std::make_unique<juce::AudioParameterChoice> (
         juce::ParameterID { ParamID::arpOctaves, 1 }, "Arp Octaves",
         juce::StringArray { "1", "2", "3" }, 1));
+    // Voice names match the latest standalone web-app labels.
     layout.add (std::make_unique<juce::AudioParameterChoice> (
         juce::ParameterID { ParamID::arpVoice, 1 }, "Arp Voice",
-        juce::StringArray { "Soft", "Sine", "Juno" }, 2));   // default Juno (web app default)
+        juce::StringArray { "Bloom", "Hush", "Glow" }, 2));   // default Glow
 
     // ─── Drum machine ─────────────────────────────────────────────────
     add (std::make_unique<FloatParam> (juce::ParameterID { ParamID::drumVol, 1 },
@@ -200,7 +204,12 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
     // always implicit; bits 1..6 = 2nd…7th of the major scale).
     layout.add (std::make_unique<juce::AudioParameterInt> (
         juce::ParameterID { ParamID::customChordMask, 1 },
-        "Custom Chord Mask", 0, 127, 0b1010100));   // 2nd + 4th + 7th — sus-y default
+        "Custom Chord Mask", 0, 127, 0b1010100));
+    // Which chord types the Evolve cycle picks from (6 bits, one per
+    // chord type). Default = all six enabled.
+    layout.add (std::make_unique<juce::AudioParameterInt> (
+        juce::ParameterID { ParamID::enabledChordsMask, 1 },
+        "Evolve Pool", 0, 63, 63));
     layout.add (std::make_unique<juce::AudioParameterBool> (
         juce::ParameterID { ParamID::evolveOn, 1 }, "Evolve", true));
     // Evolve in BARS so the chord changes line up with the arp + drum

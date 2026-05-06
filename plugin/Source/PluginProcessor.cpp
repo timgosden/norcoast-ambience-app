@@ -101,7 +101,8 @@ NorcoastAmbienceProcessor::NorcoastAmbienceProcessor()
     drumCustomMdParam  = apvts.getRawParameterValue (ParamID::drumCustomMd);
     drumCustomHhParam  = apvts.getRawParameterValue (ParamID::drumCustomHh);
     chordTypeParam       = apvts.getRawParameterValue (ParamID::chordType);
-    customChordMaskParam = apvts.getRawParameterValue (ParamID::customChordMask);
+    customChordMaskParam   = apvts.getRawParameterValue (ParamID::customChordMask);
+    enabledChordsMaskParam = apvts.getRawParameterValue (ParamID::enabledChordsMask);
     evolveOnParam      = apvts.getRawParameterValue (ParamID::evolveOn);
     evolveBarsParam    = apvts.getRawParameterValue (ParamID::evolveBars);
     droneOnParam       = apvts.getRawParameterValue (ParamID::droneOn);
@@ -278,10 +279,11 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
                 bpm = *hostBpm;
 
     {
-        const int targetType  = juce::jlimit (0, (int) ChordEvolver::NumTypes - 1,
-                                              (int) chordTypeParam->load());
-        const int customMask  = (int) customChordMaskParam->load();
-        const bool evolveOn   = evolveOnParam->load() > 0.5f;
+        const int targetType   = juce::jlimit (0, (int) ChordEvolver::NumTypes - 1,
+                                               (int) chordTypeParam->load());
+        const int customMask   = (int) customChordMaskParam->load();
+        const int enabledMask  = (int) enabledChordsMaskParam->load();
+        const bool evolveOn    = evolveOnParam->load() > 0.5f;
 
         // Evolve in bars (musical), 4/4 assumed → beats = bars * 4.
         static constexpr std::array<int, 6> kBars { 1, 2, 4, 8, 16, 32 };
@@ -289,7 +291,8 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         const float beatsPerEvolve = (float) (kBars[(size_t) barsIdx] * 4);
 
         chordEvolver.process (midi, n, /*channel*/ 1,
-                              targetType, customMask, evolveOn, beatsPerEvolve, bpm,
+                              targetType, customMask, enabledMask,
+                              evolveOn, beatsPerEvolve, bpm,
                               [this] (int newType)
                               {
                                   if (auto* p = apvts.getParameter (ParamID::chordType))
@@ -315,7 +318,15 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
                 if (keyboardState.isNoteOn (1, note))
                     heldNotesScratch.push_back (note);
 
-            const float rate    = arpRateParam->load();
+            // Arp rate as choice index → beats per note.
+            //   0 = 1/16   (0.25 beats)
+            //   1 = 1/8    (0.5)
+            //   2 = 1/4    (1.0)
+            //   3 = 1/2    (2.0)
+            //   4 = 1 bar  (4.0)
+            static constexpr std::array<float, 5> kArpBeats { 0.25f, 0.5f, 1.0f, 2.0f, 4.0f };
+            const int rateIdx = juce::jlimit (0, 4, (int) arpRateParam->load());
+            const float rate  = kArpBeats[(size_t) rateIdx];
             const int   octSpan = juce::jlimit (0, 2, (int) arpOctavesParam->load());
             const auto  voice   = static_cast<Arpeggiator::VoiceKind> (
                                       juce::jlimit (0, 2, (int) arpVoiceParam->load()));

@@ -5,6 +5,7 @@
 #include "NorcoastLookAndFeel.h"
 #include "ChordStateHeader.h"
 #include "ChoiceButtonRow.h"
+#include "BitmaskPillRow.h"
 #include "StepSequencerGrid.h"
 
 class NorcoastAmbienceEditor : public juce::AudioProcessorEditor
@@ -50,19 +51,12 @@ private:
     // Choice button rows — replace knobs for discrete pickers.
     std::unique_ptr<ChoiceButtonRow> arpVoiceRow;
     std::unique_ptr<ChoiceButtonRow> drumPatternRow;
-    std::unique_ptr<ChoiceButtonRow> chordTypeRow;     // EVOLVE chord pills
+    std::unique_ptr<BitmaskPillRow>  chordPoolRow;     // EVOLVE chord-pool toggles
     std::unique_ptr<ChoiceButtonRow> rootKeyRow;       // bottom 12-key grid
+    std::unique_ptr<BitmaskPillRow>  customDegreesRow; // custom-chord degree pills
 
     std::unique_ptr<StepSequencerGrid> stepSequencer;  // 16-step drum grid
 
-    // Custom-chord builder (7 toggle pills for major-scale degrees).
-    std::array<juce::TextButton, 7> degreeButtons {{
-        juce::TextButton ("1"), juce::TextButton ("2"), juce::TextButton ("3"),
-        juce::TextButton ("4"), juce::TextButton ("5"), juce::TextButton ("6"),
-        juce::TextButton ("7")
-    }};
-    void refreshDegreeButtons();
-    void setDegreeBit (int bitIndex, bool on);
 
     juce::TextButton  subOctButton     { "Sub Oct" };
     juce::TextButton  textureOctButton { "Tex +Oct" };

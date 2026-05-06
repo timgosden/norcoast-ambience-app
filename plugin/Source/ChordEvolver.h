@@ -91,8 +91,8 @@ public:
     //                        can be updated to reflect the change
     template <typename AdvanceFn>
     void process (juce::MidiBuffer& midi, int numSamples, int channel,
-                  int targetType, int customMask, bool evolveOn,
-                  float rateBeats, double bpm,
+                  int targetType, int customMask, int enabledMask,
+                  bool evolveOn, float rateBeats, double bpm,
                   AdvanceFn&& advanceTargetParam)
     {
         // ─── Auto-evolve: advance the target chord type periodically.
@@ -107,9 +107,27 @@ public:
             if (sampleCounter >= samplesPerCycle)
             {
                 sampleCounter -= samplesPerCycle;
-                const int next = (targetType + 1) % (int) NumTypes;
-                advanceTargetParam (next);
-                targetType = next;
+
+                // Pick the next chord that's enabled in the pool. If
+                // none are enabled, just stay on the current one.
+                int next = targetType;
+                if (enabledMask & ((1 << (int) NumTypes) - 1))
+                {
+                    for (int step = 1; step <= (int) NumTypes; ++step)
+                    {
+                        const int candidate = (targetType + step) % (int) NumTypes;
+                        if (enabledMask & (1 << candidate))
+                        {
+                            next = candidate;
+                            break;
+                        }
+                    }
+                }
+                if (next != targetType)
+                {
+                    advanceTargetParam (next);
+                    targetType = next;
+                }
             }
         }
         else

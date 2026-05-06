@@ -103,8 +103,9 @@ private:
     std::atomic<float>* drumCustomMdParam  = nullptr;
     std::atomic<float>* drumCustomHhParam  = nullptr;
     std::atomic<float>* chordTypeParam       = nullptr;
-    std::atomic<float>* customChordMaskParam = nullptr;
-    std::atomic<float>* evolveOnParam        = nullptr;
+    std::atomic<float>* customChordMaskParam   = nullptr;
+    std::atomic<float>* enabledChordsMaskParam = nullptr;
+    std::atomic<float>* evolveOnParam          = nullptr;
     std::atomic<float>* evolveBarsParam      = nullptr;
     std::atomic<float>* droneOnParam       = nullptr;
     std::atomic<float>* homeRootParam      = nullptr;
