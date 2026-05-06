@@ -109,7 +109,7 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     {
         const int idx = presetBox.getSelectedId() - 1;
         if (idx >= 0)
-            applyFactoryPreset (idx);
+            owner.setCurrentProgram (idx);     // host + inline stay in sync
     };
 
     addAndMakeVisible (saveButton);
@@ -259,7 +259,7 @@ void NorcoastAmbienceEditor::paint (juce::Graphics& g)
 
     g.setColour (juce::Colour (NorcoastLookAndFeel::kTextDim));
     g.setFont (juce::FontOptions (10.5f));
-    g.drawText ("ambient synth · v1.9 · phase 16 · pads-oct · velocity · presets",
+    g.drawText ("ambient synth · v2.0 · phase 17 · host-visible programs",
                 top.withTrimmedLeft (8),
                 juce::Justification::centredLeft);
 

@@ -29,10 +29,14 @@ public:
     bool isMidiEffect()  const override { return false; }
     double getTailLengthSeconds() const override { return 8.0; }
 
-    int  getNumPrograms()              override { return 1; }
-    int  getCurrentProgram()           override { return 0; }
-    void setCurrentProgram (int)       override {}
-    const juce::String getProgramName (int)            override { return {}; }
+    // Programs are wired to the factory preset bank (Source/Presets.h),
+    // so the host's preset menu shows our presets and recalling one
+    // applies it via APVTS. Custom user state still serializes through
+    // getStateInformation / setStateInformation independently.
+    int  getNumPrograms()              override;
+    int  getCurrentProgram()           override { return currentProgram; }
+    void setCurrentProgram (int)       override;
+    const juce::String getProgramName (int)            override;
     void changeProgramName (int, const juce::String&)  override {}
 
     void getStateInformation (juce::MemoryBlock&)   override;
@@ -51,6 +55,7 @@ private:
     LayerConfig padsConfig;
 
     juce::AudioProcessorValueTreeState apvts;
+    int currentProgram = 0;
 
     // Cached parameter atom pointers — read once per block in processBlock.
     std::atomic<float>* foundationVolParam    = nullptr;

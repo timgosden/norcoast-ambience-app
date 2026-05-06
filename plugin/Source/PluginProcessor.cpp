@@ -3,6 +3,7 @@
 #include "PadSound.h"
 #include "PadVoice.h"
 #include "Parameters.h"
+#include "Presets.h"
 
 namespace
 {
@@ -537,6 +538,31 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 juce::AudioProcessorEditor* NorcoastAmbienceProcessor::createEditor()
 {
     return new NorcoastAmbienceEditor (*this);
+}
+
+// ─── Host-visible factory programs ────────────────────────────────────
+int NorcoastAmbienceProcessor::getNumPrograms()
+{
+    return (int) Presets::factory().size();
+}
+
+const juce::String NorcoastAmbienceProcessor::getProgramName (int idx)
+{
+    const auto& list = Presets::factory();
+    if (idx < 0 || idx >= (int) list.size()) return {};
+    return list[(size_t) idx].name;
+}
+
+void NorcoastAmbienceProcessor::setCurrentProgram (int idx)
+{
+    const auto& list = Presets::factory();
+    if (idx < 0 || idx >= (int) list.size()) return;
+    Presets::apply (apvts, list[(size_t) idx]);
+    currentProgram = idx;
+
+    // Notify any AudioProcessorListeners — host preset menus rely on this
+    // to refresh their displayed program-name when state changes.
+    updateHostDisplay();
 }
 
 void NorcoastAmbienceProcessor::getStateInformation (juce::MemoryBlock& dest)
