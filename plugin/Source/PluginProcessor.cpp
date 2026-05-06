@@ -203,12 +203,12 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     const float masterVol   = masterVolParam ->load();
 
     // ─── Update parameters whose coefficients/state are expensive ─────
-    if (reverbSize != lastReverbSize)
+    if (std::abs (reverbSize - lastReverbSize) > 1e-4f)
     {
         reverb.setDecay (reverbSizeToFB (reverbSize));
         lastReverbSize = reverbSize;
     }
-    if (reverbMod != lastReverbMod)
+    if (std::abs (reverbMod - lastReverbMod) > 1e-4f)
     {
         reverb.setExcursionRate    (0.3f + reverbMod * 1.7f);
         reverb.setExcursionDepthMs (reverbMod * 1.5f);

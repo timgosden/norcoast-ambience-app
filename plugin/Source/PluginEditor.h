@@ -31,7 +31,6 @@ private:
     LatchableKeyboard keyboard;
     juce::TextButton  latchButton    { "Latch" };
     juce::TextButton  allOffButton   { "All Off" };
-    juce::TextButton  settingsButton { "MIDI / Audio…" };
 
     // Section headers
     juce::Label layersHeader, fxHeader, eqHeader, masterHeader;

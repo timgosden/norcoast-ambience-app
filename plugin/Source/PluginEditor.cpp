@@ -1,10 +1,6 @@
 #include "PluginEditor.h"
 #include "Parameters.h"
 
-#if JucePlugin_Build_Standalone
- #include <juce_audio_plugin_client/juce_audio_plugin_client.h>
-#endif
-
 namespace
 {
     constexpr auto kAccent = 0xffc4915e; // standalone's "warm orange"
@@ -67,15 +63,6 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     addAndMakeVisible (allOffButton);
     allOffButton.onClick = [this] { owner.getKeyboardState().allNotesOff (1); };
 
-   #if JucePlugin_Build_Standalone
-    addAndMakeVisible (settingsButton);
-    settingsButton.onClick = []
-    {
-        if (auto* holder = juce::StandalonePluginHolder::getInstance())
-            holder->showAudioSettingsDialog();
-    };
-   #endif
-
     styleHeader (layersHeader, "LAYERS");
     styleHeader (fxHeader,     "FX");
     styleHeader (eqHeader,     "EQ");
@@ -131,7 +118,7 @@ void NorcoastAmbienceEditor::paint (juce::Graphics& g)
 
     g.setColour (juce::Colour (0x33ffffff));
     g.setFont (juce::FontOptions (11.0f));
-    g.drawText ("plugin · v1.2 · phase 6 (+ master HPF/LPF)",
+    g.drawText ("plugin · v1.3 · phase 6 (+ master HPF/LPF)",
                 getLocalBounds().removeFromBottom (24).reduced (12, 4),
                 juce::Justification::centredRight);
 }
@@ -140,13 +127,8 @@ void NorcoastAmbienceEditor::resized()
 {
     auto bounds = getLocalBounds().reduced (24);
 
-    // Top bar — title is drawn in paint(); reserve it here, then place the
-    // settings button on the right.
-    auto top = bounds.removeFromTop (32);
-   #if JucePlugin_Build_Standalone
-    settingsButton.setBounds (top.removeFromRight (140).reduced (0, 4));
-   #endif
-
+    // Top bar — title is drawn in paint(); just reserve the height.
+    bounds.removeFromTop (32);
     bounds.removeFromTop (12);
 
     // Slider grid: 4 columns side by side.
