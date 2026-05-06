@@ -82,6 +82,8 @@ private:
     std::atomic<float>* arpVoiceParam      = nullptr;
     std::atomic<float>* drumVolParam       = nullptr;
     std::atomic<float>* drumPatternParam   = nullptr;
+    std::atomic<float>* velocitySensParam  = nullptr;
+    std::atomic<float>* pitchBendRangeParam= nullptr;
 
     juce::Synthesiser foundationSynth;
     juce::Synthesiser padsSynth;

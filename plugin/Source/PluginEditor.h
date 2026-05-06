@@ -71,6 +71,7 @@ private:
 
     ParamKnob arpVol, arpRate, arpOctaves, arpVoice;
     ParamKnob drumVol, drumPattern;
+    ParamKnob velocitySens, pitchBendRange;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (NorcoastAmbienceEditor)
 };

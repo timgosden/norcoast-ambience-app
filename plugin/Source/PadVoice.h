@@ -25,7 +25,9 @@ public:
     // extra octave below the lowest configured one.
     PadVoice (const LayerConfig& cfg,
               std::atomic<float>* gainParam,
-              std::atomic<float>* extraSubOctaveParam = nullptr);
+              std::atomic<float>* extraSubOctaveParam = nullptr,
+              std::atomic<float>* velocitySensParam   = nullptr,
+              std::atomic<float>* pitchBendRangeParam = nullptr);
     ~PadVoice() override = default;
 
     bool canPlaySound (juce::SynthesiserSound* s) override
@@ -36,7 +38,11 @@ public:
     void startNote (int midiNoteNumber, float velocity,
                     juce::SynthesiserSound*, int /*pitchWheelPosition*/) override;
     void stopNote (float velocity, bool allowTailOff) override;
-    void pitchWheelMoved (int) override {}
+    void pitchWheelMoved (int newValue) override
+    {
+        // newValue is 0..16383 (centred at 8192); convert to ±1.
+        pitchBendNormalised = ((float) newValue - 8192.0f) / 8192.0f;
+    }
     void controllerMoved (int, int) override {}
     void renderNextBlock (juce::AudioBuffer<float>& outputBuffer,
                           int startSample, int numSamples) override;
@@ -89,10 +95,14 @@ public:
 
 private:
     const LayerConfig& cfg;
-    std::atomic<float>* layerGainParam      = nullptr;
-    std::atomic<float>* extraSubOctaveParam = nullptr;
+    std::atomic<float>* layerGainParam       = nullptr;
+    std::atomic<float>* extraSubOctaveParam  = nullptr;
+    std::atomic<float>* velocitySensParam    = nullptr;
+    std::atomic<float>* pitchBendRangeParam  = nullptr;
+    float               velocityScale        = 1.0f;     // captured at note-on
+    float               pitchBendNormalised  = 0.0f;     // -1..+1 from wheel
     std::vector<Osc>    oscs;
-    int                 activeOscCount      = 0;
+    int                 activeOscCount       = 0;
     OnePoleLP filterL, filterR;
     LFO filterLFO1, filterLFO2, ampLFO, breathLFO;
     float filterBaseHz = 0.0f;

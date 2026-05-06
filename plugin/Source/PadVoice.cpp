@@ -24,8 +24,14 @@ namespace
 
 PadVoice::PadVoice (const LayerConfig& c,
                     std::atomic<float>* gainParam,
-                    std::atomic<float>* extraOct)
-    : cfg (c), layerGainParam (gainParam), extraSubOctaveParam (extraOct)
+                    std::atomic<float>* extraOct,
+                    std::atomic<float>* velSens,
+                    std::atomic<float>* pbRange)
+    : cfg (c),
+      layerGainParam (gainParam),
+      extraSubOctaveParam (extraOct),
+      velocitySensParam (velSens),
+      pitchBendRangeParam (pbRange)
 {
     // When the optional extra-sub-octave param is wired up, allocate one
     // extra octave's worth of oscillators so we never reallocate on the
@@ -123,7 +129,10 @@ void PadVoice::startNote (int midiNoteNumber, float velocity,
     adsr.setParameters (cfg.adsr);
     adsr.noteOn();
 
-    juce::ignoreUnused (velocity);
+    // Velocity → per-voice gain. velocitySens=0 ignores velocity entirely
+    // (ambient mode), velocitySens=1 makes vel=0 silent and vel=1 full.
+    const float vSens = velocitySensParam != nullptr ? velocitySensParam->load() : 0.4f;
+    velocityScale = (1.0f - vSens) + vSens * velocity;
 }
 
 void PadVoice::stopNote (float, bool allowTailOff)
@@ -154,15 +163,21 @@ void PadVoice::renderNextBlock (juce::AudioBuffer<float>& outputBuffer,
     filterL.setCutoff (sr, currentCutoff);
     filterR.setCutoff (sr, currentCutoff);
 
+    // Pitch bend: ± pitchBendRangeParam semitones around centre. Multiply
+    // every oscillator's phase increment by 2^(bendSemis/12).
+    const float pbRangeSemis = pitchBendRangeParam != nullptr
+        ? pitchBendRangeParam->load() : 2.0f;
+    const float bendCents = pitchBendNormalised * pbRangeSemis * 100.0f;
+
     for (int i = 0; i < activeOscCount; ++i)
     {
         auto& o = oscs[(size_t) i];
         const float lfoCents = o.detuneLFO.advance (numSamples);
-        o.phaseInc = detunedHz (o.baseHz, o.staticCents + lfoCents) / sr;
+        o.phaseInc = detunedHz (o.baseHz, o.staticCents + lfoCents + bendCents) / sr;
     }
 
-    const float gainParam = layerGainParam != nullptr ? layerGainParam->load() : 1.0f;
-    const float layerScale = gainParam * (1.0f + ampMod + breathMod);
+    const float gainParam  = layerGainParam != nullptr ? layerGainParam->load() : 1.0f;
+    const float layerScale = gainParam * velocityScale * (1.0f + ampMod + breathMod);
 
     auto* const left  = outputBuffer.getWritePointer (0) + startSample;
     auto* const right = outputBuffer.getNumChannels() > 1

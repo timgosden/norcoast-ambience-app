@@ -96,6 +96,8 @@ NorcoastAmbienceProcessor::NorcoastAmbienceProcessor()
     arpVoiceParam      = apvts.getRawParameterValue (ParamID::arpVoice);
     drumVolParam       = apvts.getRawParameterValue (ParamID::drumVol);
     drumPatternParam   = apvts.getRawParameterValue (ParamID::drumPattern);
+    velocitySensParam  = apvts.getRawParameterValue (ParamID::velocitySens);
+    pitchBendRangeParam= apvts.getRawParameterValue (ParamID::pitchBendRange);
 
     foundationSynth.addSound (new PadSound());
     padsSynth      .addSound (new PadSound());
@@ -103,8 +105,11 @@ NorcoastAmbienceProcessor::NorcoastAmbienceProcessor()
     for (int i = 0; i < kVoicesPerLayer; ++i)
     {
         foundationSynth.addVoice (new PadVoice (foundationConfig, foundationVolParam,
-                                                foundationSubOctParam));
-        padsSynth      .addVoice (new PadVoice (padsConfig,       padsVolParam));
+                                                foundationSubOctParam,
+                                                velocitySensParam, pitchBendRangeParam));
+        padsSynth      .addVoice (new PadVoice (padsConfig, padsVolParam,
+                                                nullptr,
+                                                velocitySensParam, pitchBendRangeParam));
     }
 }
 

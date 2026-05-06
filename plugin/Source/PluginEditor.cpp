@@ -147,6 +147,9 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     setupKnob (drumVol,       "Vol",          ParamID::drumVol);
     setupKnob (drumPattern,   "Pattern",      ParamID::drumPattern);
 
+    setupKnob (velocitySens,  "Vel Sens",     ParamID::velocitySens);
+    setupKnob (pitchBendRange, "PB Range",    ParamID::pitchBendRange, " st");
+
     // Per-section accent colour and content. Layout in resized() arranges
     // them into a 4×2 grid (top row 4 sections, bottom row 3 sections).
     const juce::Colour kColArp   { 0xff7eb6d4 };  // arp blue
@@ -160,7 +163,8 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
         { "FILTER+EQ",  kColEq,       {}, { &hpfFreq, &lpfFreq, &eqLow, &eqLoMid, &eqHiMid, &eqHigh } },
         { "ARP",        kColArp,      {}, { &arpVol, &arpRate, &arpOctaves, &arpVoice } },
         { "DRUMS",      kColDrums,    {}, { &drumVol, &drumPattern } },
-        { "MASTER",     kColMaster,   {}, { &widthMod, &satAmt, &masterVol } }
+        { "MASTER",     kColMaster,   {}, { &velocitySens, &pitchBendRange,
+                                              &widthMod, &satAmt, &masterVol } }
     }};
 
     setSize (1020, 680);
@@ -322,12 +326,12 @@ void NorcoastAmbienceEditor::resized()
         sections[3].bounds = row1.reduced (4, 0);
     }
 
-    // Bottom row: FILTER+EQ (6), ARP (4), DRUMS (2), MASTER (3) → 15 cols
+    // Bottom row: FILTER+EQ (6), ARP (4), DRUMS (2), MASTER (5) → 17 cols
     {
         const int row2Width = row2.getWidth();
-        const int colA = (int)(row2Width * (6.0f / 15.0f));
-        const int colB = (int)(row2Width * (4.0f / 15.0f));
-        const int colC = (int)(row2Width * (2.0f / 15.0f));
+        const int colA = (int)(row2Width * (6.0f / 17.0f));
+        const int colB = (int)(row2Width * (4.0f / 17.0f));
+        const int colC = (int)(row2Width * (2.0f / 17.0f));
         sections[4].bounds = row2.removeFromLeft (colA).reduced (4, 0);
         sections[5].bounds = row2.removeFromLeft (colB).reduced (4, 0);
         sections[6].bounds = row2.removeFromLeft (colC).reduced (4, 0);
