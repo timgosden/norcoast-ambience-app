@@ -6,6 +6,7 @@
 #include "DattorroReverb.h"
 #include "Shimmer.h"
 #include "Arpeggiator.h"
+#include "DrumMachine.h"
 
 class NorcoastAmbienceProcessor : public juce::AudioProcessor
 {
@@ -74,6 +75,8 @@ private:
     std::atomic<float>* arpRateParam       = nullptr;
     std::atomic<float>* arpOctavesParam    = nullptr;
     std::atomic<float>* arpVoiceParam      = nullptr;
+    std::atomic<float>* drumVolParam       = nullptr;
+    std::atomic<float>* drumPatternParam   = nullptr;
 
     juce::Synthesiser foundationSynth;
     juce::Synthesiser padsSynth;
@@ -98,6 +101,7 @@ private:
 
     Shimmer shimmer;
     Arpeggiator arpeggiator;
+    DrumMachine drumMachine;
     std::vector<int> heldNotesScratch;   // reused across processBlock calls
     float lastReverbSize = -1.0f;
     float lastReverbMod  = -1.0f;

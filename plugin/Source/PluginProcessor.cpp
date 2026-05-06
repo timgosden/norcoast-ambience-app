@@ -92,6 +92,8 @@ NorcoastAmbienceProcessor::NorcoastAmbienceProcessor()
     arpRateParam       = apvts.getRawParameterValue (ParamID::arpRate);
     arpOctavesParam    = apvts.getRawParameterValue (ParamID::arpOctaves);
     arpVoiceParam      = apvts.getRawParameterValue (ParamID::arpVoice);
+    drumVolParam       = apvts.getRawParameterValue (ParamID::drumVol);
+    drumPatternParam   = apvts.getRawParameterValue (ParamID::drumPattern);
 
     foundationSynth.addSound (new PadSound());
     padsSynth      .addSound (new PadSound());
@@ -146,6 +148,9 @@ void NorcoastAmbienceProcessor::prepareToPlay (double sampleRate, int samplesPer
     arpeggiator.prepare (sampleRate, samplesPerBlock);
     arpeggiator.reset();
     heldNotesScratch.reserve (16);
+
+    drumMachine.prepare (sampleRate, samplesPerBlock);
+    drumMachine.reset();
 
     widthPhase    = 0.0;
     widthPhaseInc = 0.3 / sampleRate;   // 0.3 Hz width LFO, matches standalone
@@ -225,6 +230,21 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         {
             arpeggiator.reset();
         }
+    }
+
+    // ─── Drums (additive — same FX chain as the pads) ─────────────────
+    {
+        const float drumVol = drumVolParam->load();
+        const int   patIdx  = juce::jlimit (0, 4, (int) drumPatternParam->load());
+
+        // Tempo from host (or 120 in standalone) — same playhead read as the arp.
+        double bpm = 120.0;
+        if (auto* ph = getPlayHead())
+            if (auto pos = ph->getPosition())
+                if (auto hostBpm = pos->getBpm())
+                    bpm = *hostBpm;
+
+        drumMachine.process (buffer, 0, n, drumVol, patIdx, bpm);
     }
 
     // Snapshot params once per block.

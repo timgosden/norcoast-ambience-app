@@ -109,9 +109,13 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     setupKnob (arpOctaves,    "Octaves",      ParamID::arpOctaves);
     setupKnob (arpVoice,      "Voice",        ParamID::arpVoice);
 
+    setupKnob (drumVol,       "Vol",          ParamID::drumVol);
+    setupKnob (drumPattern,   "Pattern",      ParamID::drumPattern);
+
     // Per-section accent colour and content. Layout in resized() arranges
     // them into a 4×2 grid (top row 4 sections, bottom row 3 sections).
-    const juce::Colour kColArp { 0xff7eb6d4 };  // arp blue
+    const juce::Colour kColArp   { 0xff7eb6d4 };  // arp blue
+    const juce::Colour kColDrums { 0xffd97171 };  // drum red
     sections =
     {{
         { "LAYERS",     kColLayers,   {}, { &foundationVol, &padsVol } },
@@ -120,10 +124,11 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
         { "REVERB",     kColReverbFx, {}, { &reverbMix, &reverbSize, &reverbMod, &shimmerVol } },
         { "FILTER+EQ",  kColEq,       {}, { &hpfFreq, &lpfFreq, &eqLow, &eqLoMid, &eqHiMid, &eqHigh } },
         { "ARP",        kColArp,      {}, { &arpVol, &arpRate, &arpOctaves, &arpVoice } },
+        { "DRUMS",      kColDrums,    {}, { &drumVol, &drumPattern } },
         { "MASTER",     kColMaster,   {}, { &widthMod, &satAmt, &masterVol } }
     }};
 
-    setSize (980, 680);
+    setSize (1020, 680);
 }
 
 NorcoastAmbienceEditor::~NorcoastAmbienceEditor()
@@ -157,7 +162,7 @@ void NorcoastAmbienceEditor::paint (juce::Graphics& g)
 
     g.setColour (juce::Colour (NorcoastLookAndFeel::kTextDim));
     g.setFont (juce::FontOptions (10.5f));
-    g.drawText ("ambient synth · v1.5 · phase 10 · DAW-tempo arp",
+    g.drawText ("ambient synth · v1.6 · phase 11 · arp + drum machine",
                 top.withTrimmedLeft (8),
                 juce::Justification::centredLeft);
 
@@ -189,7 +194,7 @@ void NorcoastAmbienceEditor::paint (juce::Graphics& g)
     // Footer
     g.setColour (juce::Colour (0x55ffffff));
     g.setFont (juce::FontOptions (10.0f));
-    g.drawText ("plugin · v1.5 · phase 10  (arp · sub-oct · rotary GUI)",
+    g.drawText ("plugin · v1.6 · phase 11  (drums · arp · sub-oct · rotary GUI)",
                 getLocalBounds().removeFromBottom (24).reduced (16, 4),
                 juce::Justification::centredRight);
 }
@@ -221,14 +226,16 @@ void NorcoastAmbienceEditor::resized()
         sections[3].bounds = row1.reduced (4, 0);
     }
 
-    // Bottom row: FILTER+EQ (6), ARP (4), MASTER (3) → 13 cols
+    // Bottom row: FILTER+EQ (6), ARP (4), DRUMS (2), MASTER (3) → 15 cols
     {
         const int row2Width = row2.getWidth();
-        const int colA = (int)(row2Width * (6.0f / 13.0f));
-        const int colB = (int)(row2Width * (4.0f / 13.0f));
+        const int colA = (int)(row2Width * (6.0f / 15.0f));
+        const int colB = (int)(row2Width * (4.0f / 15.0f));
+        const int colC = (int)(row2Width * (2.0f / 15.0f));
         sections[4].bounds = row2.removeFromLeft (colA).reduced (4, 0);
         sections[5].bounds = row2.removeFromLeft (colB).reduced (4, 0);
-        sections[6].bounds = row2.reduced (4, 0);
+        sections[6].bounds = row2.removeFromLeft (colC).reduced (4, 0);
+        sections[7].bounds = row2.reduced (4, 0);
     }
 
     // Lay out knobs inside each section

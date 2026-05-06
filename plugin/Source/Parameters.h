@@ -38,6 +38,9 @@ namespace ParamID
     inline constexpr const char* arpRate       = "arpRate";
     inline constexpr const char* arpOctaves    = "arpOctaves";
     inline constexpr const char* arpVoice      = "arpVoice";
+
+    inline constexpr const char* drumVol       = "drumVol";
+    inline constexpr const char* drumPattern   = "drumPattern";
 }
 
 inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout()
@@ -147,6 +150,14 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
     layout.add (std::make_unique<juce::AudioParameterChoice> (
         juce::ParameterID { ParamID::arpVoice, 1 }, "Arp Voice",
         juce::StringArray { "Triangle", "Saw", "Sine" }, 0));
+
+    // ─── Drum machine ─────────────────────────────────────────────────
+    add (std::make_unique<FloatParam> (juce::ParameterID { ParamID::drumVol, 1 },
+                                        "Drums",
+                                        NormRange { 0.0f, 1.0f, 0.001f }, 0.0f));
+    layout.add (std::make_unique<juce::AudioParameterChoice> (
+        juce::ParameterID { ParamID::drumPattern, 1 }, "Drum Pattern",
+        juce::StringArray { "Off", "Pulse", "Mist", "Stride", "Roam" }, 0));
 
     return layout;
 }
