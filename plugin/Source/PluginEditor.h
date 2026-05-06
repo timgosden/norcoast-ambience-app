@@ -5,6 +5,7 @@
 #include "NorcoastLookAndFeel.h"
 #include "ChordStateHeader.h"
 #include "ChoiceButtonRow.h"
+#include "StepSequencerGrid.h"
 
 class NorcoastAmbienceEditor : public juce::AudioProcessorEditor
 {
@@ -51,6 +52,8 @@ private:
     std::unique_ptr<ChoiceButtonRow> drumPatternRow;
     std::unique_ptr<ChoiceButtonRow> chordTypeRow;     // EVOLVE chord pills
     std::unique_ptr<ChoiceButtonRow> rootKeyRow;       // bottom 12-key grid
+
+    std::unique_ptr<StepSequencerGrid> stepSequencer;  // 16-step drum grid
 
     // Custom-chord builder (7 toggle pills for major-scale degrees).
     std::array<juce::TextButton, 7> degreeButtons {{

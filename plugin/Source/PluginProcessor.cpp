@@ -97,6 +97,9 @@ NorcoastAmbienceProcessor::NorcoastAmbienceProcessor()
     arpVoiceParam      = apvts.getRawParameterValue (ParamID::arpVoice);
     drumVolParam       = apvts.getRawParameterValue (ParamID::drumVol);
     drumPatternParam   = apvts.getRawParameterValue (ParamID::drumPattern);
+    drumCustomLoParam  = apvts.getRawParameterValue (ParamID::drumCustomLo);
+    drumCustomMdParam  = apvts.getRawParameterValue (ParamID::drumCustomMd);
+    drumCustomHhParam  = apvts.getRawParameterValue (ParamID::drumCustomHh);
     chordTypeParam       = apvts.getRawParameterValue (ParamID::chordType);
     customChordMaskParam = apvts.getRawParameterValue (ParamID::customChordMask);
     evolveOnParam      = apvts.getRawParameterValue (ParamID::evolveOn);
@@ -329,8 +332,12 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     // ─── Drums (additive — same FX chain as the pads) ─────────────────
     {
         const float drumVol = drumVolParam->load();
-        const int   patIdx  = juce::jlimit (0, 4, (int) drumPatternParam->load());
-        drumMachine.process (buffer, 0, n, drumVol, patIdx, bpm);
+        const int   patIdx  = juce::jlimit (0, 5, (int) drumPatternParam->load());
+        const int   loMask  = (int) drumCustomLoParam->load();
+        const int   mdMask  = (int) drumCustomMdParam->load();
+        const int   hhMask  = (int) drumCustomHhParam->load();
+        drumMachine.process (buffer, 0, n, drumVol, patIdx, bpm,
+                             loMask, mdMask, hhMask);
     }
 
     // ─── Texture (granular dulcimer — only fires while notes are held) ─

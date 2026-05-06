@@ -183,6 +183,10 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
         juce::Colour (NorcoastLookAndFeel::kAccent));
     addAndMakeVisible (*rootKeyRow);
 
+    // 16-step drum sequencer — sits below the key grid.
+    stepSequencer = std::make_unique<StepSequencerGrid> (owner.getAPVTS());
+    addAndMakeVisible (*stepSequencer);
+
     // Custom-chord degree buttons (1..7). Bit 0 (root) is implicit and
     // always on; bits 1..6 toggle the 2nd…7th of the major scale.
     for (int i = 0; i < 7; ++i)
@@ -290,7 +294,7 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
         { "MASTER",     kColMaster,   {}, { &widthMod, &satAmt, &masterVol } }
     }};
 
-    setSize (980, 640);
+    setSize (980, 730);
 
     // Give the qwerty keyboard focus so computer-keyboard keys map to MIDI.
     juce::MessageManager::callAsync ([safeThis = juce::Component::SafePointer (&qwertyKeyboard)]
@@ -537,6 +541,10 @@ void NorcoastAmbienceEditor::resized()
 
     auto keyRow = bounds.removeFromTop (44);
     if (rootKeyRow != nullptr) rootKeyRow->setBounds (keyRow);
+
+    bounds.removeFromTop (8);
+    auto seqRow = bounds.removeFromTop (78);
+    if (stepSequencer != nullptr) stepSequencer->setBounds (seqRow);
 
     // Park the invisible qwerty-keyboard 1×1 in the bottom-right corner.
     qwertyKeyboard.setBounds (getWidth() - 2, getHeight() - 2, 1, 1);

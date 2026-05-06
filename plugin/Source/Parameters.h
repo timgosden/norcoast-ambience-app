@@ -41,8 +41,11 @@ namespace ParamID
     inline constexpr const char* arpOctaves    = "arpOctaves";
     inline constexpr const char* arpVoice      = "arpVoice";
 
-    inline constexpr const char* drumVol       = "drumVol";
-    inline constexpr const char* drumPattern   = "drumPattern";
+    inline constexpr const char* drumVol         = "drumVol";
+    inline constexpr const char* drumPattern     = "drumPattern";
+    inline constexpr const char* drumCustomLo    = "drumCustomLo";   // 16-bit mask
+    inline constexpr const char* drumCustomMd    = "drumCustomMd";
+    inline constexpr const char* drumCustomHh    = "drumCustomHh";
 
     inline constexpr const char* chordType        = "chordType";
     inline constexpr const char* customChordMask  = "customChordMask";
@@ -175,7 +178,15 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
                                         NormRange { 0.0f, 1.0f, 0.001f }, 0.0f));
     layout.add (std::make_unique<juce::AudioParameterChoice> (
         juce::ParameterID { ParamID::drumPattern, 1 }, "Drum Pattern",
-        juce::StringArray { "Off", "Pulse", "Mist", "Stride", "Roam" }, 0));
+        juce::StringArray { "Off", "Pulse", "Mist", "Stride", "Roam", "Custom" }, 0));
+
+    // 16-step bitmasks for the Custom pattern, one per voice (lo / md / hh).
+    layout.add (std::make_unique<juce::AudioParameterInt> (
+        juce::ParameterID { ParamID::drumCustomLo, 1 }, "Drum Lo",  0, 65535, 0));
+    layout.add (std::make_unique<juce::AudioParameterInt> (
+        juce::ParameterID { ParamID::drumCustomMd, 1 }, "Drum Md",  0, 65535, 0));
+    layout.add (std::make_unique<juce::AudioParameterInt> (
+        juce::ParameterID { ParamID::drumCustomHh, 1 }, "Drum Hh",  0, 65535, 0));
 
     // ─── Evolve / chord generator ─────────────────────────────────────
     // Chord type names mirror the standalone's CHORD_TYPES table.

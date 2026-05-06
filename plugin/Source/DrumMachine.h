@@ -15,7 +15,7 @@
 class DrumMachine
 {
 public:
-    enum class PatternId { Off = 0, Pulse, Mist, Stride, Roam, NumPatterns };
+    enum class PatternId { Off = 0, Pulse, Mist, Stride, Roam, Custom, NumPatterns };
 
     void prepare (double sr, int /*blockSize*/)
     {
@@ -34,8 +34,11 @@ public:
 
     // Adds drum audio onto `buffer`. `vol` is master drum level
     // (0 = silent), `patternId` selects the pattern, `bpm` from host.
+    // For Custom patterns, pass the 16-bit masks (lo/md/hh) — bit i set
+    // means that voice fires on step i.
     void process (juce::AudioBuffer<float>& buffer, int startSample, int numSamples,
-                  float vol, int patternId, double bpm)
+                  float vol, int patternId, double bpm,
+                  int customLo = 0, int customMd = 0, int customHh = 0)
     {
         if (vol < 1e-4f || patternId <= 0
             || patternId >= (int) PatternId::NumPatterns)
@@ -45,8 +48,8 @@ public:
             return;
         }
 
-        const auto& pattern = kPatterns[(size_t) patternId];
-        const int   stepDur = juce::jmax (1, (int) ((60.0 / bpm) * 0.25 * sampleRate));
+        const bool isCustom = patternId == (int) PatternId::Custom;
+        const int  stepDur  = juce::jmax (1, (int) ((60.0 / bpm) * 0.25 * sampleRate));
 
         auto* L = buffer.getWritePointer (0) + startSample;
         auto* R = buffer.getNumChannels() > 1 ? buffer.getWritePointer (1) + startSample : L;
@@ -55,7 +58,18 @@ public:
         {
             if (sampleCounter <= 0)
             {
-                const auto stepCode = pattern[(size_t) (stepIdx % 16)];
+                const int stepBit = 1 << (stepIdx % 16);
+                juce::uint8 stepCode = 0;
+                if (isCustom)
+                {
+                    if (customLo & stepBit) stepCode |= MaskKick;
+                    if (customMd & stepBit) stepCode |= MaskTom;
+                    if (customHh & stepBit) stepCode |= MaskHat;
+                }
+                else
+                {
+                    stepCode = kPatterns[(size_t) patternId][(size_t) (stepIdx % 16)];
+                }
                 if (stepCode != 0)
                 {
                     if (stepCode & MaskKick) triggerKick();
@@ -83,6 +97,8 @@ private:
     static constexpr juce::uint8 MaskHat  = 0x4;
 
     // Patterns are 16 steps each; bitmask of sounds firing on that step.
+    // The Custom slot is a zeroed placeholder — process() reads the
+    // user's mask params instead of this entry when patternId = Custom.
     static constexpr std::array<std::array<juce::uint8, 16>, (size_t) PatternId::NumPatterns> kPatterns
     {{
         // Off
@@ -95,7 +111,9 @@ private:
         {{MaskKick,0,0,0, MaskTom,0,0,0, 0,0,0,0, MaskTom,0,0,0}},
         // Roam: kick + hat layered with tom and extra hats
         {{MaskKick|MaskHat,0,0,MaskHat, MaskTom,0,MaskHat,0,
-          0,0,0,MaskHat, MaskTom,0,0,0}}
+          0,0,0,MaskHat, MaskTom,0,0,0}},
+        // Custom: placeholder, real data comes from APVTS masks at process time.
+        {{0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0}}
     }};
 
     // ─── Kick voice ───────────────────────────────────────────────────

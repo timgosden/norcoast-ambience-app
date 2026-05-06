@@ -99,6 +99,9 @@ private:
     std::atomic<float>* arpVoiceParam      = nullptr;
     std::atomic<float>* drumVolParam       = nullptr;
     std::atomic<float>* drumPatternParam   = nullptr;
+    std::atomic<float>* drumCustomLoParam  = nullptr;
+    std::atomic<float>* drumCustomMdParam  = nullptr;
+    std::atomic<float>* drumCustomHhParam  = nullptr;
     std::atomic<float>* chordTypeParam       = nullptr;
     std::atomic<float>* customChordMaskParam = nullptr;
     std::atomic<float>* evolveOnParam        = nullptr;
