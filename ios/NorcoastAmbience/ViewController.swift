@@ -154,7 +154,10 @@ final class ViewController: UIViewController {
     override var prefersStatusBarHidden: Bool { true }
     override var preferredStatusBarUpdateAnimation: UIStatusBarAnimation { .fade }
     override var prefersHomeIndicatorAutoHidden: Bool { true }
-    override var supportedInterfaceOrientations: UIInterfaceOrientationMask { .portrait }
+    override var supportedInterfaceOrientations: UIInterfaceOrientationMask {
+        // iPhone stays portrait-only; iPad rotates freely.
+        UIDevice.current.userInterfaceIdiom == .pad ? .all : .portrait
+    }
 }
 
 // MARK: - NorcoastAudioControllable

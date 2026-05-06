@@ -44,6 +44,9 @@
   .edit-btn{border-radius:10px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.18);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:7px 12px;cursor:pointer;color:rgba(255,255,255,0.75);transition:all 0.2s;flex-shrink:0;gap:3px}
   .edit-btn:active{background:rgba(255,255,255,0.15)}
   .edit-btn:active{background:rgba(255,255,255,0.12)}
+  /* Focus mode is iPhone-only — hide unless either viewport dimension fits a phone. */
+  #compactBtn{display:none}
+  @media (max-width:480px),(max-height:480px){#compactBtn{display:flex}}
   /* ── Visualiser ── */
   .perf-vis-wrap{height:54px;padding:6px 16px;flex-shrink:0;display:flex;align-items:center;overflow:hidden;transition:height 0.3s ease,padding 0.3s ease}
   #visualiser{width:100%;border-radius:6px;display:block;height:42px}
@@ -76,7 +79,8 @@
   #perf.compact .perf-vis-wrap{height:0;padding-top:0;padding-bottom:0}
   #perf.compact .perf-bottom{max-height:0;padding-top:0;padding-bottom:0}
   #perf.compact .perf-quickstrip{display:none}
-  .app-version{position:absolute;bottom:calc(4px + env(safe-area-inset-bottom, 0px));right:10px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none;font-variant-numeric:tabular-nums}
+  .app-version{position:absolute;bottom:calc(4px + env(safe-area-inset-bottom, 0px));right:10px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;font-variant-numeric:tabular-nums;cursor:pointer;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;user-select:none}
+  #perfHud{position:fixed;top:calc(8px + env(safe-area-inset-top, 0px));left:8px;background:rgba(0,0,0,0.65);color:#5eb88a;font:10px/1.3 ui-monospace,Menlo,monospace;padding:5px 8px;border-radius:6px;z-index:9999;pointer-events:none;display:none;letter-spacing:0.3px;white-space:nowrap}
   .bpm-click-group{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:14px;padding:4px 6px}
   .evolve-pill{padding:8px 13px;border-radius:20px;font-size:10px;letter-spacing:2px;text-transform:uppercase;font-weight:500;cursor:pointer;transition:all 0.3s;border:1px solid transparent}
   .fade-btn{display:flex;align-items:center;justify-content:center;padding:8px 13px;border-radius:20px;font-size:10px;letter-spacing:2px;text-transform:uppercase;font-weight:500;cursor:pointer;transition:border-color 0.3s,color 0.3s,box-shadow 0.3s;border:1px solid rgba(212,107,138,0.35);background:rgba(212,107,138,0.08);color:rgba(212,107,138,0.7);touch-action:manipulation;position:relative;overflow:hidden}
@@ -184,6 +188,7 @@
 </style>
 </head>
 <body>
+<div id="perfHud"></div>
 <!-- Tap-to-start -->
 <div id="audioPrompt" onclick="initAndStart()" style="position:fixed;top:0;left:0;right:0;bottom:0;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#080b14;cursor:pointer;transition:opacity 0.8s;padding:40px">
   <svg width="84" height="84" viewBox="0 0 100 100" fill="none" style="margin-bottom:28px">
@@ -197,7 +202,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.56</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.60</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -229,7 +234,7 @@
       </button>
       <button class="edit-btn" id="createTabBtn" onclick="openCreate()">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-        <span style="font-size:9px;letter-spacing:0.5px;margin-top:1px">Create</span>
+        <span style="font-size:9px;letter-spacing:0.5px;margin-top:1px">Tweak</span>
       </button>
     </div>
   </div>
@@ -258,7 +263,7 @@
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
       <button id="clickX2Btn" class="evolve-pill off" onclick="toggleClickX2()" style="padding:8px 10px;font-size:9px;letter-spacing:1px">x2</button>
     </div>
-    <div class="app-version">v1.56</div>
+    <div class="app-version">v1.60</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -281,15 +286,10 @@ const C2=noteFreq("C",2); // base pitch of sample
 
 const CHORD_TYPES=[
   {name:"5th",      semis:[7],        weight:5},
-  {name:"Oct",      semis:[12],       weight:5, voicing:[0,7,12]},
-  {name:"4th",      semis:[5],        weight:4},
   {name:"Sus2",     semis:[2,7],      weight:4},
   {name:"Sus4",     semis:[5,7],      weight:3},
-  {name:"5th+Oct",  semis:[7,12],     weight:3},
   {name:"Maj7th",   semis:[11],       weight:3, voicing:[0,7,11]},
-  {name:"5th+9th",  semis:[7,14],     weight:3},
-  {name:"6th",      semis:[9],        weight:2},
-  {name:"5th+Maj7", semis:[7,11],     weight:2},
+  {name:"9th",      semis:[7,14],     weight:3},
   {name:"Custom",   semis:[7],        weight:3},
 ];
 
@@ -329,11 +329,15 @@ const PAD_LAYERS=[
     fBase:200,fMod:30,fRate:0.1,aMod:0.03,aRate:0.12,octaves:[-1],rootOnly:true},
   {id:"pads",name:"Pads",color:"#c4915e",type:"synth",
     timbres:[{wave:"lush",count:6,ds:10,gain:0.03,pan:0.6},{wave:"warm",count:4,ds:7,gain:0.022,pan:0.4},{wave:"choir",count:3,ds:14,gain:0.014,pan:0.75},{wave:"celestial",count:2,ds:18,gain:0.012,pan:0.9}],
-    fBase:1200,fMod:450,fRate:0.042,aMod:0.1,aRate:0.08,octaves:[0,1]},
+    fBase:1200,fMod:450,fRate:0.042,aMod:0.1,aRate:0.08,octaves:[0,1],evolveOnly:true},
   {id:"texture",name:"Texture",color:"#a08060",type:"granular"},
 ];
 
 const ATTACK=7,RELEASE=7,XFADE=7,ROOT_OCT=3,DELAY_Q=60/70,PRESET_FADE=3;
+// Granular texture is summed from several streams that overlap, so its
+// effective gain is lower than the synth pads. TEX_GAIN compensates so the
+// Texture slider sits in the same perceptual range as Foundation / Pads.
+const TEX_GAIN=1.3;
 
 // ─── STATE ───
 let ctx,waves,master,reverb,reverbGain,dryGain,delayNode,delayGainN,delayFB,dToneNode,analyser;
@@ -345,7 +349,7 @@ let lpfQ=0.7,hpfQ=0.7,lpfSlope=12,hpfSlope=12;
 let eqLowGain=0,eqLoMidGain=-0.6,eqHiMidGain=-2.0,eqHighGain=1.4;
 let chorusGainNode=null,chorusMix=0.35;
 let dulcimerBuf=null; // decoded audio buffer
-let homeRoot="C",evolving=true,evolveSpeed=0.5,currentEvolve=6;
+let homeRoot="C",evolving=true,evolveSpeed=0.5,currentEvolve=3;
 let delayTimeVal=DELAY_Q;
 let lpfValue=0.897,hpfValue=0;
 let reverbMix=0.71,reverbSize=0.92,reverbMod=0.74,delayMixVal=0.46,delayFeedback=0.57,delayTone=1.0,masterVol=0.5,satAmt=0;
@@ -373,7 +377,7 @@ let currentPresetName=null;
 let sheetMode="setlist";
 let audioPaused=false;
 let easyMode=true;
-let enabledEvolveIdx=new Set([0,1,2,3,4,5,6,7,8,9]);
+let enabledEvolveIdx=new Set([0,1,2,3,4]);
 
 const DEFAULT_VOLUMES={foundation:0.55,pads:0.5,texture:0.85};
 PAD_LAYERS.forEach(l=>{layerState[l.id]={active:true,volume:DEFAULT_VOLUMES[l.id]??0}});
@@ -458,7 +462,7 @@ function startGranular(vol,atk){
 
   granularGain=ctx.createGain();
   granularGain.gain.setValueAtTime(0,ctx.currentTime);
-  granularGain.gain.linearRampToValueAtTime(vol*0.8,ctx.currentTime+atk);
+  granularGain.gain.linearRampToValueAtTime(vol*TEX_GAIN,ctx.currentTime+atk);
   granularGain.connect(master);
 
   // 5 streams: root, 5th, evolve voice, root+oct, 5th+oct
@@ -741,7 +745,10 @@ function fadeOut(nodes,time){
 }
 
 function getStaticFreqs(root,def){const r=noteFreq(root,ROOT_OCT);return def.rootOnly?[r]:[r,semiFreq(r,7)]}
-function getEvolveFreq(root,ei){const r=noteFreq(root,ROOT_OCT);return CHORD_TYPES[ei].semis.map(s=>semiFreq(r,s))}
+// Evolve voicing always includes the root so the chord stands on its own —
+// otherwise chords whose semis don't include 0 (e.g. Maj7th=[11]) sound
+// rootless when they're the only thing playing in their register.
+function getEvolveFreq(root,ei){const r=noteFreq(root,ROOT_OCT);return [r,...CHORD_TYPES[ei].semis.map(s=>semiFreq(r,s))]}
 
 // True shimmer: Dattorro plate with pitch-shifted feedback loop. Each pass
 // through the loop is raised an octave, producing an ascending halo cascade
@@ -837,8 +844,13 @@ function startPad(def,vol,root,ei,atk,xfo){
   const sxfo=(oldS&&oldS._atkUntil>now)?0.3:xfo;
   const exfo=(oldE&&oldE._atkUntil>now)?0.3:xfo;
   fadeOut(oldS,sxfo);fadeOut(oldE,exfo);
-  staticNodes[def.id]=buildGroup(def,getStaticFreqs(root,def),vol,atk);
-  staticNodes[def.id]._atkUntil=now+atk;
+  // evolveOnly layers (e.g. Pads) skip the static drone group — their
+  // entire sound rebuilds on each chord change so the chord movement
+  // is audible. Foundation provides the sustained root drone instead.
+  if(!def.evolveOnly){
+    staticNodes[def.id]=buildGroup(def,getStaticFreqs(root,def),vol,atk);
+    staticNodes[def.id]._atkUntil=now+atk;
+  }
   if(!def.rootOnly){
     evolveNodes[def.id]=buildGroup(def,getEvolveFreq(root,ei),vol,atk);
     evolveNodes[def.id]._atkUntil=now+atk;
@@ -1357,7 +1369,7 @@ function randomise(){
   const rV=(a,b)=>a+Math.random()*(b-a);
   const applyL=(l,v)=>{
     const wasZ=layerState[l.id].volume<=0;layerState[l.id].volume=v;
-    if(l.type==='granular'){if(v>0&&wasZ)startGranular(v);else if(v<=0)stopGranular();else if(granularGain)granularGain.gain.linearRampToValueAtTime(v*0.8,ctx.currentTime+ATTACK);}
+    if(l.type==='granular'){if(v>0&&wasZ)startGranular(v);else if(v<=0)stopGranular();else if(granularGain)granularGain.gain.linearRampToValueAtTime(v*TEX_GAIN,ctx.currentTime+ATTACK);}
     else{if(v>0&&wasZ)startPad(l,v,homeRoot,currentEvolve);else if(v<=0)stopPad(l.id);else{const rt=ctx.currentTime+ATTACK;if(staticNodes[l.id]){staticNodes[l.id].gain.gain.linearRampToValueAtTime(v,rt);if(staticNodes[l.id].ampMod)staticNodes[l.id].ampMod.gain.linearRampToValueAtTime(l.aMod*v,rt);}if(evolveNodes[l.id]){evolveNodes[l.id].gain.gain.linearRampToValueAtTime(v,rt);if(evolveNodes[l.id].ampMod)evolveNodes[l.id].ampMod.gain.linearRampToValueAtTime(l.aMod*v,rt);}}}
   };
   let vF=Math.random()<0.65?rV(0.25,0.85):0;
@@ -1645,7 +1657,7 @@ function buildEditSheet(){
       const raw=parseFloat(e.target.value),vol=faderToVol(raw),wasZero=layerState[l.id].volume===0;
       layerState[l.id].volume=vol;queueSave();
       inp.style.background='linear-gradient(to right,'+l.color+'55 '+raw*100+'%,rgba(255,255,255,0.06) '+raw*100+'%)';
-      if(l.type==="granular"){if(vol>0&&wasZero)startGranular(vol);else if(vol<=0)stopGranular();else if(granularGain)granularGain.gain.linearRampToValueAtTime(vol*0.8,ctx.currentTime+0.1)}
+      if(l.type==="granular"){if(vol>0&&wasZero)startGranular(vol);else if(vol<=0)stopGranular();else if(granularGain)granularGain.gain.linearRampToValueAtTime(vol*TEX_GAIN,ctx.currentTime+0.1)}
       else{if(vol>0&&wasZero&&!staticNodes[l.id])startPad(l,vol,homeRoot,currentEvolve);else{const t=ctx.currentTime+0.4;if(staticNodes[l.id]){staticNodes[l.id].gain.gain.linearRampToValueAtTime(vol,t);if(staticNodes[l.id].ampMod)staticNodes[l.id].ampMod.gain.linearRampToValueAtTime(l.aMod*vol,t);if(staticNodes[l.id].breathMod)staticNodes[l.id].breathMod.gain.linearRampToValueAtTime(vol*0.03,t);}if(evolveNodes[l.id]){evolveNodes[l.id].gain.gain.linearRampToValueAtTime(vol,t);if(evolveNodes[l.id].ampMod)evolveNodes[l.id].ampMod.gain.linearRampToValueAtTime(l.aMod*vol,t);if(evolveNodes[l.id].breathMod)evolveNodes[l.id].breathMod.gain.linearRampToValueAtTime(vol*0.03,t);}}}
       const row=inp.closest('.edit-layer'),on=vol>0;
       const db=row.querySelector('.layer-dot-btn');db.style.borderColor=on?l.color+'55':'rgba(255,255,255,0.1)';db.style.background=on?l.color+'15':'transparent';
@@ -1808,7 +1820,7 @@ function loadSettings(){try{const raw=localStorage.getItem('norcoast_v1');if(!ra
   // a future build that may have fields we don't understand — log it but
   // continue with whatever fields we do recognise.
   if(s._v!=null&&s._v>1)console.warn('loadSettings: settings written by newer schema v'+s._v+', some fields may be ignored.');
-  if(s.homeRoot)homeRoot=s.homeRoot;if(s.evolving!=null)evolving=s.evolving;if(s.evolveSpeed!=null)evolveSpeed=s.evolveSpeed;if(s.lpfValue!=null)lpfValue=s.lpfValue;if(s.hpfValue!=null)hpfValue=s.hpfValue;if(s.lpfQ!=null)lpfQ=s.lpfQ;if(s.hpfQ!=null)hpfQ=s.hpfQ;if(s.lpfSlope!=null)lpfSlope=s.lpfSlope;if(s.hpfSlope!=null)hpfSlope=s.hpfSlope;if(s.eqLowGain!=null)eqLowGain=s.eqLowGain;if(s.eqLoMidGain!=null)eqLoMidGain=s.eqLoMidGain;if(s.eqHiMidGain!=null)eqHiMidGain=s.eqHiMidGain;if(s.eqHighGain!=null)eqHighGain=s.eqHighGain;if(s.chorusMix!=null)chorusMix=s.chorusMix;if(s.widthMod!=null)widthMod=s.widthMod;if(s.shimmerVol!=null)shimmerVol=Math.min(s.shimmerVol,0.5);if(s.reverbMix!=null)reverbMix=s.reverbMix;if(s.reverbSize!=null)reverbSize=s.reverbSize;if(s.reverbMod!=null)reverbMod=s.reverbMod;if(s.delayMixVal!=null)delayMixVal=s.delayMixVal;if(s.delayFeedback!=null)delayFeedback=s.delayFeedback;if(s.delayTone!=null)delayTone=s.delayTone;if(s.delaySync!=null)delaySync=s.delaySync;if(s.delaySyncDiv)delaySyncDiv=s.delaySyncDiv;if(s.delayTimeVal!=null)delayTimeVal=s.delayTimeVal;if(s.masterVol!=null)masterVol=s.masterVol;if(s.satAmt!=null){satAmt=s.satAmt;if(satWS)satWS.curve=buildSatCurve(satAmt);if(satCompNode)satCompNode.gain.value=1-satAmt*0.3;}if(s.textureOctUp!=null)textureOctUp=s.textureOctUp;if(s.foundationSubOct!=null)foundationSubOct=s.foundationSubOct;if(s.clickBPM!=null)clickBPM=s.clickBPM;if(s.evolveOnBeat!=null)evolveOnBeat=s.evolveOnBeat;if(s.evolveBars!=null)evolveBars=s.evolveBars;if(s.arpVol!=null)arpVol=s.arpVol;if(s.arpRate!=null)arpRate=s.arpRate;if(s.arpOct!=null)arpOct=s.arpOct;if(s.arpVoice)arpVoice=s.arpVoice;if(s.movementVol!=null)movementVol=s.movementVol;if(s.movementPattern!=null)movementPattern=s.movementPattern;if(s.clickRateX2!=null)clickRateX2=s.clickRateX2;if(s.clickAccent!=null)clickAccent=s.clickAccent;if(s.timeSig)timeSig=s.timeSig;if(s.easyMode!=null)easyMode=s.easyMode;if(Array.isArray(s.customChordSemis)&&s.customChordSemis.length>0){customChordSemis=s.customChordSemis;CHORD_TYPES[CUSTOM_CHORD_IDX].semis=[...customChordSemis];}if(s.customSeqGrid){customSeqGrid=s.customSeqGrid;rebuildCustomPattern();}if(Array.isArray(s.enabledEvolveIdx))enabledEvolveIdx=new Set(s.enabledEvolveIdx);if(s.layers)PAD_LAYERS.forEach(l=>{if(s.layers[l.id]!=null)layerState[l.id].volume=s.layers[l.id].volume??0})}catch(e){}}
+  if(s.homeRoot)homeRoot=s.homeRoot;if(s.evolving!=null)evolving=s.evolving;if(s.evolveSpeed!=null)evolveSpeed=s.evolveSpeed;if(s.lpfValue!=null)lpfValue=s.lpfValue;if(s.hpfValue!=null)hpfValue=s.hpfValue;if(s.lpfQ!=null)lpfQ=s.lpfQ;if(s.hpfQ!=null)hpfQ=s.hpfQ;if(s.lpfSlope!=null)lpfSlope=s.lpfSlope;if(s.hpfSlope!=null)hpfSlope=s.hpfSlope;if(s.eqLowGain!=null)eqLowGain=s.eqLowGain;if(s.eqLoMidGain!=null)eqLoMidGain=s.eqLoMidGain;if(s.eqHiMidGain!=null)eqHiMidGain=s.eqHiMidGain;if(s.eqHighGain!=null)eqHighGain=s.eqHighGain;if(s.chorusMix!=null)chorusMix=s.chorusMix;if(s.widthMod!=null)widthMod=s.widthMod;if(s.shimmerVol!=null)shimmerVol=Math.min(s.shimmerVol,0.5);if(s.reverbMix!=null)reverbMix=s.reverbMix;if(s.reverbSize!=null)reverbSize=s.reverbSize;if(s.reverbMod!=null)reverbMod=s.reverbMod;if(s.delayMixVal!=null)delayMixVal=s.delayMixVal;if(s.delayFeedback!=null)delayFeedback=s.delayFeedback;if(s.delayTone!=null)delayTone=s.delayTone;if(s.delaySync!=null)delaySync=s.delaySync;if(s.delaySyncDiv)delaySyncDiv=s.delaySyncDiv;if(s.delayTimeVal!=null)delayTimeVal=s.delayTimeVal;if(s.masterVol!=null)masterVol=s.masterVol;if(s.satAmt!=null){satAmt=s.satAmt;if(satWS)satWS.curve=buildSatCurve(satAmt);if(satCompNode)satCompNode.gain.value=1-satAmt*0.3;}if(s.textureOctUp!=null)textureOctUp=s.textureOctUp;if(s.foundationSubOct!=null)foundationSubOct=s.foundationSubOct;if(s.clickBPM!=null)clickBPM=s.clickBPM;if(s.evolveOnBeat!=null)evolveOnBeat=s.evolveOnBeat;if(s.evolveBars!=null)evolveBars=s.evolveBars;if(s.arpVol!=null)arpVol=s.arpVol;if(s.arpRate!=null)arpRate=s.arpRate;if(s.arpOct!=null)arpOct=s.arpOct;if(s.arpVoice)arpVoice=s.arpVoice;if(s.movementVol!=null)movementVol=s.movementVol;if(s.movementPattern!=null)movementPattern=s.movementPattern;if(s.clickRateX2!=null)clickRateX2=s.clickRateX2;if(s.clickAccent!=null)clickAccent=s.clickAccent;if(s.timeSig)timeSig=s.timeSig;if(s.easyMode!=null)easyMode=s.easyMode;if(Array.isArray(s.customChordSemis)&&s.customChordSemis.length>0){customChordSemis=s.customChordSemis;CHORD_TYPES[CUSTOM_CHORD_IDX].semis=[...customChordSemis];}if(s.customSeqGrid){customSeqGrid=s.customSeqGrid;rebuildCustomPattern();}if(Array.isArray(s.enabledEvolveIdx))enabledEvolveIdx=new Set(s.enabledEvolveIdx.filter(i=>i>=0&&i<CHORD_TYPES.length));if(s.layers)PAD_LAYERS.forEach(l=>{if(s.layers[l.id]!=null)layerState[l.id].volume=s.layers[l.id].volume??0})}catch(e){}}
 let _saveT=null;function queueSave(){clearTimeout(_saveT);_saveT=setTimeout(saveSettings,500)}
 
 // ─── PRESETS ───
@@ -1887,7 +1899,7 @@ function loadPreset(name){try{
     }else{movementVol=newM;}
   }
   if(s.clickBPM!=null){clickBPM=s.clickBPM;if(clickActive){stopClick();startClick()}}
-  if(Array.isArray(s.enabledEvolveIdx)&&s.enabledEvolveIdx.length>0)enabledEvolveIdx=new Set(s.enabledEvolveIdx);
+  if(Array.isArray(s.enabledEvolveIdx)&&s.enabledEvolveIdx.length>0)enabledEvolveIdx=new Set(s.enabledEvolveIdx.filter(i=>i>=0&&i<CHORD_TYPES.length));
   if(s.layers)PAD_LAYERS.forEach(l=>{if(s.layers[l.id]!=null)layerState[l.id].volume=s.layers[l.id].volume??0});
   // Apply audio nodes
   if(s.lpfSlope!=null)lpfSlope=s.lpfSlope;
@@ -2197,17 +2209,23 @@ let _tapTimes=[];
 let _bpmPressTimer=null,_bpmLongPressed=false;
 function onBpmPointerDown(){
   _bpmLongPressed=false;
-  _bpmPressTimer=setTimeout(()=>{_bpmLongPressed=true;showBpmTypeInput();},600);
+  // Just flag the long press — the input swap + focus must happen in the
+  // pointerup handler so it counts as a user gesture. iOS WKWebView refuses
+  // to show the keyboard for focus() calls fired from a setTimeout chain.
+  _bpmPressTimer=setTimeout(()=>{_bpmLongPressed=true;},600);
 }
 function onBpmPointerUp(){
   if(_bpmPressTimer){clearTimeout(_bpmPressTimer);_bpmPressTimer=null;}
+  if(_bpmLongPressed)showBpmTypeInput();
 }
 function showBpmTypeInput(){
   const btn=document.getElementById('bpmTapMain');
   btn.innerHTML='<input id="bpmTypeInp" type="number" min="50" max="250" value="'+clickBPM+'" style="width:52px;background:transparent;border:none;outline:none;color:#c4915e;font-size:18px;font-weight:700;font-family:Open Sans,sans-serif;text-align:center;-moz-appearance:textfield;-webkit-appearance:none" onclick="event.stopPropagation()" /><span class="bpm-tap-label">TYPE BPM</span>';
   btn.onclick=null;
   const inp=document.getElementById('bpmTypeInp');
-  setTimeout(()=>{const i=document.getElementById('bpmTypeInp');if(i){i.select();i.focus();}},50);
+  if(!inp)return;
+  // Synchronous focus inside the user-gesture handler so iOS shows the keyboard.
+  inp.focus();inp.select();
   inp.addEventListener('keydown',e=>{if(e.key==='Enter'){confirmBpmType();}if(e.key==='Escape'){restoreBpmButton();}e.stopPropagation();});
   inp.addEventListener('blur',()=>setTimeout(confirmBpmType,100));
 }
@@ -2319,6 +2337,44 @@ const _midiClkTimes=[];
 let midiPulseNext=0;
 const _midiHeldNotes=new Set();
 const MIDI_NOTE_NAMES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+// ─── PERF HUD ───
+// Toggle: long-press (700ms) the version label, or load with ?perf=1.
+// State persists in localStorage. Renders fps, oscillator count, audio
+// output latency, JS heap (Chromium only), and audio context state.
+let _perfHudOn=new URLSearchParams(location.search).get('perf')==='1'||localStorage.getItem('norcoast_perf')==='1';
+let _perfFrames=0,_perfLast=0,_perfFPS=0,_perfTickerOn=false;
+function togglePerfHud(){_perfHudOn=!_perfHudOn;try{localStorage.setItem('norcoast_perf',_perfHudOn?'1':'0')}catch(e){}applyPerfHud();}
+function applyPerfHud(){
+  const el=document.getElementById('perfHud');if(!el)return;
+  el.style.display=_perfHudOn?'block':'none';
+  if(_perfHudOn&&!_perfTickerOn){_perfTickerOn=true;_perfLast=performance.now();_perfFrames=0;requestAnimationFrame(_perfTick);}
+}
+function _perfTick(now){
+  if(!_perfHudOn){_perfTickerOn=false;return;}
+  _perfFrames++;
+  const dt=now-_perfLast;
+  if(dt>=500){_perfFPS=Math.round(_perfFrames*1000/dt);_perfFrames=0;_perfLast=now;_perfRender();}
+  requestAnimationFrame(_perfTick);
+}
+function _perfRender(){
+  const el=document.getElementById('perfHud');if(!el)return;
+  let oscs=0;
+  for(const k in staticNodes){if(staticNodes[k]&&staticNodes[k].oscs)oscs+=staticNodes[k].oscs.length;}
+  for(const k in evolveNodes){if(evolveNodes[k]&&evolveNodes[k].oscs)oscs+=evolveNodes[k].oscs.length;}
+  const lat=ctx&&ctx.outputLatency!=null?Math.round(ctx.outputLatency*1000):'?';
+  const mem=performance.memory?Math.round(performance.memory.usedJSHeapSize/1048576)+'M':'—';
+  el.textContent='fps '+_perfFPS+'  osc '+oscs+'  lat '+lat+'ms  heap '+mem+'  '+(ctx?ctx.state:'no-ctx');
+}
+function initPerfHud(){
+  applyPerfHud();
+  // Long-press version label to toggle. 700ms threshold matches BPM type.
+  const v=document.querySelector('.app-version');
+  if(!v)return;
+  let _t=null;
+  v.addEventListener('pointerdown',()=>{_t=setTimeout(togglePerfHud,700);});
+  ['pointerup','pointerleave','pointercancel'].forEach(e=>v.addEventListener(e,()=>{if(_t){clearTimeout(_t);_t=null;}}));
+}
+
 function loadMidiMappings(){try{midiMappings=JSON.parse(localStorage.getItem('norcoast_midi')||'{}')}catch(e){midiMappings={}}}
 function saveMidiMappings(){localStorage.setItem('norcoast_midi',JSON.stringify(midiMappings))}
 function toggleMIDILearn(){midiLearnMode=!midiLearnMode;midiLearnPending=null;if(document.getElementById('editSheet').classList.contains('open'))buildEditSheet()}
@@ -2583,6 +2639,7 @@ async function initAndStart(){
       });
     }
     loadMidiMappings();buildKeys();startVis();scheduleEvolve();initMIDI();updatePerfSetlist();initQuickStrips();
+    initPerfHud();
     if(compactMode)toggleCompact();
     // Swipe down to close edit sheet
     {const sheet=document.getElementById('editSheet');let _sy=0,_sw=false;

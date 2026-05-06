@@ -10,6 +10,7 @@ DerivedData/
 *.hmap
 *.ipa
 public/index.html.bak-*
+package-lock.json
 
 # Plugin build artefacts (CMake + JUCE)
 plugin/build/
