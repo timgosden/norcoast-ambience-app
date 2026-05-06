@@ -7,6 +7,7 @@
 #include "Shimmer.h"
 #include "Arpeggiator.h"
 #include "DrumMachine.h"
+#include "Texture.h"
 
 class NorcoastAmbienceProcessor : public juce::AudioProcessor
 {
@@ -52,7 +53,9 @@ private:
     // Cached parameter atom pointers — read once per block in processBlock.
     std::atomic<float>* foundationVolParam    = nullptr;
     std::atomic<float>* padsVolParam          = nullptr;
+    std::atomic<float>* textureVolParam       = nullptr;
     std::atomic<float>* foundationSubOctParam = nullptr;
+    std::atomic<float>* textureOctUpParam     = nullptr;
     std::atomic<float>* chorusMixParam     = nullptr;
     std::atomic<float>* delayMixParam      = nullptr;
     std::atomic<float>* delayFbParam       = nullptr;
@@ -102,6 +105,7 @@ private:
     Shimmer shimmer;
     Arpeggiator arpeggiator;
     DrumMachine drumMachine;
+    Texture     texture;
     std::vector<int> heldNotesScratch;   // reused across processBlock calls
     float lastReverbSize = -1.0f;
     float lastReverbMod  = -1.0f;

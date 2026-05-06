@@ -45,7 +45,16 @@ target_sources(NorcoastAmbience PRIVATE
     Source/PluginEditor.cpp
     Source/PadVoice.cpp
     Source/Waves.cpp
+    Source/Texture.cpp
 )
+
+# Embed dulcimer.wav so the granular Texture layer doesn't need an
+# external file at runtime. The generated NorcoastBinaryData target
+# exposes BinaryData::dulcimer_wav and BinaryData::dulcimer_wavSize.
+juce_add_binary_data(NorcoastBinaryData
+    HEADER_NAME BinaryData.h
+    NAMESPACE   BinaryData
+    SOURCES     Resources/dulcimer.wav)
 
 target_compile_definitions(NorcoastAmbience PUBLIC
     JUCE_WEB_BROWSER=0
@@ -55,8 +64,10 @@ target_compile_definitions(NorcoastAmbience PUBLIC
 )
 
 target_link_libraries(NorcoastAmbience PRIVATE
+    NorcoastBinaryData
     juce::juce_audio_utils
     juce::juce_dsp
+    juce::juce_audio_formats
     juce::juce_audio_plugin_client
     juce::juce_recommended_config_flags
     juce::juce_recommended_lto_flags

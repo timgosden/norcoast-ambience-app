@@ -78,8 +78,14 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     subOctAttach = std::make_unique<ButtonAttach> (
         owner.getAPVTS(), ParamID::foundationSubOct, subOctButton);
 
+    addAndMakeVisible (textureOctButton);
+    textureOctButton.setClickingTogglesState (true);
+    textureOctAttach = std::make_unique<ButtonAttach> (
+        owner.getAPVTS(), ParamID::textureOctUp, textureOctButton);
+
     setupKnob (foundationVol, "Foundation",   ParamID::foundationVol);
     setupKnob (padsVol,       "Pads",         ParamID::padsVol);
+    setupKnob (textureVol,    "Texture",      ParamID::textureVol);
 
     setupKnob (chorusMix,     "Chorus",       ParamID::chorusMix);
     setupKnob (delayMix,      "Delay",        ParamID::delayMix);
@@ -118,7 +124,7 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     const juce::Colour kColDrums { 0xffd97171 };  // drum red
     sections =
     {{
-        { "LAYERS",     kColLayers,   {}, { &foundationVol, &padsVol } },
+        { "LAYERS",     kColLayers,   {}, { &foundationVol, &padsVol, &textureVol } },
         { "CHORUS",     kColModFx,    {}, { &chorusMix } },
         { "DELAY",      kColModFx,    {}, { &delayMix, &delayFb, &delayTimeMs, &delayTone } },
         { "REVERB",     kColReverbFx, {}, { &reverbMix, &reverbSize, &reverbMod, &shimmerVol } },
@@ -162,7 +168,7 @@ void NorcoastAmbienceEditor::paint (juce::Graphics& g)
 
     g.setColour (juce::Colour (NorcoastLookAndFeel::kTextDim));
     g.setFont (juce::FontOptions (10.5f));
-    g.drawText ("ambient synth · v1.6 · phase 11 · arp + drum machine",
+    g.drawText ("ambient synth · v1.7 · phase 12 · texture (granular dulcimer)",
                 top.withTrimmedLeft (8),
                 juce::Justification::centredLeft);
 
@@ -194,7 +200,7 @@ void NorcoastAmbienceEditor::paint (juce::Graphics& g)
     // Footer
     g.setColour (juce::Colour (0x55ffffff));
     g.setFont (juce::FontOptions (10.0f));
-    g.drawText ("plugin · v1.6 · phase 11  (drums · arp · sub-oct · rotary GUI)",
+    g.drawText ("plugin · v1.7 · phase 12  (texture · drums · arp · sub-oct · rotary GUI)",
                 getLocalBounds().removeFromBottom (24).reduced (16, 4),
                 juce::Justification::centredRight);
 }
@@ -214,12 +220,12 @@ void NorcoastAmbienceEditor::resized()
     knobArea.removeFromTop (8);
     auto row2 = knobArea;
 
-    // Top row: LAYERS (2), CHORUS (1), DELAY (4), REVERB (4) → 11 cols
+    // Top row: LAYERS (3), CHORUS (1), DELAY (4), REVERB (4) → 12 cols
     {
         const int row1Width = row1.getWidth();
-        const int colA = (int)(row1Width * (2.0f / 11.0f));
-        const int colB = (int)(row1Width * (1.0f / 11.0f));
-        const int colC = (int)(row1Width * (4.0f / 11.0f));
+        const int colA = (int)(row1Width * (3.0f / 12.0f));
+        const int colB = (int)(row1Width * (1.0f / 12.0f));
+        const int colC = (int)(row1Width * (4.0f / 12.0f));
         sections[0].bounds = row1.removeFromLeft (colA).reduced (4, 0);
         sections[1].bounds = row1.removeFromLeft (colB).reduced (4, 0);
         sections[2].bounds = row1.removeFromLeft (colC).reduced (4, 0);
@@ -245,12 +251,14 @@ void NorcoastAmbienceEditor::resized()
         auto inner = s.bounds.reduced (kSectionPadX, kSectionPadY)
                              .withTrimmedTop (kSectionHeaderH);
 
-        // LAYERS section also gets the sub-oct toggle docked at the bottom.
+        // LAYERS section also gets two toggle buttons docked at the bottom.
         const bool isLayers = (&s == &sections[0]);
         if (isLayers)
         {
             auto buttonArea = inner.removeFromBottom (24).reduced (4, 0);
-            subOctButton.setBounds (buttonArea);
+            const int half = buttonArea.getWidth() / 2;
+            subOctButton    .setBounds (buttonArea.removeFromLeft (half).reduced (2, 0));
+            textureOctButton.setBounds (buttonArea.reduced (2, 0));
         }
 
         const int kW = inner.getWidth() / (int) s.knobs.size();

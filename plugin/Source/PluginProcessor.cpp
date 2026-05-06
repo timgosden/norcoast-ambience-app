@@ -69,7 +69,9 @@ NorcoastAmbienceProcessor::NorcoastAmbienceProcessor()
     // Cache atom pointers for realtime-safe param reads.
     foundationVolParam    = apvts.getRawParameterValue (ParamID::foundationVol);
     padsVolParam          = apvts.getRawParameterValue (ParamID::padsVol);
+    textureVolParam       = apvts.getRawParameterValue (ParamID::textureVol);
     foundationSubOctParam = apvts.getRawParameterValue (ParamID::foundationSubOct);
+    textureOctUpParam     = apvts.getRawParameterValue (ParamID::textureOctUp);
     chorusMixParam     = apvts.getRawParameterValue (ParamID::chorusMix);
     delayMixParam      = apvts.getRawParameterValue (ParamID::delayMix);
     delayFbParam       = apvts.getRawParameterValue (ParamID::delayFb);
@@ -151,6 +153,9 @@ void NorcoastAmbienceProcessor::prepareToPlay (double sampleRate, int samplesPer
 
     drumMachine.prepare (sampleRate, samplesPerBlock);
     drumMachine.reset();
+
+    texture.prepare (sampleRate, samplesPerBlock);
+    texture.reset();
 
     widthPhase    = 0.0;
     widthPhaseInc = 0.3 / sampleRate;   // 0.3 Hz width LFO, matches standalone
@@ -245,6 +250,21 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
                     bpm = *hostBpm;
 
         drumMachine.process (buffer, 0, n, drumVol, patIdx, bpm);
+    }
+
+    // ─── Texture (granular dulcimer — only fires while notes are held) ─
+    {
+        const float textureVol = textureVolParam->load();
+        if (textureVol > 1e-4f)
+        {
+            heldNotesScratch.clear();
+            for (int note = 0; note < 128; ++note)
+                if (keyboardState.isNoteOn (1, note))
+                    heldNotesScratch.push_back (note);
+
+            const bool octUp = textureOctUpParam->load() > 0.5f;
+            texture.process (buffer, 0, n, heldNotesScratch, textureVol, octUp);
+        }
     }
 
     // Snapshot params once per block.

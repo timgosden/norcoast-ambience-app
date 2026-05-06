@@ -37,8 +37,10 @@ private:
     juce::TextButton  latchButton  { "Latch" };
     juce::TextButton  allOffButton { "All Off" };
 
-    juce::TextButton  subOctButton { "Sub Oct" };
+    juce::TextButton  subOctButton    { "Sub Oct" };
+    juce::TextButton  textureOctButton { "Tex +Oct" };
     std::unique_ptr<ButtonAttach> subOctAttach;
+    std::unique_ptr<ButtonAttach> textureOctAttach;
 
     // Six logical sections, drawn as rounded-rect panels with a header.
     // Each holds one or more knobs.
@@ -52,7 +54,7 @@ private:
     std::array<Section, 8> sections;
 
     // Knobs (allocated as members so their lifetime matches the editor)
-    ParamKnob foundationVol, padsVol;
+    ParamKnob foundationVol, padsVol, textureVol;
     ParamKnob chorusMix, delayMix, delayFb, delayTimeMs, delayTone;
     ParamKnob reverbMix, reverbSize, reverbMod, shimmerVol;
     ParamKnob hpfFreq, lpfFreq;
