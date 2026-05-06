@@ -71,8 +71,8 @@ public:
                 if (g.active)
                     g.render (l, r);
 
-            L[s] += l * vol * 1.8f;   // boosted vs standalone for more presence
-            R[s] += r * vol * 1.8f;
+            L[s] += l * vol * 4.0f;   // ~+12 dB vs the standalone bus level
+            R[s] += r * vol * 4.0f;
         }
     }
 

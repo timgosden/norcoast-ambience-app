@@ -46,6 +46,7 @@ namespace ParamID
     inline constexpr const char* drumCustomLo    = "drumCustomLo";   // 16-bit mask
     inline constexpr const char* drumCustomMd    = "drumCustomMd";
     inline constexpr const char* drumCustomHh    = "drumCustomHh";
+    inline constexpr const char* timeSig         = "timeSig";        // 0=4/4, 1=6/8
 
     inline constexpr const char* chordType         = "chordType";
     inline constexpr const char* customChordMask   = "customChordMask";
@@ -183,6 +184,9 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
     layout.add (std::make_unique<juce::AudioParameterChoice> (
         juce::ParameterID { ParamID::drumPattern, 1 }, "Drum Pattern",
         juce::StringArray { "Off", "Pulse", "Mist", "Stride", "Roam", "Custom" }, 0));
+    layout.add (std::make_unique<juce::AudioParameterChoice> (
+        juce::ParameterID { ParamID::timeSig, 1 }, "Time Sig",
+        juce::StringArray { "4/4", "6/8" }, 0));
 
     // 16-step bitmasks for the Custom pattern, one per voice (lo / md / hh).
     layout.add (std::make_unique<juce::AudioParameterInt> (
@@ -226,8 +230,8 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
         juce::ParameterID { ParamID::droneOn, 1 }, "Drone", true));
     layout.add (std::make_unique<juce::AudioParameterChoice> (
         juce::ParameterID { ParamID::homeRoot, 1 }, "Home Root",
-        juce::StringArray { "C", "C#", "D", "D#", "E", "F",
-                            "F#", "G", "G#", "A", "A#", "B" }, 0));
+        juce::StringArray { "C", "Db", "D", "Eb", "E", "F",
+                            "Gb", "G", "Ab", "A", "Bb", "B" }, 0));
 
     return layout;
 }

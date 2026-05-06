@@ -25,8 +25,7 @@ public:
 
     void reset()
     {
-        sampleCounter = 0;
-        stepIdx = 0;
+        lastFiredStep = -1;
         kickAge = tomAge = hatAge = -1;
         kickPhase = tomPhase = 0.0;
         hatHp = hatLp = 0.0f;
@@ -36,29 +35,35 @@ public:
     // (0 = silent), `patternId` selects the pattern, `bpm` from host.
     // For Custom patterns, pass the 16-bit masks (lo/md/hh) — bit i set
     // means that voice fires on step i.
+    // `timeSig` is 0 = 4/4 (16 steps, step = 1/16), 1 = 6/8 (12 steps,
+    // step = 1/8 of dotted-quarter beat).
+    // `transportSamples` is the shared block-start sample clock so the
+    // drum step grid is locked to the same transport as arp + evolve.
     void process (juce::AudioBuffer<float>& buffer, int startSample, int numSamples,
                   float vol, int patternId, double bpm,
-                  int customLo = 0, int customMd = 0, int customHh = 0)
+                  int customLo, int customMd, int customHh,
+                  int timeSig, juce::int64 transportSamples)
     {
-        if (vol < 1e-4f || patternId <= 0
-            || patternId >= (int) PatternId::NumPatterns)
-        {
-            sampleCounter = 0;
-            stepIdx = 0;
-            return;
-        }
+        const bool muted = vol < 1e-4f || patternId <= 0
+                           || patternId >= (int) PatternId::NumPatterns;
 
-        const bool isCustom = patternId == (int) PatternId::Custom;
-        const int  stepDur  = juce::jmax (1, (int) ((60.0 / bpm) * 0.25 * sampleRate));
+        const bool is68    = timeSig == 1;
+        const int  numSteps = is68 ? 12 : 16;
+        // 4/4: step = 1/16 = 0.25 beats. 6/8: step = 1/8 (eighth-note) = 0.5 beats.
+        const double stepBeats = is68 ? 0.5 : 0.25;
+        const int  stepDur     = juce::jmax (1, (int) ((60.0 / bpm) * stepBeats * sampleRate));
+        const bool isCustom    = patternId == (int) PatternId::Custom;
 
         auto* L = buffer.getWritePointer (0) + startSample;
         auto* R = buffer.getNumChannels() > 1 ? buffer.getWritePointer (1) + startSample : L;
 
         for (int s = 0; s < numSamples; ++s)
         {
-            if (sampleCounter <= 0)
+            const juce::int64 stepNow = (transportSamples + s) / stepDur;
+            if (! muted && stepNow != lastFiredStep)
             {
-                const int stepBit = 1 << (stepIdx % 16);
+                const int idx = (int) (stepNow % numSteps);
+                const int stepBit = 1 << idx;
                 juce::uint8 stepCode = 0;
                 if (isCustom)
                 {
@@ -68,7 +73,9 @@ public:
                 }
                 else
                 {
-                    stepCode = kPatterns[(size_t) patternId][(size_t) (stepIdx % 16)];
+                    stepCode = is68
+                        ? kPatterns68[(size_t) patternId][(size_t) idx]
+                        : kPatterns[(size_t) patternId][(size_t) idx];
                 }
                 if (stepCode != 0)
                 {
@@ -76,19 +83,25 @@ public:
                     if (stepCode & MaskTom)  triggerTom();
                     if (stepCode & MaskHat)  triggerHat();
                 }
-                stepIdx = (stepIdx + 1) % 16;
-                sampleCounter = stepDur;
+                lastFiredStep = stepNow;
             }
-            --sampleCounter;
 
             float l = 0.0f, r = 0.0f;
             renderKick (l, r);
             renderTom  (l, r);
             renderHat  (l, r);
 
-            L[s] += l * vol;
-            R[s] += r * vol;
+            if (! muted)
+            {
+                L[s] += l * vol;
+                R[s] += r * vol;
+            }
         }
+
+        // Keep step counter ticking even when muted so re-enabling locks back
+        // to the master grid instead of starting fresh from the press moment.
+        if (muted)
+            lastFiredStep = (transportSamples + numSamples - 1) / stepDur;
     }
 
 private:
@@ -114,6 +127,24 @@ private:
           0,0,0,MaskHat, MaskTom,0,0,0}},
         // Custom: placeholder, real data comes from APVTS masks at process time.
         {{0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0}}
+    }};
+
+    // 6/8 patterns: 12 steps per bar, step = eighth-note. Beats accent on
+    // step 0 and step 6 (the two dotted-quarter pulses).
+    static constexpr std::array<std::array<juce::uint8, 12>, (size_t) PatternId::NumPatterns> kPatterns68
+    {{
+        // Off
+        {{0,0,0, 0,0,0, 0,0,0, 0,0,0}},
+        // Pulse: tom on the two main pulses
+        {{MaskTom,0,0, 0,0,0, MaskTom,0,0, 0,0,0}},
+        // Mist: gentle hat sway
+        {{MaskHat,0,0, MaskHat,0,MaskHat, 0,0,MaskHat, 0,MaskHat,0}},
+        // Stride: kick on 1, tom on 4
+        {{MaskKick,0,0, 0,0,0, MaskTom,0,0, 0,0,0}},
+        // Roam: layered kick / tom / hats (12-step variant of Roam)
+        {{MaskKick|MaskHat,0,MaskHat, 0,MaskHat,0, MaskTom,0,MaskHat, 0,MaskHat,0}},
+        // Custom placeholder
+        {{0,0,0, 0,0,0, 0,0,0, 0,0,0}}
     }};
 
     // ─── Kick voice ───────────────────────────────────────────────────
@@ -197,9 +228,8 @@ private:
         else hatAge++;
     }
 
-    double sampleRate = 44100.0;
-    int sampleCounter = 0;
-    int stepIdx = 0;
+    double      sampleRate    = 44100.0;
+    juce::int64 lastFiredStep = -1;
 
     int    kickAge = -1; double kickPhase = 0.0;
     int    tomAge  = -1; double tomPhase  = 0.0;

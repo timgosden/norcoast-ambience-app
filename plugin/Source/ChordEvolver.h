@@ -71,7 +71,7 @@ public:
 
     void reset()
     {
-        sampleCounter   = 0;
+        lastFiredCycle  = -1;
         activeChordType = 0;
         for (auto& a : activeRoots) a = false;
     }
@@ -93,20 +93,24 @@ public:
     void process (juce::MidiBuffer& midi, int numSamples, int channel,
                   int targetType, int customMask, int enabledMask,
                   bool evolveOn, float rateBeats, double bpm,
+                  juce::int64 transportSamples,
                   AdvanceFn&& advanceTargetParam)
     {
         // ─── Auto-evolve: advance the target chord type periodically.
-        // Tempo-locked: cycle every rateBeats beats at the host BPM, so
-        // chord changes line up with the arp + drum tempo grid.
+        // Tempo-locked to the shared transport so chord changes land on
+        // the same beat grid as arp + drums.
+        const double samplesPerCycle = (60.0 / juce::jmax (1.0, bpm))
+                                        * (double) juce::jmax (1.0f, rateBeats)
+                                        * sampleRate;
         if (evolveOn)
         {
-            sampleCounter += numSamples;
-            const double samplesPerCycle = (60.0 / juce::jmax (1.0, bpm))
-                                            * (double) juce::jmax (1.0f, rateBeats)
-                                            * sampleRate;
-            if (sampleCounter >= samplesPerCycle)
+            const juce::int64 cycleNow =
+                (juce::int64) ((double) (transportSamples + numSamples) / samplesPerCycle);
+            if (lastFiredCycle < 0)
+                lastFiredCycle = cycleNow;
+            else if (cycleNow > lastFiredCycle)
             {
-                sampleCounter -= samplesPerCycle;
+                lastFiredCycle = cycleNow;
 
                 // Pick the next chord that's enabled in the pool. If
                 // none are enabled, just stay on the current one.
@@ -132,7 +136,9 @@ public:
         }
         else
         {
-            sampleCounter = 0;
+            // Re-prime so re-enabling doesn't immediately fire.
+            lastFiredCycle = (juce::int64)
+                ((double) (transportSamples + numSamples) / samplesPerCycle);
         }
 
         targetType = juce::jlimit (0, (int) NumTypes - 1, targetType);
@@ -211,9 +217,9 @@ public:
     }
 
 private:
-    double sampleRate     = 44100.0;
-    double sampleCounter  = 0.0;
-    int    activeChordType  = 0;
-    int    activeCustomMask = 0;
+    double      sampleRate       = 44100.0;
+    juce::int64 lastFiredCycle   = -1;
+    int         activeChordType  = 0;
+    int         activeCustomMask = 0;
     std::array<bool, 128> activeRoots {};
 };

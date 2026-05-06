@@ -102,6 +102,7 @@ private:
     std::atomic<float>* drumCustomLoParam  = nullptr;
     std::atomic<float>* drumCustomMdParam  = nullptr;
     std::atomic<float>* drumCustomHhParam  = nullptr;
+    std::atomic<float>* timeSigParam       = nullptr;
     std::atomic<float>* chordTypeParam       = nullptr;
     std::atomic<float>* customChordMaskParam   = nullptr;
     std::atomic<float>* enabledChordsMaskParam = nullptr;
@@ -137,7 +138,14 @@ private:
     Texture     texture;
     ChordEvolver chordEvolver;
 
-    int currentDroneNote = -1;   // MIDI note currently held by the drone, or -1
+    int  currentDroneNote = -1;        // MIDI note currently held by the drone, or -1
+    bool lastFoundationSubOct = false; // detect toggle to retrigger drone
+
+    // Shared monotonic sample clock for arp + drums + evolve. Increments by
+    // numSamples each block regardless of host transport state, so all three
+    // grid-locked modules derive their step boundaries from the same divisor
+    // base and stay phase-aligned with each other.
+    juce::int64 transportSamples = 0;
     std::atomic<bool> latchOn { false };
     std::atomic<bool> stopped { false };
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> stopFade;

@@ -36,22 +36,19 @@ public:
     void reset()
     {
         for (auto& v : voices) v.active = false;
-        sampleCounter = 0;
+        lastFiredStep = -1;
         stepIdx = 0;
     }
 
+    // transportSamples: shared monotonic sample clock used by arp + drums +
+    // evolve so all three lock to the same beat grid. Wraps every step.
     void process (juce::AudioBuffer<float>& buffer, int startSample, int numSamples,
                   const std::vector<int>& heldNotes,
                   float vol, float rateBeats, double bpm,
-                  int octSpan, VoiceKind voiceKind)
+                  int octSpan, VoiceKind voiceKind,
+                  juce::int64 transportSamples)
     {
         const bool noteSourceLive = vol >= 1e-4f && ! heldNotes.empty();
-        if (! noteSourceLive)
-        {
-            // Stop scheduling — but let any in-flight voices ring out.
-            sampleCounter = 0;
-            stepIdx = 0;
-        }
 
         const int patternSize  = noteSourceLive
             ? (int) heldNotes.size() * (octSpan + 1) : 1;
@@ -63,13 +60,16 @@ public:
 
         for (int s = 0; s < numSamples; ++s)
         {
-            if (noteSourceLive && sampleCounter <= 0)
+            // Step boundary derived from the shared transport clock — all
+            // grid-based modules use the same divisor base so they line up.
+            const juce::int64 stepNow = (transportSamples + s) / tickSamples;
+
+            if (noteSourceLive && stepNow != lastFiredStep)
             {
                 triggerArpNote (heldNotes, octSpan, voiceKind, vol, noteDurSamps);
-                sampleCounter = tickSamples;
                 stepIdx = (stepIdx + 1) % juce::jmax (1, patternSize);
+                lastFiredStep = stepNow;
             }
-            if (sampleCounter > 0) --sampleCounter;
 
             float l = 0.0f, r = 0.0f;
             for (auto& v : voices)
@@ -79,6 +79,11 @@ public:
             L[s] += l;
             R[s] += r;
         }
+
+        // Even when not firing, keep lastFiredStep in lockstep so that when
+        // notes resume we don't double-fire the current step.
+        if (! noteSourceLive)
+            lastFiredStep = (transportSamples + numSamples - 1) / tickSamples;
     }
 
 private:
@@ -309,8 +314,8 @@ private:
         v.age++;
     }
 
-    double sampleRate    = 44100.0;
-    int    sampleCounter = 0;
-    int    stepIdx       = 0;
+    double      sampleRate    = 44100.0;
+    juce::int64 lastFiredStep = -1;
+    int         stepIdx       = 0;
     std::array<Voice, 16> voices;
 };

@@ -50,6 +50,7 @@ private:
 
     // Choice button rows — replace knobs for discrete pickers.
     std::unique_ptr<ChoiceButtonRow> arpVoiceRow;
+    std::unique_ptr<ChoiceButtonRow> arpOctavesRow;
     std::unique_ptr<ChoiceButtonRow> drumPatternRow;
     std::unique_ptr<BitmaskPillRow>  chordPoolRow;     // EVOLVE chord-pool toggles
     std::unique_ptr<ChoiceButtonRow> rootKeyRow;       // bottom 12-key grid
@@ -96,7 +97,7 @@ private:
     ParamKnob eqLow, eqLoMid, eqHiMid, eqHigh;
     ParamKnob widthMod, satAmt, masterVol;
 
-    ParamKnob arpVol, arpRate, arpOctaves;
+    ParamKnob arpVol, arpRate;
     ParamKnob drumVol;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (NorcoastAmbienceEditor)

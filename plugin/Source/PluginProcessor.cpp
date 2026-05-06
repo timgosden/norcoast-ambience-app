@@ -100,6 +100,7 @@ NorcoastAmbienceProcessor::NorcoastAmbienceProcessor()
     drumCustomLoParam  = apvts.getRawParameterValue (ParamID::drumCustomLo);
     drumCustomMdParam  = apvts.getRawParameterValue (ParamID::drumCustomMd);
     drumCustomHhParam  = apvts.getRawParameterValue (ParamID::drumCustomHh);
+    timeSigParam       = apvts.getRawParameterValue (ParamID::timeSig);
     chordTypeParam       = apvts.getRawParameterValue (ParamID::chordType);
     customChordMaskParam   = apvts.getRawParameterValue (ParamID::customChordMask);
     enabledChordsMaskParam = apvts.getRawParameterValue (ParamID::enabledChordsMask);
@@ -170,6 +171,8 @@ void NorcoastAmbienceProcessor::prepareToPlay (double sampleRate, int samplesPer
     drumMachine.prepare (sampleRate, samplesPerBlock);
     drumMachine.reset();
 
+    transportSamples = 0;
+
     texture.prepare (sampleRate, samplesPerBlock);
     texture.reset();
 
@@ -237,6 +240,21 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         midi.swapWith (filtered);
     }
 
+    // ─── Foundation Sub-Oct retrigger ─────────────────────────────────
+    // PadVoice samples the sub-oct param at note-on time, so a toggle
+    // mid-note has no effect on currently-held voices. Detect the flip
+    // here and force the drone to re-fire so the new octave count
+    // applies immediately.
+    {
+        const bool subOn = foundationSubOctParam->load() > 0.5f;
+        if (subOn != lastFoundationSubOct)
+        {
+            lastFoundationSubOct = subOn;
+            foundationSynth.allNotesOff (1, true);
+            currentDroneNote = -1;            // forces re-emit below
+        }
+    }
+
     // ─── Drone: ensure the homeRoot is always held when on, so the
     // synth auto-plays a chord on load like the standalone web app.
     {
@@ -293,6 +311,7 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         chordEvolver.process (midi, n, /*channel*/ 1,
                               targetType, customMask, enabledMask,
                               evolveOn, beatsPerEvolve, bpm,
+                              transportSamples,
                               [this] (int newType)
                               {
                                   if (auto* p = apvts.getParameter (ParamID::chordType))
@@ -311,33 +330,28 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     // ─── Arpeggiator (additive — same FX chain as the pads) ───────────
     {
         const float arpVol = arpVolParam->load();
+        heldNotesScratch.clear();
         if (arpVol > 1e-4f)
-        {
-            heldNotesScratch.clear();
             for (int note = 0; note < 128; ++note)
                 if (keyboardState.isNoteOn (1, note))
                     heldNotesScratch.push_back (note);
 
-            // Arp rate as choice index → beats per note.
-            //   0 = 1/16   (0.25 beats)
-            //   1 = 1/8    (0.5)
-            //   2 = 1/4    (1.0)
-            //   3 = 1/2    (2.0)
-            //   4 = 1 bar  (4.0)
-            static constexpr std::array<float, 5> kArpBeats { 0.25f, 0.5f, 1.0f, 2.0f, 4.0f };
-            const int rateIdx = juce::jlimit (0, 4, (int) arpRateParam->load());
-            const float rate  = kArpBeats[(size_t) rateIdx];
-            const int   octSpan = juce::jlimit (0, 2, (int) arpOctavesParam->load());
-            const auto  voice   = static_cast<Arpeggiator::VoiceKind> (
-                                      juce::jlimit (0, 2, (int) arpVoiceParam->load()));
+        // Arp rate as choice index → beats per note.
+        //   0 = 1/16  (0.25 beats)   1 = 1/8 (0.5)    2 = 1/4 (1.0)
+        //   3 = 1/2   (2.0)          4 = 1 bar (4.0)
+        static constexpr std::array<float, 5> kArpBeats { 0.25f, 0.5f, 1.0f, 2.0f, 4.0f };
+        const int rateIdx = juce::jlimit (0, 4, (int) arpRateParam->load());
+        const float rate  = kArpBeats[(size_t) rateIdx];
+        const int   octSpan = juce::jlimit (0, 2, (int) arpOctavesParam->load());
+        const auto  voice   = static_cast<Arpeggiator::VoiceKind> (
+                                  juce::jlimit (0, 2, (int) arpVoiceParam->load()));
 
-            arpeggiator.process (buffer, 0, n, heldNotesScratch,
-                                 arpVol, rate, bpm, octSpan, voice);
-        }
-        else
-        {
-            arpeggiator.reset();
-        }
+        // Always call process() — when muted it keeps the step grid in
+        // lockstep with the shared transport and lets in-flight voices
+        // ring out instead of cutting them off.
+        arpeggiator.process (buffer, 0, n, heldNotesScratch,
+                             arpVol, rate, bpm, octSpan, voice,
+                             transportSamples);
     }
 
     // ─── Drums (additive — same FX chain as the pads) ─────────────────
@@ -347,8 +361,10 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         const int   loMask  = (int) drumCustomLoParam->load();
         const int   mdMask  = (int) drumCustomMdParam->load();
         const int   hhMask  = (int) drumCustomHhParam->load();
+        const int   timeSig = juce::jlimit (0, 1, (int) timeSigParam->load());
         drumMachine.process (buffer, 0, n, drumVol, patIdx, bpm,
-                             loMask, mdMask, hhMask);
+                             loMask, mdMask, hhMask,
+                             timeSig, transportSamples);
     }
 
     // ─── Texture (granular dulcimer — only fires while notes are held) ─
@@ -396,8 +412,11 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     }
     if (std::abs (reverbMod - lastReverbMod) > 1e-4f)
     {
-        reverb.setExcursionRate    (0.3f + reverbMod * 1.7f);
-        reverb.setExcursionDepthMs (reverbMod * 1.5f);
+        // Tamed from the standalone (was 0.3 + 1.7*r and 1.5*r) — at full
+        // depth the modulation was wobbling pitches enough to hear, which
+        // is musically too much for ambient pads.
+        reverb.setExcursionRate    (0.2f + reverbMod * 0.6f);   // 0.2..0.8 Hz
+        reverb.setExcursionDepthMs (reverbMod * 0.6f);          // 0..0.6 ms
         lastReverbMod = reverbMod;
     }
 
@@ -628,6 +647,10 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         R[s] *= g;
     }
 
+    // Advance the shared transport clock for the next block. All grid-locked
+    // modules (arp, drums, evolve) read this at block-start and stay phase
+    // aligned with each other regardless of when notes are pressed.
+    transportSamples += n;
 }
 
 juce::AudioProcessorEditor* NorcoastAmbienceProcessor::createEditor()

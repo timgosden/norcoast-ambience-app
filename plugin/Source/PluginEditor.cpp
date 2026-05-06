@@ -27,6 +27,9 @@ namespace
         l.setJustificationType (juce::Justification::centred);
         l.setColour (juce::Label::textColourId,
                      juce::Colour (NorcoastLookAndFeel::kTextDim));
+        // Scale text down (rather than truncate with "...") for long labels
+        // like "Foundation" / "Saturation" in narrow knob slots.
+        l.setMinimumHorizontalScale (0.6f);
     }
 }
 
@@ -218,6 +221,13 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     setupKnob (reverbMod,     "Mod",          ParamID::reverbMod);
     setupKnob (shimmerVol,    "Shimmer",      ParamID::shimmerVol);
 
+    // Reverb size readout: 1 → 10 s (matches the standalone's display).
+    reverbSize.knob.textFromValueFunction = [] (double v) -> juce::String
+    {
+        return juce::String ((int) std::round (1.0 + v * 9.0)) + "s";
+    };
+    reverbSize.knob.updateText();
+
     setupKnob (hpfFreq,       "High Pass",    ParamID::hpfFreq);
     setupKnob (lpfFreq,       "Low Pass",     ParamID::lpfFreq);
 
@@ -260,7 +270,11 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
         };
         arpRate.knob.updateText();
     }
-    setupKnob (arpOctaves,    "Octaves",      ParamID::arpOctaves);
+    // Arp octaves as a 3-pill button row instead of a knob (it's a 3-way choice).
+    arpOctavesRow = std::make_unique<ChoiceButtonRow> (
+        owner.getAPVTS(), ParamID::arpOctaves,
+        juce::Colour (0xff7eb6d4));
+    addAndMakeVisible (*arpOctavesRow);
 
     setupKnob (drumVol,       "Vol",          ParamID::drumVol);
 
@@ -284,7 +298,7 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
         { "REVERB",     kColReverbFx, {}, { &reverbMix, &reverbSize, &reverbMod, &shimmerVol } },
         { "FILTER",     kColFilter,   {}, { &hpfFreq, &lpfFreq } },
         { "EQ",         kColEq,       {}, { &eqLow, &eqLoMid, &eqHiMid, &eqHigh } },
-        { "ARP",        kColArp,      {}, { &arpVol, &arpRate, &arpOctaves } },
+        { "ARP",        kColArp,      {}, { &arpVol, &arpRate } },
         { "DRUMS",      kColDrums,    {}, { &drumVol } },
         { "MASTER",     kColMaster,   {}, { &widthMod, &satAmt, &masterVol } }
     }};
@@ -479,10 +493,13 @@ void NorcoastAmbienceEditor::resized()
             subOctButton    .setBounds (row.removeFromLeft (half).reduced (2, 0));
             textureOctButton.setBounds (row.reduced (2, 0));
         }
-        else if (&s == &sections[7] && arpVoiceRow)        // ARP — voice pills
+        else if (&s == &sections[7] && arpVoiceRow && arpOctavesRow)  // ARP
         {
-            auto row = inner.removeFromBottom (24).reduced (4, 0);
-            arpVoiceRow->setBounds (row);
+            auto voiceRow = inner.removeFromBottom (22).reduced (4, 0);
+            arpVoiceRow->setBounds (voiceRow);
+            inner.removeFromBottom (3);
+            auto octRow   = inner.removeFromBottom (22).reduced (4, 0);
+            arpOctavesRow->setBounds (octRow);
         }
         else if (&s == &sections[8] && drumPatternRow)     // DRUMS — pattern pills
         {
