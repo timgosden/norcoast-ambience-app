@@ -202,7 +202,7 @@
   <div style="font-size:32px;font-weight:200;letter-spacing:4px;color:rgba(255,255,255,0.9);font-family:'Open Sans',sans-serif;margin-bottom:48px;animation:splashFade 0.8s ease-out 1.4s both">Ambience</div>
   <div style="font-size:13px;letter-spacing:3px;color:rgba(255,255,255,0.75);text-transform:uppercase;font-family:'Open Sans',sans-serif;background:rgba(196,145,94,0.15);border:1px solid rgba(196,145,94,0.35);border-radius:24px;padding:12px 28px;animation:splashPulse 2.5s ease-in-out 2s infinite">Tap to begin</div>
   <div id="loadStatus" style="font-size:10px;color:rgba(255,255,255,0.12);margin-top:12px"></div>
-  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.60</div>
+  <div style="position:absolute;bottom:14px;right:16px;font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.5px;pointer-events:none">v1.61</div>
 </div>
 <style>
 @keyframes splashRing{to{stroke-dashoffset:0}}
@@ -263,7 +263,7 @@
       <button id="clickBtn" class="evolve-pill off" onclick="toggleClick()">Click</button>
       <button id="clickX2Btn" class="evolve-pill off" onclick="toggleClickX2()" style="padding:8px 10px;font-size:9px;letter-spacing:1px">x2</button>
     </div>
-    <div class="app-version">v1.60</div>
+    <div class="app-version">v1.61</div>
   </div>
 </div>
 <!-- Edit backdrop -->
@@ -732,6 +732,10 @@ function rampParam(param,target,dur){
     param.linearRampToValueAtTime(target,t+dur);
   }catch(e){param.value=target;}
 }
+// Active set of groups whose oscillators are still running but whose gain
+// is being ramped to zero. Tracked so the perf HUD can include them in
+// the live voice count — they consume CPU until their setTimeout fires.
+const _dyingGroups=new Set();
 function fadeOut(nodes,time){
   if(!nodes)return;const now=ctx.currentTime;
   nodes.gain.gain.cancelScheduledValues(now);nodes.gain.gain.setValueAtTime(nodes.gain.gain.value,now);
@@ -741,7 +745,12 @@ function fadeOut(nodes,time){
   // producing audible signal long after a "fade out" is supposed to be silent.
   if(nodes.ampMod){nodes.ampMod.gain.cancelScheduledValues(now);nodes.ampMod.gain.setValueAtTime(nodes.ampMod.gain.value,now);nodes.ampMod.gain.linearRampToValueAtTime(0,now+time);}
   if(nodes.breathMod){nodes.breathMod.gain.cancelScheduledValues(now);nodes.breathMod.gain.setValueAtTime(nodes.breathMod.gain.value,now);nodes.breathMod.gain.linearRampToValueAtTime(0,now+time);}
-  setTimeout(()=>{nodes.oscs.forEach(o=>{try{o.stop()}catch(e){}});nodes.lfos.forEach(o=>{try{o.stop()}catch(e){}});try{nodes.gain.disconnect()}catch(e){};try{nodes.filter.disconnect()}catch(e){}},time*1000+500);
+  _dyingGroups.add(nodes);
+  // Tight cleanup window: the gain ramp lands exactly at `time`, so we only
+  // need a small safety margin before stopping the oscillators. The previous
+  // 500ms buffer kept dying groups alive long enough that rapid-fire key
+  // changes stacked 4-5 generations of orphan voices.
+  setTimeout(()=>{nodes.oscs.forEach(o=>{try{o.stop()}catch(e){}});nodes.lfos.forEach(o=>{try{o.stop()}catch(e){}});try{nodes.gain.disconnect()}catch(e){};try{nodes.filter.disconnect()}catch(e){};_dyingGroups.delete(nodes);},time*1000+50);
 }
 
 function getStaticFreqs(root,def){const r=noteFreq(root,ROOT_OCT);return def.rootOnly?[r]:[r,semiFreq(r,7)]}
@@ -1226,17 +1235,27 @@ function buildKeys(){
         // build up alongside the pads instead of arriving full-strength.
         if(_sumBus){_sumBus.gain.cancelScheduledValues(t);_sumBus.gain.setValueAtTime(_sumBus.gain.value,t);_sumBus.gain.linearRampToValueAtTime(0.7,t+ATTACK);}
       }
-      arpStep=0;
-      const firstChord=[...enabledEvolveIdx][0]??0;
-      currentEvolve=firstChord;pendingEvolve=-1;
-      clearPendingChord();
-      document.getElementById('stateEvolve').textContent=CHORD_TYPES[firstChord].name;
-      PAD_LAYERS.forEach(l=>{
-        if(layerState[l.id].volume<=0)return;
-        startPad(l,layerState[l.id].volume,homeRoot,currentEvolve);
-      });
-      scheduleEvolve();
-      buildKeys();saveSettings();
+      // Debounce the audio rebuild so a fast tap-burst across keys doesn't
+      // stack 3-5 generations of orphan oscillator groups during their fade-
+      // outs. Visual state (root letter, key highlight) updates immediately
+      // above; the actual startPad calls only run once you stop tapping for
+      // 150ms. The trailing-edge timer always uses the LATEST homeRoot.
+      buildKeys();
+      if(_keyChangeT)clearTimeout(_keyChangeT);
+      _keyChangeT=setTimeout(()=>{
+        _keyChangeT=null;
+        arpStep=0;
+        const firstChord=[...enabledEvolveIdx][0]??0;
+        currentEvolve=firstChord;pendingEvolve=-1;
+        clearPendingChord();
+        document.getElementById('stateEvolve').textContent=CHORD_TYPES[firstChord].name;
+        PAD_LAYERS.forEach(l=>{
+          if(layerState[l.id].volume<=0)return;
+          startPad(l,layerState[l.id].volume,homeRoot,currentEvolve);
+        });
+        scheduleEvolve();
+        saveSettings();
+      },150);
     };
     row.appendChild(btn);
   });
@@ -1822,6 +1841,7 @@ function loadSettings(){try{const raw=localStorage.getItem('norcoast_v1');if(!ra
   if(s._v!=null&&s._v>1)console.warn('loadSettings: settings written by newer schema v'+s._v+', some fields may be ignored.');
   if(s.homeRoot)homeRoot=s.homeRoot;if(s.evolving!=null)evolving=s.evolving;if(s.evolveSpeed!=null)evolveSpeed=s.evolveSpeed;if(s.lpfValue!=null)lpfValue=s.lpfValue;if(s.hpfValue!=null)hpfValue=s.hpfValue;if(s.lpfQ!=null)lpfQ=s.lpfQ;if(s.hpfQ!=null)hpfQ=s.hpfQ;if(s.lpfSlope!=null)lpfSlope=s.lpfSlope;if(s.hpfSlope!=null)hpfSlope=s.hpfSlope;if(s.eqLowGain!=null)eqLowGain=s.eqLowGain;if(s.eqLoMidGain!=null)eqLoMidGain=s.eqLoMidGain;if(s.eqHiMidGain!=null)eqHiMidGain=s.eqHiMidGain;if(s.eqHighGain!=null)eqHighGain=s.eqHighGain;if(s.chorusMix!=null)chorusMix=s.chorusMix;if(s.widthMod!=null)widthMod=s.widthMod;if(s.shimmerVol!=null)shimmerVol=Math.min(s.shimmerVol,0.5);if(s.reverbMix!=null)reverbMix=s.reverbMix;if(s.reverbSize!=null)reverbSize=s.reverbSize;if(s.reverbMod!=null)reverbMod=s.reverbMod;if(s.delayMixVal!=null)delayMixVal=s.delayMixVal;if(s.delayFeedback!=null)delayFeedback=s.delayFeedback;if(s.delayTone!=null)delayTone=s.delayTone;if(s.delaySync!=null)delaySync=s.delaySync;if(s.delaySyncDiv)delaySyncDiv=s.delaySyncDiv;if(s.delayTimeVal!=null)delayTimeVal=s.delayTimeVal;if(s.masterVol!=null)masterVol=s.masterVol;if(s.satAmt!=null){satAmt=s.satAmt;if(satWS)satWS.curve=buildSatCurve(satAmt);if(satCompNode)satCompNode.gain.value=1-satAmt*0.3;}if(s.textureOctUp!=null)textureOctUp=s.textureOctUp;if(s.foundationSubOct!=null)foundationSubOct=s.foundationSubOct;if(s.clickBPM!=null)clickBPM=s.clickBPM;if(s.evolveOnBeat!=null)evolveOnBeat=s.evolveOnBeat;if(s.evolveBars!=null)evolveBars=s.evolveBars;if(s.arpVol!=null)arpVol=s.arpVol;if(s.arpRate!=null)arpRate=s.arpRate;if(s.arpOct!=null)arpOct=s.arpOct;if(s.arpVoice)arpVoice=s.arpVoice;if(s.movementVol!=null)movementVol=s.movementVol;if(s.movementPattern!=null)movementPattern=s.movementPattern;if(s.clickRateX2!=null)clickRateX2=s.clickRateX2;if(s.clickAccent!=null)clickAccent=s.clickAccent;if(s.timeSig)timeSig=s.timeSig;if(s.easyMode!=null)easyMode=s.easyMode;if(Array.isArray(s.customChordSemis)&&s.customChordSemis.length>0){customChordSemis=s.customChordSemis;CHORD_TYPES[CUSTOM_CHORD_IDX].semis=[...customChordSemis];}if(s.customSeqGrid){customSeqGrid=s.customSeqGrid;rebuildCustomPattern();}if(Array.isArray(s.enabledEvolveIdx))enabledEvolveIdx=new Set(s.enabledEvolveIdx.filter(i=>i>=0&&i<CHORD_TYPES.length));if(s.layers)PAD_LAYERS.forEach(l=>{if(s.layers[l.id]!=null)layerState[l.id].volume=s.layers[l.id].volume??0})}catch(e){}}
 let _saveT=null;function queueSave(){clearTimeout(_saveT);_saveT=setTimeout(saveSettings,500)}
+let _keyChangeT=null;
 
 // ─── PRESETS ───
 function escapeHTML(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
@@ -2358,12 +2378,13 @@ function _perfTick(now){
 }
 function _perfRender(){
   const el=document.getElementById('perfHud');if(!el)return;
-  let oscs=0;
+  let oscs=0,dying=0;
   for(const k in staticNodes){if(staticNodes[k]&&staticNodes[k].oscs)oscs+=staticNodes[k].oscs.length;}
   for(const k in evolveNodes){if(evolveNodes[k]&&evolveNodes[k].oscs)oscs+=evolveNodes[k].oscs.length;}
+  for(const g of _dyingGroups){if(g.oscs)dying+=g.oscs.length;}
   const lat=ctx&&ctx.outputLatency!=null?Math.round(ctx.outputLatency*1000):'?';
   const mem=performance.memory?Math.round(performance.memory.usedJSHeapSize/1048576)+'M':'—';
-  el.textContent='fps '+_perfFPS+'  osc '+oscs+'  lat '+lat+'ms  heap '+mem+'  '+(ctx?ctx.state:'no-ctx');
+  el.textContent='fps '+_perfFPS+'  osc '+oscs+(dying?'+'+dying:'')+'  lat '+lat+'ms  heap '+mem+'  '+(ctx?ctx.state:'no-ctx');
 }
 function initPerfHud(){
   applyPerfHud();
