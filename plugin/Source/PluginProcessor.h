@@ -139,7 +139,6 @@ private:
     ChordEvolver chordEvolver;
 
     int  currentDroneNote = -1;        // MIDI note currently held by the drone, or -1
-    bool lastFoundationSubOct = false; // detect toggle to retrigger drone
 
     // Shared monotonic sample clock for arp + drums + evolve. Increments by
     // numSamples each block regardless of host transport state, so all three

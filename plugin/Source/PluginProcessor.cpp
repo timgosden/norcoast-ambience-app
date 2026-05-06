@@ -240,21 +240,6 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         midi.swapWith (filtered);
     }
 
-    // ─── Foundation Sub-Oct retrigger ─────────────────────────────────
-    // PadVoice samples the sub-oct param at note-on time, so a toggle
-    // mid-note has no effect on currently-held voices. Detect the flip
-    // here and force the drone to re-fire so the new octave count
-    // applies immediately.
-    {
-        const bool subOn = foundationSubOctParam->load() > 0.5f;
-        if (subOn != lastFoundationSubOct)
-        {
-            lastFoundationSubOct = subOn;
-            foundationSynth.allNotesOff (1, true);
-            currentDroneNote = -1;            // forces re-emit below
-        }
-    }
-
     // ─── Drone: ensure the homeRoot is always held when on, so the
     // synth auto-plays a chord on load like the standalone web app.
     {

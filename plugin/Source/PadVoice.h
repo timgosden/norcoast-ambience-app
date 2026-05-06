@@ -79,6 +79,10 @@ public:
         float            gain         = 0.0f;
         float            panL         = 1.0f / std::sqrt (2.0f);
         float            panR         = 1.0f / std::sqrt (2.0f);
+        // 0 = regular octave, 1 = extra sub-oct, 2 = extra super-oct.
+        // Lets renderNextBlock fade the extra octaves in/out from the
+        // toggle params smoothly without retriggering the voice.
+        int              octGroup     = 0;
         LFO              detuneLFO;
     };
 
@@ -109,6 +113,11 @@ private:
     LFO filterLFO1, filterLFO2, ampLFO, breathLFO;
     float filterBaseHz = 0.0f;
     juce::ADSR adsr;
+
+    // Smoothed gains for the optional extra-octave groups so the toggle
+    // buttons fade those oscs in/out without clicks or retriggering.
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> subOctGain   { 0.0f };
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> superOctGain { 0.0f };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PadVoice)
 };

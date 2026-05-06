@@ -51,28 +51,43 @@ void PadVoice::startNote (int midiNoteNumber, float velocity,
 
     const double rootHz = juce::MidiMessage::getMidiNoteInHertz (midiNoteNumber);
 
-    // Build the effective octave list — append extra sub/super octaves
-    // when the optional toggles are on.
+    // Build the effective octave list — always include slots for the
+    // optional extra sub/super octaves when the param POINTER is wired.
+    // The toggle just rampts those oscs' gain in/out at render time so a
+    // mid-note flip is heard immediately without retriggering.
     std::array<int, 8> effOcts {};
+    std::array<int, 8> octGroup {};   // 0 = regular, 1 = sub, 2 = super
     int numOcts = 0;
     int lowest  = cfg.octaves[0];
     int highest = cfg.octaves[0];
     for (int oct : cfg.octaves)
     {
-        effOcts[(size_t) numOcts++] = oct;
+        octGroup[(size_t) numOcts] = 0;
+        effOcts [(size_t) numOcts++] = oct;
         lowest  = juce::jmin (lowest,  oct);
         highest = juce::jmax (highest, oct);
     }
-    if (extraSubOctaveParam != nullptr && extraSubOctaveParam->load() > 0.5f
-        && numOcts < (int) effOcts.size())
+    if (extraSubOctaveParam != nullptr && numOcts < (int) effOcts.size())
     {
-        effOcts[(size_t) numOcts++] = lowest - 1;
+        octGroup[(size_t) numOcts] = 1;
+        effOcts [(size_t) numOcts++] = lowest - 1;
     }
-    if (extraSuperOctaveParam != nullptr && extraSuperOctaveParam->load() > 0.5f
-        && numOcts < (int) effOcts.size())
+    if (extraSuperOctaveParam != nullptr && numOcts < (int) effOcts.size())
     {
-        effOcts[(size_t) numOcts++] = highest + 1;
+        octGroup[(size_t) numOcts] = 2;
+        effOcts [(size_t) numOcts++] = highest + 1;
     }
+
+    // Initial gain for the smoothers — match the current param state so
+    // the very first block sounds correct (no ramp from 0).
+    const float subOnNow   = (extraSubOctaveParam   != nullptr
+                              && extraSubOctaveParam->load() > 0.5f)   ? 1.0f : 0.0f;
+    const float superOnNow = (extraSuperOctaveParam != nullptr
+                              && extraSuperOctaveParam->load() > 0.5f) ? 1.0f : 0.0f;
+    subOctGain  .reset (sr, 0.05);   // 50 ms ramp
+    superOctGain.reset (sr, 0.05);
+    subOctGain  .setCurrentAndTargetValue (subOnNow);
+    superOctGain.setCurrentAndTargetValue (superOnNow);
 
     int idx = 0;
     for (int oi = 0; oi < numOcts; ++oi)
@@ -101,6 +116,7 @@ void PadVoice::startNote (int midiNoteNumber, float velocity,
                 o.baseHz      = octHz;
                 o.staticCents = t * tb.ds * kSpreadConst;
                 o.phaseInc    = detunedHz (octHz, o.staticCents) / sr;
+                o.octGroup    = octGroup[(size_t) oi];
                 setPan (o, t * tb.pan * panFlip * kPanConst);
 
                 // Per-osc detune LFO — same formula as in the standalone with
@@ -186,6 +202,14 @@ void PadVoice::renderNextBlock (juce::AudioBuffer<float>& outputBuffer,
     const float gainParam  = layerGainParam != nullptr ? layerGainParam->load() : 1.0f;
     const float layerScale = gainParam * velocityScale * (1.0f + ampMod + breathMod);
 
+    // Ramp the extra-octave gates toward the current toggle state so a
+    // sub-oct / super-oct flip mid-note is heard immediately (50 ms ramp
+    // configured in startNote, no clicks).
+    if (extraSubOctaveParam != nullptr)
+        subOctGain  .setTargetValue (extraSubOctaveParam->load()   > 0.5f ? 1.0f : 0.0f);
+    if (extraSuperOctaveParam != nullptr)
+        superOctGain.setTargetValue (extraSuperOctaveParam->load() > 0.5f ? 1.0f : 0.0f);
+
     auto* const left  = outputBuffer.getWritePointer (0) + startSample;
     auto* const right = outputBuffer.getNumChannels() > 1
                             ? outputBuffer.getWritePointer (1) + startSample
@@ -196,11 +220,17 @@ void PadVoice::renderNextBlock (juce::AudioBuffer<float>& outputBuffer,
         const float env = adsr.getNextSample();
         const float g   = env * layerScale;
 
+        const float subG   = subOctGain  .getNextValue();
+        const float superG = superOctGain.getNextValue();
+
         float sumL = 0.0f, sumR = 0.0f;
         for (int i = 0; i < activeOscCount; ++i)
         {
             auto& o = oscs[(size_t) i];
-            const float sample = o.table->sample (o.phase) * o.gain;
+            float sample = o.table->sample (o.phase) * o.gain;
+            // Gate optional octave groups by their smoothed gain.
+            if      (o.octGroup == 1) sample *= subG;
+            else if (o.octGroup == 2) sample *= superG;
             sumL += sample * o.panL;
             sumR += sample * o.panR;
 

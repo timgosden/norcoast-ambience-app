@@ -68,6 +68,11 @@ private:
     std::unique_ptr<ButtonAttach> evolveAttach;
     std::unique_ptr<ButtonAttach> droneAttach;
 
+    // EQ panel is collapsed by default — matches the web app's "EQ ▾"
+    // toggle. Click expands the four EQ knobs into row 2.
+    juce::TextButton  eqToggleButton   { "EQ ▾" };
+    bool              eqExpanded       = false;
+
 
     juce::ComboBox    presetBox;
     juce::TextButton  saveButton  { "Save" };

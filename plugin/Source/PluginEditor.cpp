@@ -11,15 +11,19 @@ namespace
     constexpr int kSectionHeaderH = 20;
 
     // Per-section accent colours pulled from the standalone's slider strips.
-    const juce::Colour kColLayers   { 0xff5eb88a }; // green
-    const juce::Colour kColModFx    { 0xffc4b8e8 }; // lavender
-    const juce::Colour kColReverbFx { 0xffc4915e }; // warm orange
-    const juce::Colour kColFilter   { 0xffd46b8a }; // pink
-    const juce::Colour kColEq       { 0xffb07acc }; // purple
-    const juce::Colour kColArp      { 0xff7eb6d4 }; // blue
-    const juce::Colour kColDrums    { 0xffd97171 }; // red
-    const juce::Colour kColMaster   { 0xffe0d2a8 }; // cream
-    const juce::Colour kColEvolve   { 0xffaadc8a }; // lime — chord evolve
+    // Section accent palette — mirrors the web app's per-layer colours
+    // (public/index.html). Each section gets its own hue so the page
+    // reads as a colour-coded heat map at a glance.
+    const juce::Colour kColLayers   { 0xff5eb88a }; // green   — Foundation
+    const juce::Colour kColEvolve   { 0xffc4915e }; // amber   — chord evolution
+    const juce::Colour kColChorus   { 0xffc4b8e8 }; // lavender — chorus / modulation
+    const juce::Colour kColDelay    { 0xff5eb88a }; // green   — delay
+    const juce::Colour kColReverbFx { 0xff6a9fd8 }; // blue    — reverb
+    const juce::Colour kColFilter   { 0xffd46b8a }; // pink    — filter
+    const juce::Colour kColEq       { 0xffb07acc }; // purple  — EQ
+    const juce::Colour kColArp      { 0xff9b7fd4 }; // purple  — arpeggiator
+    const juce::Colour kColDrums    { 0xffe8a45e }; // orange  — movement / drums
+    const juce::Colour kColMaster   { 0xffc4915e }; // amber   — master volume
 
     void styleKnobLabel (juce::Label& l, const juce::String& text)
     {
@@ -134,6 +138,35 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     droneButton.setClickingTogglesState (true);
     droneAttach = std::make_unique<ButtonAttach> (
         owner.getAPVTS(), ParamID::droneOn, droneButton);
+
+    // EQ collapse toggle — sits in row 2 in place of the EQ section
+    // until the user clicks it, at which point the four EQ knobs swap
+    // in and the surrounding sections shrink to make room.
+    addAndMakeVisible (eqToggleButton);
+    eqToggleButton.setClickingTogglesState (true);
+    eqToggleButton.setColour (juce::TextButton::buttonColourId,
+                              juce::Colour (NorcoastLookAndFeel::kPanelBg));
+    eqToggleButton.setColour (juce::TextButton::buttonOnColourId,
+                              juce::Colour (NorcoastLookAndFeel::kAccent).withAlpha (0.4f));
+    eqToggleButton.onClick = [this]
+    {
+        eqExpanded = eqToggleButton.getToggleState();
+        eqToggleButton.setButtonText (eqExpanded ? juce::String ("EQ ▴")
+                                                 : juce::String ("EQ ▾"));
+        for (auto* k : { &eqLow, &eqLoMid, &eqHiMid, &eqHigh })
+        {
+            k->label.setVisible (eqExpanded);
+            k->knob .setVisible (eqExpanded);
+        }
+        resized();
+        repaint();
+    };
+    // Initialise hidden state.
+    for (auto* k : { &eqLow, &eqLoMid, &eqHiMid, &eqHigh })
+    {
+        k->label.setVisible (false);
+        k->knob .setVisible (false);
+    }
 
     // ── Preset bar ──────────────────────────────────────────────────────
     addAndMakeVisible (presetBox);
@@ -293,8 +326,8 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     {{
         { "LAYERS",     kColLayers,   {}, { &foundationVol, &padsVol, &textureVol } },
         { "EVOLVE",     kColEvolve,   {}, { &evolveRate } },
-        { "CHORUS",     kColModFx,    {}, { &chorusMix } },
-        { "DELAY",      kColModFx,    {}, { &delayMix, &delayFb, &delayTimeMs, &delayTone } },
+        { "CHORUS",     kColChorus,   {}, { &chorusMix } },
+        { "DELAY",      kColDelay,    {}, { &delayMix, &delayFb, &delayTimeMs, &delayTone } },
         { "REVERB",     kColReverbFx, {}, { &reverbMix, &reverbSize, &reverbMod, &shimmerVol } },
         { "FILTER",     kColFilter,   {}, { &hpfFreq, &lpfFreq } },
         { "EQ",         kColEq,       {}, { &eqLow, &eqLoMid, &eqHiMid, &eqHigh } },
@@ -410,6 +443,11 @@ void NorcoastAmbienceEditor::paint (juce::Graphics& g)
         g.setColour (s.accent.withAlpha (0.85f));
         g.fillRoundedRectangle (headerStrip, 1.5f);
 
+        // Skip drawing the EQ panel's title text when the EQ is
+        // collapsed — eqToggleButton fills that space instead.
+        if (&s == &sections[6] && ! eqExpanded)
+            continue;
+
         g.setColour (s.accent);
         g.setFont (juce::FontOptions (10.0f).withStyle ("Bold"));
         g.drawText (s.title,
@@ -464,19 +502,27 @@ void NorcoastAmbienceEditor::resized()
         sections[4].bounds = row1.reduced (4, 0);
     }
 
-    // Bottom: FILTER (2) · EQ (4) · ARP (3) · DRUMS (3) · MASTER (3) → 15 units
-    // DRUMS bumped 2→3 so its 6 pattern pills fit.
+    // Bottom: FILTER (2) · EQ (4 expanded / 1 collapsed) · ARP (3) · DRUMS (3) · MASTER (3)
+    // DRUMS bumped 2→3 so its 6 pattern pills fit. EQ shrinks to a slim
+    // toggle column when collapsed, returning that real estate to the
+    // surrounding sections.
     {
         const int w = row2.getWidth();
-        const int colA = (int)(w * (2.0f / 15.0f));
-        const int colB = (int)(w * (4.0f / 15.0f));
-        const int colC = (int)(w * (3.0f / 15.0f));
-        const int colD = (int)(w * (3.0f / 15.0f));
+        const float eqUnits      = eqExpanded ? 4.0f : 1.0f;
+        const float totalUnits   = 2.0f + eqUnits + 3.0f + 3.0f + 3.0f;
+        const int colA = (int)(w * (2.0f / totalUnits));
+        const int colB = (int)(w * (eqUnits / totalUnits));
+        const int colC = (int)(w * (3.0f / totalUnits));
+        const int colD = (int)(w * (3.0f / totalUnits));
         sections[5].bounds = row2.removeFromLeft (colA).reduced (4, 0);
         sections[6].bounds = row2.removeFromLeft (colB).reduced (4, 0);
         sections[7].bounds = row2.removeFromLeft (colC).reduced (4, 0);
         sections[8].bounds = row2.removeFromLeft (colD).reduced (4, 0);
         sections[9].bounds = row2.reduced (4, 0);
+
+        // Toggle button overlays the EQ section's title strip whether
+        // collapsed or expanded — clicking it flips eqExpanded.
+        eqToggleButton.setBounds (sections[6].bounds.reduced (6, 6));
     }
 
     // Knobs + per-section toggle button row (LAYERS / EVOLVE).
@@ -519,6 +565,10 @@ void NorcoastAmbienceEditor::resized()
             droneButton .setBounds (buttonRow.removeFromLeft (half).reduced (2, 0));
             evolveButton.setBounds (buttonRow.reduced (2, 0));
         }
+
+        // EQ knobs are hidden until the user expands the panel.
+        if (&s == &sections[6] && ! eqExpanded)
+            continue;
 
         const int kW = inner.getWidth() / (int) s.knobs.size();
         for (auto* k : s.knobs)
