@@ -38,17 +38,16 @@ private:
     // sees it.
     juce::MidiKeyboardComponent qwertyKeyboard;
 
-    juce::TextButton  latchButton  { "Latch" };
-    juce::TextButton  allOffButton { "All Off" };
-
     juce::TextButton  subOctButton     { "Sub Oct" };
     juce::TextButton  padsOctButton    { "Pads +Oct" };
     juce::TextButton  textureOctButton { "Tex +Oct" };
     juce::TextButton  evolveButton     { "Evolve" };
+    juce::TextButton  droneButton      { "Drone" };
     std::unique_ptr<ButtonAttach> subOctAttach;
     std::unique_ptr<ButtonAttach> padsOctAttach;
     std::unique_ptr<ButtonAttach> textureOctAttach;
     std::unique_ptr<ButtonAttach> evolveAttach;
+    std::unique_ptr<ButtonAttach> droneAttach;
 
 
     juce::ComboBox    presetBox;
@@ -72,7 +71,7 @@ private:
 
     // Knobs (allocated as members so their lifetime matches the editor)
     ParamKnob foundationVol, padsVol, textureVol;
-    ParamKnob chordType, evolveRate;
+    ParamKnob chordType, evolveRate, homeRoot;
     ParamKnob chorusMix, delayMix, delayFb, delayTimeMs, delayTone;
     ParamKnob reverbMix, reverbSize, reverbMod, shimmerVol;
     ParamKnob hpfFreq, lpfFreq;

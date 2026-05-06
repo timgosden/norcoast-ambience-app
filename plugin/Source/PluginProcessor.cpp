@@ -101,6 +101,8 @@ NorcoastAmbienceProcessor::NorcoastAmbienceProcessor()
     chordTypeParam     = apvts.getRawParameterValue (ParamID::chordType);
     evolveOnParam      = apvts.getRawParameterValue (ParamID::evolveOn);
     evolveRateParam    = apvts.getRawParameterValue (ParamID::evolveRate);
+    droneOnParam       = apvts.getRawParameterValue (ParamID::droneOn);
+    homeRootParam      = apvts.getRawParameterValue (ParamID::homeRoot);
 
     foundationSynth.addSound (new PadSound());
     padsSynth      .addSound (new PadSound());
@@ -214,8 +216,7 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     const int  n  = buffer.getNumSamples();
 
     // ─── Latch: drop all incoming note-off events before they reach
-    // the keyboard state or the synths. The on-screen keyboard's
-    // toggle behaviour is handled in LatchableKeyboard itself.
+    // the keyboard state or the synths.
     if (latchOn.load (std::memory_order_acquire))
     {
         juce::MidiBuffer filtered;
@@ -226,6 +227,30 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
                 filtered.addEvent (msg, meta.samplePosition);
         }
         midi.swapWith (filtered);
+    }
+
+    // ─── Drone: ensure the homeRoot is always held when on, so the
+    // synth auto-plays a chord on load like the standalone web app.
+    {
+        const bool droneOn = droneOnParam->load() > 0.5f;
+        const int  rootIdx = juce::jlimit (0, 11, (int) homeRootParam->load());
+        const int  desiredNote = 48 + rootIdx;          // C3 + offset
+
+        if (droneOn)
+        {
+            if (currentDroneNote != desiredNote)
+            {
+                if (currentDroneNote >= 0)
+                    midi.addEvent (juce::MidiMessage::noteOff (1, currentDroneNote), 0);
+                midi.addEvent (juce::MidiMessage::noteOn (1, desiredNote, 0.7f), 0);
+                currentDroneNote = desiredNote;
+            }
+        }
+        else if (currentDroneNote >= 0)
+        {
+            midi.addEvent (juce::MidiMessage::noteOff (1, currentDroneNote), 0);
+            currentDroneNote = -1;
+        }
     }
 
     // ─── Chord Evolve: augment user note-ons with chord intervals,

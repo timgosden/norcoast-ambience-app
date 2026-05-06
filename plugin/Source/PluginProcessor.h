@@ -96,6 +96,8 @@ private:
     std::atomic<float>* chordTypeParam     = nullptr;
     std::atomic<float>* evolveOnParam      = nullptr;
     std::atomic<float>* evolveRateParam    = nullptr;
+    std::atomic<float>* droneOnParam       = nullptr;
+    std::atomic<float>* homeRootParam      = nullptr;
 
     juce::Synthesiser foundationSynth;
     juce::Synthesiser padsSynth;
@@ -124,6 +126,7 @@ private:
     Texture     texture;
     ChordEvolver chordEvolver;
 
+    int currentDroneNote = -1;   // MIDI note currently held by the drone, or -1
     std::atomic<bool> latchOn { false };
     std::vector<int> heldNotesScratch;   // reused across processBlock calls
     float lastReverbSize = -1.0f;

@@ -48,6 +48,8 @@ namespace ParamID
     inline constexpr const char* chordType     = "chordType";
     inline constexpr const char* evolveOn      = "evolveOn";
     inline constexpr const char* evolveRate    = "evolveRate";
+    inline constexpr const char* droneOn       = "droneOn";
+    inline constexpr const char* homeRoot      = "homeRoot";
 }
 
 inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout()
@@ -187,6 +189,17 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
     add (std::make_unique<FloatParam> (juce::ParameterID { ParamID::evolveRate, 1 },
                                         "Evolve Rate",
                                         NormRange { 1.0f, 30.0f, 0.1f, 0.5f }, 8.0f));
+
+    // Drone — ON by default so the synth auto-plays a chord on load
+    // (matches the standalone web app's behaviour). When on, a single
+    // root note is held forever; the chord evolver layers intervals on
+    // top. Player MIDI just adds extra notes to the mix.
+    layout.add (std::make_unique<juce::AudioParameterBool> (
+        juce::ParameterID { ParamID::droneOn, 1 }, "Drone", true));
+    layout.add (std::make_unique<juce::AudioParameterChoice> (
+        juce::ParameterID { ParamID::homeRoot, 1 }, "Home Root",
+        juce::StringArray { "C", "C#", "D", "D#", "E", "F",
+                            "F#", "G", "G#", "A", "A#", "B" }, 0));
 
     return layout;
 }

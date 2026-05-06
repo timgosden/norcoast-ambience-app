@@ -74,21 +74,6 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     qwertyKeyboard.setWantsKeyboardFocus (true);
     qwertyKeyboard.setVelocity (0.7f, false);
 
-    addAndMakeVisible (latchButton);
-    latchButton.setClickingTogglesState (true);
-    latchButton.onClick = [this]
-    {
-        owner.setLatchOn (latchButton.getToggleState());
-    };
-
-    addAndMakeVisible (allOffButton);
-    allOffButton.onClick = [this]
-    {
-        owner.getKeyboardState().allNotesOff (1);
-        if (latchButton.getToggleState())
-            latchButton.setToggleState (false, juce::sendNotification);
-    };
-
     addAndMakeVisible (subOctButton);
     subOctButton.setClickingTogglesState (true);
     subOctAttach = std::make_unique<ButtonAttach> (
@@ -108,6 +93,11 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     evolveButton.setClickingTogglesState (true);
     evolveAttach = std::make_unique<ButtonAttach> (
         owner.getAPVTS(), ParamID::evolveOn, evolveButton);
+
+    addAndMakeVisible (droneButton);
+    droneButton.setClickingTogglesState (true);
+    droneAttach = std::make_unique<ButtonAttach> (
+        owner.getAPVTS(), ParamID::droneOn, droneButton);
 
     // ── Preset bar ──────────────────────────────────────────────────────
     addAndMakeVisible (presetBox);
@@ -139,8 +129,8 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
 
     setupKnob (chordType,     "Chord",        ParamID::chordType);
     setupKnob (evolveRate,    "Rate",         ParamID::evolveRate, " s");
+    setupKnob (homeRoot,      "Root",         ParamID::homeRoot);
 
-    // Format chord-type knob value as the chord name instead of an index.
     {
         const auto names = ChordEvolver::getChordNames();
         chordType.knob.textFromValueFunction = [names] (double v) -> juce::String
@@ -149,6 +139,16 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
             return names[idx];
         };
         chordType.knob.updateText();
+    }
+    {
+        static const juce::StringArray noteNames
+            { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
+        homeRoot.knob.textFromValueFunction = [] (double v) -> juce::String
+        {
+            const int idx = juce::jlimit (0, noteNames.size() - 1, (int) std::round (v));
+            return noteNames[idx];
+        };
+        homeRoot.knob.updateText();
     }
 
     setupKnob (chorusMix,     "Chorus",       ParamID::chorusMix);
@@ -213,7 +213,7 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     sections =
     {{
         { "LAYERS",     kColLayers,   {}, { &foundationVol, &padsVol, &textureVol } },
-        { "EVOLVE",     kColEvolve,   {}, { &chordType, &evolveRate } },
+        { "EVOLVE",     kColEvolve,   {}, { &homeRoot, &chordType, &evolveRate } },
         { "CHORUS",     kColModFx,    {}, { &chorusMix } },
         { "DELAY",      kColModFx,    {}, { &delayMix, &delayFb, &delayTimeMs, &delayTone } },
         { "REVERB",     kColReverbFx, {}, { &reverbMix, &reverbSize, &reverbMod, &shimmerVol } },
@@ -223,7 +223,7 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
         { "DRUMS",      kColDrums,    {}, { &drumVol, &drumPattern } }
     }};
 
-    setSize (1080, 540);
+    setSize (1080, 480);
 
     // Give the qwerty keyboard focus so computer-keyboard keys map to MIDI.
     juce::MessageManager::callAsync ([safeThis = juce::Component::SafePointer (&qwertyKeyboard)]
@@ -355,13 +355,13 @@ void NorcoastAmbienceEditor::resized()
     knobArea.removeFromTop (8);
     auto row2 = knobArea;
 
-    // Top: LAYERS (3) · EVOLVE (2) · CHORUS (1) · DELAY (4) · REVERB (4) → 14 col-units
+    // Top: LAYERS (3) · EVOLVE (3) · CHORUS (1) · DELAY (4) · REVERB (4) → 15 col-units
     {
         const int w = row1.getWidth();
-        const int colA = (int)(w * (3.0f / 14.0f));
-        const int colB = (int)(w * (2.0f / 14.0f));
-        const int colC = (int)(w * (1.0f / 14.0f));
-        const int colD = (int)(w * (4.0f / 14.0f));
+        const int colA = (int)(w * (3.0f / 15.0f));
+        const int colB = (int)(w * (3.0f / 15.0f));
+        const int colC = (int)(w * (1.0f / 15.0f));
+        const int colD = (int)(w * (4.0f / 15.0f));
         sections[0].bounds = row1.removeFromLeft (colA).reduced (4, 0);
         sections[1].bounds = row1.removeFromLeft (colB).reduced (4, 0);
         sections[2].bounds = row1.removeFromLeft (colC).reduced (4, 0);
@@ -396,10 +396,12 @@ void NorcoastAmbienceEditor::resized()
             padsOctButton   .setBounds (row.removeFromLeft (third).reduced (2, 0));
             textureOctButton.setBounds (row.reduced (2, 0));
         }
-        else if (&s == &sections[1])      // EVOLVE — Evolve toggle
+        else if (&s == &sections[1])      // EVOLVE — Drone + Evolve toggles
         {
             auto row = inner.removeFromBottom (24).reduced (4, 0);
-            evolveButton.setBounds (row);
+            const int half = row.getWidth() / 2;
+            droneButton .setBounds (row.removeFromLeft (half).reduced (2, 0));
+            evolveButton.setBounds (row.reduced (2, 0));
         }
 
         const int kW = inner.getWidth() / (int) s.knobs.size();
@@ -410,15 +412,6 @@ void NorcoastAmbienceEditor::resized()
             k->knob .setBounds (col.reduced (4, 2));
         }
     }
-
-    bounds.removeFromTop (12);
-
-    // Latch + All Off — slim row above the footer.
-    auto buttonRow = bounds.removeFromTop (32);
-    const int buttonW = 96;
-    latchButton.setBounds  (buttonRow.removeFromLeft (buttonW));
-    buttonRow.removeFromLeft (8);
-    allOffButton.setBounds (buttonRow.removeFromLeft (buttonW));
 
     // Park the invisible qwerty-keyboard 1×1 in the bottom-right corner.
     qwertyKeyboard.setBounds (getWidth() - 2, getHeight() - 2, 1, 1);
