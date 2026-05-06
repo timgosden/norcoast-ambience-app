@@ -25,9 +25,10 @@ public:
     // extra octave below the lowest configured one.
     PadVoice (const LayerConfig& cfg,
               std::atomic<float>* gainParam,
-              std::atomic<float>* extraSubOctaveParam = nullptr,
-              std::atomic<float>* velocitySensParam   = nullptr,
-              std::atomic<float>* pitchBendRangeParam = nullptr);
+              std::atomic<float>* extraSubOctaveParam   = nullptr,
+              std::atomic<float>* velocitySensParam     = nullptr,
+              std::atomic<float>* pitchBendRangeParam   = nullptr,
+              std::atomic<float>* extraSuperOctaveParam = nullptr);
     ~PadVoice() override = default;
 
     bool canPlaySound (juce::SynthesiserSound* s) override
@@ -95,10 +96,11 @@ public:
 
 private:
     const LayerConfig& cfg;
-    std::atomic<float>* layerGainParam       = nullptr;
-    std::atomic<float>* extraSubOctaveParam  = nullptr;
-    std::atomic<float>* velocitySensParam    = nullptr;
-    std::atomic<float>* pitchBendRangeParam  = nullptr;
+    std::atomic<float>* layerGainParam        = nullptr;
+    std::atomic<float>* extraSubOctaveParam   = nullptr;
+    std::atomic<float>* velocitySensParam     = nullptr;
+    std::atomic<float>* pitchBendRangeParam   = nullptr;
+    std::atomic<float>* extraSuperOctaveParam = nullptr;
     float               velocityScale        = 1.0f;     // captured at note-on
     float               pitchBendNormalised  = 0.0f;     // -1..+1 from wheel
     std::vector<Osc>    oscs;

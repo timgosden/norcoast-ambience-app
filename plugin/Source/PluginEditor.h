@@ -37,9 +37,11 @@ private:
     juce::TextButton  latchButton  { "Latch" };
     juce::TextButton  allOffButton { "All Off" };
 
-    juce::TextButton  subOctButton    { "Sub Oct" };
+    juce::TextButton  subOctButton     { "Sub Oct" };
+    juce::TextButton  padsOctButton    { "Pads +Oct" };
     juce::TextButton  textureOctButton { "Tex +Oct" };
     std::unique_ptr<ButtonAttach> subOctAttach;
+    std::unique_ptr<ButtonAttach> padsOctAttach;
     std::unique_ptr<ButtonAttach> textureOctAttach;
 
     juce::ComboBox    presetBox;

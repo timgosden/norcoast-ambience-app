@@ -12,6 +12,7 @@ namespace ParamID
     inline constexpr const char* textureVol       = "textureVol";
     inline constexpr const char* foundationSubOct = "foundationSubOct";
     inline constexpr const char* textureOctUp     = "textureOctUp";
+    inline constexpr const char* padsOctUp        = "padsOctUp";
 
     inline constexpr const char* chorusMix     = "chorusMix";
 
@@ -72,6 +73,8 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
         juce::ParameterID { ParamID::foundationSubOct, 1 }, "Foundation Sub-Oct", true));
     layout.add (std::make_unique<juce::AudioParameterBool> (
         juce::ParameterID { ParamID::textureOctUp, 1 }, "Texture +Oct", true));
+    layout.add (std::make_unique<juce::AudioParameterBool> (
+        juce::ParameterID { ParamID::padsOctUp, 1 }, "Pads +Oct", false));
 
     // ─── Chorus ───────────────────────────────────────────────────────
     add (std::make_unique<FloatParam> (juce::ParameterID { ParamID::chorusMix, 1 },

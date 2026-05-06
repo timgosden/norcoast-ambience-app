@@ -58,6 +58,7 @@ private:
     std::atomic<float>* textureVolParam       = nullptr;
     std::atomic<float>* foundationSubOctParam = nullptr;
     std::atomic<float>* textureOctUpParam     = nullptr;
+    std::atomic<float>* padsOctUpParam        = nullptr;
     std::atomic<float>* chorusMixParam     = nullptr;
     std::atomic<float>* delayMixParam      = nullptr;
     std::atomic<float>* delayFbParam       = nullptr;

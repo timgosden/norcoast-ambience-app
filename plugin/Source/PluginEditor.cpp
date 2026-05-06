@@ -83,6 +83,11 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     subOctAttach = std::make_unique<ButtonAttach> (
         owner.getAPVTS(), ParamID::foundationSubOct, subOctButton);
 
+    addAndMakeVisible (padsOctButton);
+    padsOctButton.setClickingTogglesState (true);
+    padsOctAttach = std::make_unique<ButtonAttach> (
+        owner.getAPVTS(), ParamID::padsOctUp, padsOctButton);
+
     addAndMakeVisible (textureOctButton);
     textureOctButton.setClickingTogglesState (true);
     textureOctAttach = std::make_unique<ButtonAttach> (
@@ -254,7 +259,7 @@ void NorcoastAmbienceEditor::paint (juce::Graphics& g)
 
     g.setColour (juce::Colour (NorcoastLookAndFeel::kTextDim));
     g.setFont (juce::FontOptions (10.5f));
-    g.drawText ("ambient synth · v1.8 · phase 14 · texture · presets · scope",
+    g.drawText ("ambient synth · v1.9 · phase 16 · pads-oct · velocity · presets",
                 top.withTrimmedLeft (8),
                 juce::Justification::centredLeft);
 
@@ -345,13 +350,14 @@ void NorcoastAmbienceEditor::resized()
         auto inner = s.bounds.reduced (kSectionPadX, kSectionPadY)
                              .withTrimmedTop (kSectionHeaderH);
 
-        // LAYERS section also gets two toggle buttons docked at the bottom.
+        // LAYERS section also gets three toggle buttons docked at the bottom.
         const bool isLayers = (&s == &sections[0]);
         if (isLayers)
         {
             auto buttonArea = inner.removeFromBottom (24).reduced (4, 0);
-            const int half = buttonArea.getWidth() / 2;
-            subOctButton    .setBounds (buttonArea.removeFromLeft (half).reduced (2, 0));
+            const int third = buttonArea.getWidth() / 3;
+            subOctButton    .setBounds (buttonArea.removeFromLeft (third).reduced (2, 0));
+            padsOctButton   .setBounds (buttonArea.removeFromLeft (third).reduced (2, 0));
             textureOctButton.setBounds (buttonArea.reduced (2, 0));
         }
 

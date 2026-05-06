@@ -26,19 +26,19 @@ PadVoice::PadVoice (const LayerConfig& c,
                     std::atomic<float>* gainParam,
                     std::atomic<float>* extraOct,
                     std::atomic<float>* velSens,
-                    std::atomic<float>* pbRange)
+                    std::atomic<float>* pbRange,
+                    std::atomic<float>* extraSuper)
     : cfg (c),
       layerGainParam (gainParam),
       extraSubOctaveParam (extraOct),
       velocitySensParam (velSens),
-      pitchBendRangeParam (pbRange)
+      pitchBendRangeParam (pbRange),
+      extraSuperOctaveParam (extraSuper)
 {
-    // When the optional extra-sub-octave param is wired up, allocate one
-    // extra octave's worth of oscillators so we never reallocate on the
-    // audio thread when the toggle flips.
     int oscsPerOctave = 0;
     for (auto& t : cfg.timbres) oscsPerOctave += t.count;
-    const int extraOctaves = (extraSubOctaveParam != nullptr) ? 1 : 0;
+    int extraOctaves = (extraSubOctaveParam   != nullptr) ? 1 : 0;
+    extraOctaves    += (extraSuperOctaveParam != nullptr) ? 1 : 0;
     oscs.resize ((size_t) (oscsPerOctave * ((int) cfg.octaves.size() + extraOctaves)));
     activeOscCount = (int) oscs.size();
 }
@@ -51,20 +51,27 @@ void PadVoice::startNote (int midiNoteNumber, float velocity,
 
     const double rootHz = juce::MidiMessage::getMidiNoteInHertz (midiNoteNumber);
 
-    // Build the effective octave list — append an extra sub-octave when
-    // the optional toggle is on (only used for Foundation right now).
+    // Build the effective octave list — append extra sub/super octaves
+    // when the optional toggles are on.
     std::array<int, 8> effOcts {};
     int numOcts = 0;
-    int lowest = cfg.octaves[0];
+    int lowest  = cfg.octaves[0];
+    int highest = cfg.octaves[0];
     for (int oct : cfg.octaves)
     {
         effOcts[(size_t) numOcts++] = oct;
-        lowest = juce::jmin (lowest, oct);
+        lowest  = juce::jmin (lowest,  oct);
+        highest = juce::jmax (highest, oct);
     }
     if (extraSubOctaveParam != nullptr && extraSubOctaveParam->load() > 0.5f
         && numOcts < (int) effOcts.size())
     {
         effOcts[(size_t) numOcts++] = lowest - 1;
+    }
+    if (extraSuperOctaveParam != nullptr && extraSuperOctaveParam->load() > 0.5f
+        && numOcts < (int) effOcts.size())
+    {
+        effOcts[(size_t) numOcts++] = highest + 1;
     }
 
     int idx = 0;

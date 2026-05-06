@@ -72,6 +72,7 @@ NorcoastAmbienceProcessor::NorcoastAmbienceProcessor()
     textureVolParam       = apvts.getRawParameterValue (ParamID::textureVol);
     foundationSubOctParam = apvts.getRawParameterValue (ParamID::foundationSubOct);
     textureOctUpParam     = apvts.getRawParameterValue (ParamID::textureOctUp);
+    padsOctUpParam        = apvts.getRawParameterValue (ParamID::padsOctUp);
     chorusMixParam     = apvts.getRawParameterValue (ParamID::chorusMix);
     delayMixParam      = apvts.getRawParameterValue (ParamID::delayMix);
     delayFbParam       = apvts.getRawParameterValue (ParamID::delayFb);
@@ -106,10 +107,12 @@ NorcoastAmbienceProcessor::NorcoastAmbienceProcessor()
     {
         foundationSynth.addVoice (new PadVoice (foundationConfig, foundationVolParam,
                                                 foundationSubOctParam,
-                                                velocitySensParam, pitchBendRangeParam));
+                                                velocitySensParam, pitchBendRangeParam,
+                                                nullptr));
         padsSynth      .addVoice (new PadVoice (padsConfig, padsVolParam,
                                                 nullptr,
-                                                velocitySensParam, pitchBendRangeParam));
+                                                velocitySensParam, pitchBendRangeParam,
+                                                padsOctUpParam));
     }
 }
 
