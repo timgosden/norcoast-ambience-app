@@ -104,17 +104,26 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     setupKnob (satAmt,        "Saturation",   ParamID::satAmt);
     setupKnob (masterVol,     "Master",       ParamID::masterVol);
 
+    setupKnob (arpVol,        "Vol",          ParamID::arpVol);
+    setupKnob (arpRate,       "Rate",         ParamID::arpRate, " b");
+    setupKnob (arpOctaves,    "Octaves",      ParamID::arpOctaves);
+    setupKnob (arpVoice,      "Voice",        ParamID::arpVoice);
+
+    // Per-section accent colour and content. Layout in resized() arranges
+    // them into a 4×2 grid (top row 4 sections, bottom row 3 sections).
+    const juce::Colour kColArp { 0xff7eb6d4 };  // arp blue
     sections =
     {{
-        { "LAYERS",           kColLayers,   {}, { &foundationVol, &padsVol } },
-        { "CHORUS  /  DELAY", kColModFx,    {}, { &chorusMix, &delayMix, &delayFb, &delayTimeMs, &delayTone } },
-        { "REVERB",           kColReverbFx, {}, { &reverbMix, &reverbSize, &reverbMod, &shimmerVol } },
-        { "FILTER",           kColFilter,   {}, { &hpfFreq, &lpfFreq } },
-        { "EQ",               kColEq,       {}, { &eqLow, &eqLoMid, &eqHiMid, &eqHigh } },
-        { "MASTER",           kColMaster,   {}, { &widthMod, &satAmt, &masterVol } }
+        { "LAYERS",     kColLayers,   {}, { &foundationVol, &padsVol } },
+        { "CHORUS",     kColModFx,    {}, { &chorusMix } },
+        { "DELAY",      kColModFx,    {}, { &delayMix, &delayFb, &delayTimeMs, &delayTone } },
+        { "REVERB",     kColReverbFx, {}, { &reverbMix, &reverbSize, &reverbMod, &shimmerVol } },
+        { "FILTER+EQ",  kColEq,       {}, { &hpfFreq, &lpfFreq, &eqLow, &eqLoMid, &eqHiMid, &eqHigh } },
+        { "ARP",        kColArp,      {}, { &arpVol, &arpRate, &arpOctaves, &arpVoice } },
+        { "MASTER",     kColMaster,   {}, { &widthMod, &satAmt, &masterVol } }
     }};
 
-    setSize (920, 660);
+    setSize (980, 680);
 }
 
 NorcoastAmbienceEditor::~NorcoastAmbienceEditor()
@@ -148,7 +157,7 @@ void NorcoastAmbienceEditor::paint (juce::Graphics& g)
 
     g.setColour (juce::Colour (NorcoastLookAndFeel::kTextDim));
     g.setFont (juce::FontOptions (10.5f));
-    g.drawText ("ambient synth · v1.4 · phase 7",
+    g.drawText ("ambient synth · v1.5 · phase 10 · DAW-tempo arp",
                 top.withTrimmedLeft (8),
                 juce::Justification::centredLeft);
 
@@ -180,7 +189,7 @@ void NorcoastAmbienceEditor::paint (juce::Graphics& g)
     // Footer
     g.setColour (juce::Colour (0x55ffffff));
     g.setFont (juce::FontOptions (10.0f));
-    g.drawText ("plugin · v1.4 · phase 7  (smoother shimmer · rotary GUI)",
+    g.drawText ("plugin · v1.5 · phase 10  (arp · sub-oct · rotary GUI)",
                 getLocalBounds().removeFromBottom (24).reduced (16, 4),
                 juce::Justification::centredRight);
 }
@@ -193,29 +202,34 @@ void NorcoastAmbienceEditor::resized()
     bounds.removeFromTop (52);
     bounds.removeFromTop (8);
 
-    // Knob area: 2 rows × 3 columns of section panels.
+    // Knob area: 2 rows of section panels.
     auto knobArea = bounds.removeFromTop (340);
     const int rowH = (knobArea.getHeight() - 8) / 2;
     auto row1 = knobArea.removeFromTop (rowH);
     knobArea.removeFromTop (8);
     auto row2 = knobArea;
 
-    // Top row column widths shaped by knob counts.
-    // Layers (2), Chorus/Delay (5), Reverb (4) — total 11 knobs → ratios 2/5/4
-    const int row1Width = row1.getWidth();
-    const int col1Top = (int)(row1Width * (2.0f / 11.0f));
-    const int col2Top = (int)(row1Width * (5.0f / 11.0f));
-    sections[0].bounds = row1.removeFromLeft (col1Top).reduced (4, 0);
-    sections[1].bounds = row1.removeFromLeft (col2Top).reduced (4, 0);
-    sections[2].bounds = row1.reduced (4, 0);
+    // Top row: LAYERS (2), CHORUS (1), DELAY (4), REVERB (4) → 11 cols
+    {
+        const int row1Width = row1.getWidth();
+        const int colA = (int)(row1Width * (2.0f / 11.0f));
+        const int colB = (int)(row1Width * (1.0f / 11.0f));
+        const int colC = (int)(row1Width * (4.0f / 11.0f));
+        sections[0].bounds = row1.removeFromLeft (colA).reduced (4, 0);
+        sections[1].bounds = row1.removeFromLeft (colB).reduced (4, 0);
+        sections[2].bounds = row1.removeFromLeft (colC).reduced (4, 0);
+        sections[3].bounds = row1.reduced (4, 0);
+    }
 
-    // Bottom row: Filter (2), EQ (4), Master (3) — ratios 2/4/3
-    const int row2Width = row2.getWidth();
-    const int col1Bot = (int)(row2Width * (2.0f / 9.0f));
-    const int col2Bot = (int)(row2Width * (4.0f / 9.0f));
-    sections[3].bounds = row2.removeFromLeft (col1Bot).reduced (4, 0);
-    sections[4].bounds = row2.removeFromLeft (col2Bot).reduced (4, 0);
-    sections[5].bounds = row2.reduced (4, 0);
+    // Bottom row: FILTER+EQ (6), ARP (4), MASTER (3) → 13 cols
+    {
+        const int row2Width = row2.getWidth();
+        const int colA = (int)(row2Width * (6.0f / 13.0f));
+        const int colB = (int)(row2Width * (4.0f / 13.0f));
+        sections[4].bounds = row2.removeFromLeft (colA).reduced (4, 0);
+        sections[5].bounds = row2.removeFromLeft (colB).reduced (4, 0);
+        sections[6].bounds = row2.reduced (4, 0);
+    }
 
     // Lay out knobs inside each section
     for (auto& s : sections)

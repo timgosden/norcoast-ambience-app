@@ -5,6 +5,7 @@
 #include "LayerConfig.h"
 #include "DattorroReverb.h"
 #include "Shimmer.h"
+#include "Arpeggiator.h"
 
 class NorcoastAmbienceProcessor : public juce::AudioProcessor
 {
@@ -69,6 +70,10 @@ private:
     std::atomic<float>* eqLoMidParam       = nullptr;
     std::atomic<float>* eqHiMidParam       = nullptr;
     std::atomic<float>* eqHighParam        = nullptr;
+    std::atomic<float>* arpVolParam        = nullptr;
+    std::atomic<float>* arpRateParam       = nullptr;
+    std::atomic<float>* arpOctavesParam    = nullptr;
+    std::atomic<float>* arpVoiceParam      = nullptr;
 
     juce::Synthesiser foundationSynth;
     juce::Synthesiser padsSynth;
@@ -92,6 +97,8 @@ private:
     juce::AudioBuffer<float> reverbBuffer;
 
     Shimmer shimmer;
+    Arpeggiator arpeggiator;
+    std::vector<int> heldNotesScratch;   // reused across processBlock calls
     float lastReverbSize = -1.0f;
     float lastReverbMod  = -1.0f;
 

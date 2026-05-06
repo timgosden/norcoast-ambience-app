@@ -88,6 +88,10 @@ NorcoastAmbienceProcessor::NorcoastAmbienceProcessor()
     eqLoMidParam       = apvts.getRawParameterValue (ParamID::eqLoMid);
     eqHiMidParam       = apvts.getRawParameterValue (ParamID::eqHiMid);
     eqHighParam        = apvts.getRawParameterValue (ParamID::eqHigh);
+    arpVolParam        = apvts.getRawParameterValue (ParamID::arpVol);
+    arpRateParam       = apvts.getRawParameterValue (ParamID::arpRate);
+    arpOctavesParam    = apvts.getRawParameterValue (ParamID::arpOctaves);
+    arpVoiceParam      = apvts.getRawParameterValue (ParamID::arpVoice);
 
     foundationSynth.addSound (new PadSound());
     padsSynth      .addSound (new PadSound());
@@ -139,6 +143,10 @@ void NorcoastAmbienceProcessor::prepareToPlay (double sampleRate, int samplesPer
     shimmer.prepare (sampleRate, samplesPerBlock);
     shimmer.reset();
 
+    arpeggiator.prepare (sampleRate, samplesPerBlock);
+    arpeggiator.reset();
+    heldNotesScratch.reserve (16);
+
     widthPhase    = 0.0;
     widthPhaseInc = 0.3 / sampleRate;   // 0.3 Hz width LFO, matches standalone
 
@@ -187,6 +195,37 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
     foundationSynth.renderNextBlock (buffer, midi, 0, n);
     padsSynth      .renderNextBlock (buffer, midi, 0, n);
+
+    // ─── Arpeggiator (additive — same FX chain as the pads) ───────────
+    {
+        const float arpVol = arpVolParam->load();
+        if (arpVol > 1e-4f)
+        {
+            heldNotesScratch.clear();
+            for (int note = 0; note < 128; ++note)
+                if (keyboardState.isNoteOn (1, note))
+                    heldNotesScratch.push_back (note);
+
+            // Tempo from host (or 120 in standalone).
+            double bpm = 120.0;
+            if (auto* ph = getPlayHead())
+                if (auto pos = ph->getPosition())
+                    if (auto hostBpm = pos->getBpm())
+                        bpm = *hostBpm;
+
+            const float rate    = arpRateParam->load();
+            const int   octSpan = juce::jlimit (0, 2, (int) arpOctavesParam->load());
+            const auto  voice   = static_cast<Arpeggiator::VoiceKind> (
+                                      juce::jlimit (0, 2, (int) arpVoiceParam->load()));
+
+            arpeggiator.process (buffer, 0, n, heldNotesScratch,
+                                 arpVol, rate, bpm, octSpan, voice);
+        }
+        else
+        {
+            arpeggiator.reset();
+        }
+    }
 
     // Snapshot params once per block.
     const float chorusMix   = chorusMixParam ->load();

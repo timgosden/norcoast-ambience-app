@@ -33,6 +33,11 @@ namespace ParamID
     inline constexpr const char* eqLoMid       = "eqLoMid";
     inline constexpr const char* eqHiMid       = "eqHiMid";
     inline constexpr const char* eqHigh        = "eqHigh";
+
+    inline constexpr const char* arpVol        = "arpVol";
+    inline constexpr const char* arpRate       = "arpRate";
+    inline constexpr const char* arpOctaves    = "arpOctaves";
+    inline constexpr const char* arpVoice      = "arpVoice";
 }
 
 inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout()
@@ -123,6 +128,25 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
     add (std::make_unique<FloatParam> (juce::ParameterID { ParamID::eqHigh, 1 },
                                         "EQ High",
                                         NormRange { -12.0f, 12.0f, 0.1f }, 1.4f));
+
+    // ─── Arpeggiator ──────────────────────────────────────────────────
+    // arpVol: 0 = arp off
+    // arpRate: note duration in beats (0.0625 = 16th, 0.125 = 8th note triplet,
+    //                                   0.25 = 8th, 0.5 = quarter, 1.0 = half)
+    // arpOctaves: 0..2 — extra octaves above the held notes
+    // arpVoice: 0=Triangle, 1=Saw, 2=Sine
+    add (std::make_unique<FloatParam> (juce::ParameterID { ParamID::arpVol, 1 },
+                                        "Arp Vol",
+                                        NormRange { 0.0f, 1.0f, 0.001f }, 0.0f));
+    add (std::make_unique<FloatParam> (juce::ParameterID { ParamID::arpRate, 1 },
+                                        "Arp Rate",
+                                        NormRange { 0.0625f, 1.0f, 0.001f, 0.5f }, 0.25f));
+    layout.add (std::make_unique<juce::AudioParameterChoice> (
+        juce::ParameterID { ParamID::arpOctaves, 1 }, "Arp Octaves",
+        juce::StringArray { "1", "2", "3" }, 1));
+    layout.add (std::make_unique<juce::AudioParameterChoice> (
+        juce::ParameterID { ParamID::arpVoice, 1 }, "Arp Voice",
+        juce::StringArray { "Triangle", "Saw", "Sine" }, 0));
 
     return layout;
 }

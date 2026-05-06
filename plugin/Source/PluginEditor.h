@@ -49,7 +49,7 @@ private:
         juce::Rectangle<int> bounds;
         std::vector<ParamKnob*> knobs;
     };
-    std::array<Section, 6> sections;
+    std::array<Section, 7> sections;
 
     // Knobs (allocated as members so their lifetime matches the editor)
     ParamKnob foundationVol, padsVol;
@@ -58,6 +58,8 @@ private:
     ParamKnob hpfFreq, lpfFreq;
     ParamKnob eqLow, eqLoMid, eqHiMid, eqHigh;
     ParamKnob widthMod, satAmt, masterVol;
+
+    ParamKnob arpVol, arpRate, arpOctaves, arpVoice;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (NorcoastAmbienceEditor)
 };
