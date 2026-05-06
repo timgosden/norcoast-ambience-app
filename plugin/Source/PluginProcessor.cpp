@@ -185,6 +185,10 @@ void NorcoastAmbienceProcessor::prepareToPlay (double sampleRate, int samplesPer
 
     masterGain.reset (sampleRate, 0.05); // 50 ms ramp
     masterGain.setCurrentAndTargetValue (masterVolParam->load());
+
+    // Stop-fade ramp time: 1 second feels like the standalone's "Stop" pill.
+    stopFade.reset (sampleRate, 1.0);
+    stopFade.setCurrentAndTargetValue (1.0f);
 }
 
 void NorcoastAmbienceProcessor::releaseResources()
@@ -594,11 +598,12 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         }
     }
 
-    // ─── Master volume (smoothed) ─────────────────────────────────────
+    // ─── Master volume + Stop fade ────────────────────────────────────
     masterGain.setTargetValue (masterVol);
+    stopFade .setTargetValue (stopped.load (std::memory_order_acquire) ? 0.0f : 1.0f);
     for (int s = 0; s < n; ++s)
     {
-        const float g = masterGain.getNextValue();
+        const float g = masterGain.getNextValue() * stopFade.getNextValue();
         L[s] *= g;
         R[s] *= g;
     }

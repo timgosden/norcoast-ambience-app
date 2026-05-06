@@ -53,6 +53,13 @@ public:
     void setLatchOn (bool b) noexcept { latchOn.store (b, std::memory_order_release); }
     bool isLatchOn()    const noexcept { return latchOn.load (std::memory_order_acquire); }
 
+    // Stop fades the master output to silence over ~1 second. Re-enable
+    // by clicking Stop again — the audio fades back in to the user's
+    // master-vol setting. Doesn't affect parameter state, so toggling
+    // stop is non-destructive.
+    void setStopped (bool b) noexcept { stopped.store (b, std::memory_order_release); }
+    bool isStopped() const noexcept { return stopped.load (std::memory_order_acquire); }
+
 private:
     static constexpr int kVoicesPerLayer = 8;
 
@@ -127,6 +134,8 @@ private:
 
     int currentDroneNote = -1;   // MIDI note currently held by the drone, or -1
     std::atomic<bool> latchOn { false };
+    std::atomic<bool> stopped { false };
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> stopFade;
     std::vector<int> heldNotesScratch;   // reused across processBlock calls
     float lastReverbSize = -1.0f;
     float lastReverbMod  = -1.0f;

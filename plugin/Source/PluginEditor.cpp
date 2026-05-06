@@ -85,17 +85,32 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     : juce::AudioProcessorEditor (&p),
       owner (p),
       qwertyKeyboard (p.getKeyboardState(),
-                      juce::MidiKeyboardComponent::horizontalKeyboard)
+                      juce::MidiKeyboardComponent::horizontalKeyboard),
+      chordHeader (p.getAPVTS())
 {
     setLookAndFeel (&laf);
 
-    // Invisible focus-catcher for computer-keyboard input. JUCE's
-    // built-in qwerty mapping (a/w/s/e/d/f/t/g/y/h/u/j/k = C..C+1)
-    // does the work; we just need a focusable child component.
     addAndMakeVisible (qwertyKeyboard);
     qwertyKeyboard.setKeyPressBaseOctave (4);
     qwertyKeyboard.setWantsKeyboardFocus (true);
     qwertyKeyboard.setVelocity (0.7f, false);
+
+    addAndMakeVisible (chordHeader);
+
+    addAndMakeVisible (stopButton);
+    stopButton.setClickingTogglesState (true);
+    stopButton.setColour (juce::TextButton::buttonColourId,
+                          juce::Colour (NorcoastLookAndFeel::kPanelBg));
+    stopButton.setColour (juce::TextButton::buttonOnColourId,
+                          juce::Colour (0xffd46b8a));      // standalone "stop" pink
+    stopButton.setColour (juce::TextButton::textColourOnId,
+                          juce::Colour (NorcoastLookAndFeel::kBg));
+    stopButton.setColour (juce::TextButton::textColourOffId,
+                          juce::Colour (0xffd46b8a).withAlpha (0.7f));
+    stopButton.onClick = [this]
+    {
+        owner.setStopped (stopButton.getToggleState());
+    };
 
     addAndMakeVisible (subOctButton);
     subOctButton.setClickingTogglesState (true);
@@ -233,10 +248,19 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     setupKnob (arpVol,        "Vol",          ParamID::arpVol);
     setupKnob (arpRate,       "Rate",         ParamID::arpRate, " b");
     setupKnob (arpOctaves,    "Octaves",      ParamID::arpOctaves);
-    setupKnob (arpVoice,      "Voice",        ParamID::arpVoice);
 
     setupKnob (drumVol,       "Vol",          ParamID::drumVol);
-    setupKnob (drumPattern,   "Pattern",      ParamID::drumPattern);
+
+    // Voice / Pattern pickers as pill button rows (knobs are awkward
+    // for short discrete choices).
+    arpVoiceRow    = std::make_unique<ChoiceButtonRow> (
+        owner.getAPVTS(), ParamID::arpVoice,
+        juce::Colour (0xff7eb6d4));    // arp blue
+    drumPatternRow = std::make_unique<ChoiceButtonRow> (
+        owner.getAPVTS(), ParamID::drumPattern,
+        juce::Colour (0xffd97171));    // drum red
+    addAndMakeVisible (*arpVoiceRow);
+    addAndMakeVisible (*drumPatternRow);
 
     sections =
     {{
@@ -247,11 +271,12 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
         { "REVERB",     kColReverbFx, {}, { &reverbMix, &reverbSize, &reverbMod, &shimmerVol } },
         { "FILTER",     kColFilter,   {}, { &hpfFreq, &lpfFreq } },
         { "EQ",         kColEq,       {}, { &eqLow, &eqLoMid, &eqHiMid, &eqHigh } },
-        { "ARP",        kColArp,      {}, { &arpVol, &arpRate, &arpOctaves, &arpVoice } },
-        { "DRUMS",      kColDrums,    {}, { &drumVol, &drumPattern } }
+        { "ARP",        kColArp,      {}, { &arpVol, &arpRate, &arpOctaves } },
+        { "DRUMS",      kColDrums,    {}, { &drumVol } },
+        { "MASTER",     kColMaster,   {}, { &widthMod, &satAmt, &masterVol } }
     }};
 
-    setSize (1080, 480);
+    setSize (980, 580);
 
     // Give the qwerty keyboard focus so computer-keyboard keys map to MIDI.
     juce::MessageManager::callAsync ([safeThis = juce::Component::SafePointer (&qwertyKeyboard)]
@@ -327,15 +352,9 @@ void NorcoastAmbienceEditor::paint (juce::Graphics& g)
     g.setGradientFill (bg);
     g.fillAll();
 
-    auto bounds = getLocalBounds().reduced (16);
-
-    // Just the logo. No subtitle, no version. Clean.
-    auto top = bounds.removeFromTop (40);
-    g.setColour (juce::Colour (NorcoastLookAndFeel::kAccent));
-    g.setFont (juce::FontOptions (20.0f).withStyle ("Light"));
-    g.drawText ("NORCOAST AMBIENCE",
-                top.withTrimmedLeft (8),
-                juce::Justification::centredLeft);
+    // Title bar contents (chord header + preset bar + stop) live as
+    // child Components — they're laid out in resized() and draw
+    // themselves; nothing to paint here.
 
     for (auto& s : sections)
     {
@@ -364,26 +383,33 @@ void NorcoastAmbienceEditor::resized()
 {
     auto bounds = getLocalBounds().reduced (16);
 
-    // Preset bar — small, right-aligned in the title strip.
+    // Title strip — chord state header centred, preset bar + Stop on the right.
     {
-        auto title = bounds.removeFromTop (40);
-        auto right = title.removeFromRight (220).reduced (0, 8);
+        auto title = bounds.removeFromTop (52);
+
+        // Right side: Save / Load / Preset combo / Stop pill
+        auto right = title.removeFromRight (300).reduced (0, 10);
         loadButton.setBounds (right.removeFromRight (44));
         right.removeFromRight (4);
         saveButton.setBounds (right.removeFromRight (44));
         right.removeFromRight (6);
+        stopButton.setBounds (right.removeFromRight (52));
+        right.removeFromRight (8);
         presetBox.setBounds  (right);
+
+        // Big chord state header fills what's left.
+        chordHeader.setBounds (title);
     }
     bounds.removeFromTop (8);
 
-    // 9 panels in a 5+4 grid.
-    auto knobArea = bounds.removeFromTop (340);
+    // 10 panels in a 5+5 grid.
+    auto knobArea = bounds.removeFromTop (440);
     const int rowH = (knobArea.getHeight() - 8) / 2;
     auto row1 = knobArea.removeFromTop (rowH);
     knobArea.removeFromTop (8);
     auto row2 = knobArea;
 
-    // Top: LAYERS (3) · EVOLVE (3) · CHORUS (1) · DELAY (4) · REVERB (4) → 15 col-units
+    // Top: LAYERS (3) · EVOLVE (3) · CHORUS (1) · DELAY (4) · REVERB (4) → 15 units
     {
         const int w = row1.getWidth();
         const int colA = (int)(w * (3.0f / 15.0f));
@@ -397,16 +423,18 @@ void NorcoastAmbienceEditor::resized()
         sections[4].bounds = row1.reduced (4, 0);
     }
 
-    // Bottom: FILTER (2) · EQ (4) · ARP (4) · DRUMS (2) → 12 col-units
+    // Bottom: FILTER (2) · EQ (4) · ARP (3) · DRUMS (2) · MASTER (3) → 14 units
     {
         const int w = row2.getWidth();
-        const int colA = (int)(w * (2.0f / 12.0f));
-        const int colB = (int)(w * (4.0f / 12.0f));
-        const int colC = (int)(w * (4.0f / 12.0f));
+        const int colA = (int)(w * (2.0f / 14.0f));
+        const int colB = (int)(w * (4.0f / 14.0f));
+        const int colC = (int)(w * (3.0f / 14.0f));
+        const int colD = (int)(w * (2.0f / 14.0f));
         sections[5].bounds = row2.removeFromLeft (colA).reduced (4, 0);
         sections[6].bounds = row2.removeFromLeft (colB).reduced (4, 0);
         sections[7].bounds = row2.removeFromLeft (colC).reduced (4, 0);
-        sections[8].bounds = row2.reduced (4, 0);
+        sections[8].bounds = row2.removeFromLeft (colD).reduced (4, 0);
+        sections[9].bounds = row2.reduced (4, 0);
     }
 
     // Knobs + per-section toggle button row (LAYERS / EVOLVE).
@@ -422,6 +450,16 @@ void NorcoastAmbienceEditor::resized()
             const int half = row.getWidth() / 2;
             subOctButton    .setBounds (row.removeFromLeft (half).reduced (2, 0));
             textureOctButton.setBounds (row.reduced (2, 0));
+        }
+        else if (&s == &sections[7] && arpVoiceRow)        // ARP — voice pills
+        {
+            auto row = inner.removeFromBottom (24).reduced (4, 0);
+            arpVoiceRow->setBounds (row);
+        }
+        else if (&s == &sections[8] && drumPatternRow)     // DRUMS — pattern pills
+        {
+            auto row = inner.removeFromBottom (24).reduced (4, 0);
+            drumPatternRow->setBounds (row);
         }
         else if (&s == &sections[1])      // EVOLVE — Drone + Evolve toggles
         {

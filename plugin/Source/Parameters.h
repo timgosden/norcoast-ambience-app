@@ -117,9 +117,12 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
                                         "High Pass",
                                         NormRange { 0.0f, 1.0f, 0.001f }, 0.0f));
 
+    // Shimmer max capped at 0.3 — the granular pitch shifter is a
+    // simplified phase-vocoder substitute, so even at "max" the wet
+    // send stays musically usable instead of accumulating into noise.
     add (std::make_unique<FloatParam> (juce::ParameterID { ParamID::shimmerVol, 1 },
                                         "Shimmer",
-                                        NormRange { 0.0f, 1.0f, 0.001f }, 0.0f));
+                                        NormRange { 0.0f, 0.3f, 0.001f }, 0.0f));
 
     // ─── Master ───────────────────────────────────────────────────────
     add (std::make_unique<FloatParam> (juce::ParameterID { ParamID::widthMod, 1 },

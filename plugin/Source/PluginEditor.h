@@ -3,6 +3,8 @@
 #include <juce_audio_utils/juce_audio_utils.h>
 #include "PluginProcessor.h"
 #include "NorcoastLookAndFeel.h"
+#include "ChordStateHeader.h"
+#include "ChoiceButtonRow.h"
 
 class NorcoastAmbienceEditor : public juce::AudioProcessorEditor
 {
@@ -38,6 +40,16 @@ private:
     // sees it.
     juce::MidiKeyboardComponent qwertyKeyboard;
 
+    // Big "C · Maj7th" centred header — visual heartbeat of the plugin.
+    ChordStateHeader chordHeader;
+
+    // Stop pill — 1 s master fade-out / fade-in.
+    juce::TextButton stopButton { "Stop" };
+
+    // Choice button rows — replace knobs for discrete pickers.
+    std::unique_ptr<ChoiceButtonRow> arpVoiceRow;
+    std::unique_ptr<ChoiceButtonRow> drumPatternRow;
+
     juce::TextButton  subOctButton     { "Sub Oct" };
     juce::TextButton  textureOctButton { "Tex +Oct" };
     juce::TextButton  evolveButton     { "Evolve" };
@@ -65,7 +77,7 @@ private:
         juce::Rectangle<int> bounds;
         std::vector<ParamKnob*> knobs;
     };
-    std::array<Section, 9> sections;
+    std::array<Section, 10> sections;
 
     // Knobs (allocated as members so their lifetime matches the editor)
     ParamKnob foundationVol, padsVol, textureVol;
@@ -76,8 +88,8 @@ private:
     ParamKnob eqLow, eqLoMid, eqHiMid, eqHigh;
     ParamKnob widthMod, satAmt, masterVol;
 
-    ParamKnob arpVol, arpRate, arpOctaves, arpVoice;
-    ParamKnob drumVol, drumPattern;
+    ParamKnob arpVol, arpRate, arpOctaves;
+    ParamKnob drumVol;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (NorcoastAmbienceEditor)
 };
