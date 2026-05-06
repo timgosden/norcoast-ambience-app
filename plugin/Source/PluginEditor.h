@@ -39,12 +39,10 @@ private:
     juce::MidiKeyboardComponent qwertyKeyboard;
 
     juce::TextButton  subOctButton     { "Sub Oct" };
-    juce::TextButton  padsOctButton    { "Pads +Oct" };
     juce::TextButton  textureOctButton { "Tex +Oct" };
     juce::TextButton  evolveButton     { "Evolve" };
     juce::TextButton  droneButton      { "Drone" };
     std::unique_ptr<ButtonAttach> subOctAttach;
-    std::unique_ptr<ButtonAttach> padsOctAttach;
     std::unique_ptr<ButtonAttach> textureOctAttach;
     std::unique_ptr<ButtonAttach> evolveAttach;
     std::unique_ptr<ButtonAttach> droneAttach;

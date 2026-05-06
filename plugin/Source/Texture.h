@@ -60,8 +60,9 @@ public:
                     spawnGrain (streamId, heldNotes, octUp);
 
                 // Reschedule next grain — random within ~0.4–0.7 s @ 44.1k.
+                // Tighter spawn interval = denser, smoother texture.
                 streamSchedule[(size_t) streamId] =
-                    (int) ((0.35 + rng.nextFloat() * 0.35) * sampleRate);
+                    (int) ((0.18 + rng.nextFloat() * 0.22) * sampleRate);
             }
 
             // Render every active grain.
@@ -70,8 +71,8 @@ public:
                 if (g.active)
                     g.render (l, r);
 
-            L[s] += l * vol * 0.8f;   // standalone uses vol*0.8 on the bus
-            R[s] += r * vol * 0.8f;
+            L[s] += l * vol * 1.8f;   // boosted vs standalone for more presence
+            R[s] += r * vol * 1.8f;
         }
     }
 
@@ -164,7 +165,7 @@ private:
         g.readPos    = (double) start;
         g.readRate   = (double) finalRate * (sourceSampleRate / sampleRate);
         g.age        = 0;
-        g.level      = (streamId >= 3) ? 0.12f : 0.15f;
+        g.level      = (streamId >= 3) ? 0.18f : 0.22f;   // boosted per-grain
 
         // Stream pan spread.
         const float basePan  = (float) (streamId - 2) * 0.3f;

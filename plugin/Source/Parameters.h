@@ -12,7 +12,6 @@ namespace ParamID
     inline constexpr const char* textureVol       = "textureVol";
     inline constexpr const char* foundationSubOct = "foundationSubOct";
     inline constexpr const char* textureOctUp     = "textureOctUp";
-    inline constexpr const char* padsOctUp        = "padsOctUp";
 
     inline constexpr const char* chorusMix     = "chorusMix";
 
@@ -47,7 +46,7 @@ namespace ParamID
 
     inline constexpr const char* chordType     = "chordType";
     inline constexpr const char* evolveOn      = "evolveOn";
-    inline constexpr const char* evolveRate    = "evolveRate";
+    inline constexpr const char* evolveBars    = "evolveBars";
     inline constexpr const char* droneOn       = "droneOn";
     inline constexpr const char* homeRoot      = "homeRoot";
 }
@@ -76,8 +75,6 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
         juce::ParameterID { ParamID::foundationSubOct, 1 }, "Foundation Sub-Oct", true));
     layout.add (std::make_unique<juce::AudioParameterBool> (
         juce::ParameterID { ParamID::textureOctUp, 1 }, "Texture +Oct", true));
-    layout.add (std::make_unique<juce::AudioParameterBool> (
-        juce::ParameterID { ParamID::padsOctUp, 1 }, "Pads +Oct", false));
 
     // ─── Chorus ───────────────────────────────────────────────────────
     add (std::make_unique<FloatParam> (juce::ParameterID { ParamID::chorusMix, 1 },
@@ -122,7 +119,7 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
 
     add (std::make_unique<FloatParam> (juce::ParameterID { ParamID::shimmerVol, 1 },
                                         "Shimmer",
-                                        NormRange { 0.0f, 1.0f, 0.001f }, 0.07f));
+                                        NormRange { 0.0f, 1.0f, 0.001f }, 0.0f));
 
     // ─── Master ───────────────────────────────────────────────────────
     add (std::make_unique<FloatParam> (juce::ParameterID { ParamID::widthMod, 1 },
@@ -166,7 +163,7 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
         juce::StringArray { "1", "2", "3" }, 1));
     layout.add (std::make_unique<juce::AudioParameterChoice> (
         juce::ParameterID { ParamID::arpVoice, 1 }, "Arp Voice",
-        juce::StringArray { "Triangle", "Saw", "Sine" }, 0));
+        juce::StringArray { "Soft", "Sine", "Juno" }, 2));   // default Juno (web app default)
 
     // ─── Drum machine ─────────────────────────────────────────────────
     add (std::make_unique<FloatParam> (juce::ParameterID { ParamID::drumVol, 1 },
@@ -183,12 +180,14 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
     // single held root) works inside the plugin too.
     layout.add (std::make_unique<juce::AudioParameterChoice> (
         juce::ParameterID { ParamID::chordType, 1 }, "Chord Type",
-        juce::StringArray { "5th", "Sus2", "Sus4", "Major", "Minor", "Maj7", "9th" }, 1));
+        juce::StringArray { "5th", "Sus2", "Sus4", "Maj7th", "9th" }, 1));
     layout.add (std::make_unique<juce::AudioParameterBool> (
         juce::ParameterID { ParamID::evolveOn, 1 }, "Evolve", true));
-    add (std::make_unique<FloatParam> (juce::ParameterID { ParamID::evolveRate, 1 },
-                                        "Evolve Rate",
-                                        NormRange { 1.0f, 30.0f, 0.1f, 0.5f }, 8.0f));
+    // Evolve in BARS so the chord changes line up with the arp + drum
+    // tempo grid. 4/4 assumed; default 8 bars matches the web app.
+    layout.add (std::make_unique<juce::AudioParameterChoice> (
+        juce::ParameterID { ParamID::evolveBars, 1 }, "Evolve Bars",
+        juce::StringArray { "1", "2", "4", "8", "16", "32" }, 3));
 
     // Drone — ON by default so the synth auto-plays a chord on load
     // (matches the standalone web app's behaviour). When on, a single

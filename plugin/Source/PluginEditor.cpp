@@ -43,13 +43,36 @@ void NorcoastAmbienceEditor::setupKnob (ParamKnob& k, const juce::String& displa
                                 true);
     k.knob.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 64, 14);
     k.knob.setLookAndFeel (&laf);
-    if (suffix.isNotEmpty())
-        k.knob.setTextValueSuffix (suffix);
     addAndMakeVisible (k.knob);
 
     k.attach = std::make_unique<SliderAttach> (owner.getAPVTS(), paramID, k.knob);
 
-    // Double-click resets the knob to its parameter default.
+    // Default value-display formatting depends on the suffix:
+    //   "%"   → percent of 0..1
+    //   " dB" → one decimal + dB
+    //   ""    → integer percent of 0..1 (default for unitless params)
+    //   anything else → number + suffix, no decimals
+    if (suffix == "%" || suffix.isEmpty())
+    {
+        k.knob.textFromValueFunction = [] (double v) -> juce::String
+        {
+            return juce::String ((int) std::round (v * 100.0)) + "%";
+        };
+    }
+    else if (suffix == " dB")
+    {
+        k.knob.textFromValueFunction = [] (double v) -> juce::String
+        {
+            return juce::String (v, 1) + " dB";
+        };
+    }
+    else
+    {
+        k.knob.setTextValueSuffix (suffix);
+    }
+    k.knob.updateText();
+
+    // Double-click resets to the parameter default.
     if (auto* p = owner.getAPVTS().getParameter (paramID))
     {
         const float def = p->getNormalisableRange()
@@ -78,11 +101,6 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     subOctButton.setClickingTogglesState (true);
     subOctAttach = std::make_unique<ButtonAttach> (
         owner.getAPVTS(), ParamID::foundationSubOct, subOctButton);
-
-    addAndMakeVisible (padsOctButton);
-    padsOctButton.setClickingTogglesState (true);
-    padsOctAttach = std::make_unique<ButtonAttach> (
-        owner.getAPVTS(), ParamID::padsOctUp, padsOctButton);
 
     addAndMakeVisible (textureOctButton);
     textureOctButton.setClickingTogglesState (true);
@@ -128,8 +146,18 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     setupKnob (textureVol,    "Texture",      ParamID::textureVol);
 
     setupKnob (chordType,     "Chord",        ParamID::chordType);
-    setupKnob (evolveRate,    "Rate",         ParamID::evolveRate, " s");
+    setupKnob (evolveRate,    "Bars",         ParamID::evolveBars);
     setupKnob (homeRoot,      "Root",         ParamID::homeRoot);
+
+    {
+        static const juce::StringArray barChoices { "1", "2", "4", "8", "16", "32" };
+        evolveRate.knob.textFromValueFunction = [] (double v) -> juce::String
+        {
+            const int idx = juce::jlimit (0, barChoices.size() - 1, (int) std::round (v));
+            return barChoices[idx];
+        };
+        evolveRate.knob.updateText();
+    }
 
     {
         const auto names = ChordEvolver::getChordNames();
@@ -388,12 +416,11 @@ void NorcoastAmbienceEditor::resized()
         auto inner = s.bounds.reduced (kSectionPadX, kSectionPadY)
                              .withTrimmedTop (kSectionHeaderH);
 
-        if (&s == &sections[0])           // LAYERS — 3 toggles
+        if (&s == &sections[0])           // LAYERS — 2 toggles
         {
             auto row = inner.removeFromBottom (24).reduced (4, 0);
-            const int third = row.getWidth() / 3;
-            subOctButton    .setBounds (row.removeFromLeft (third).reduced (2, 0));
-            padsOctButton   .setBounds (row.removeFromLeft (third).reduced (2, 0));
+            const int half = row.getWidth() / 2;
+            subOctButton    .setBounds (row.removeFromLeft (half).reduced (2, 0));
             textureOctButton.setBounds (row.reduced (2, 0));
         }
         else if (&s == &sections[1])      // EVOLVE — Drone + Evolve toggles

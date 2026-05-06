@@ -17,23 +17,24 @@
 class ChordEvolver
 {
 public:
-    enum ChordType { Fifth, Sus2, Sus4, Major, Minor, Maj7, Ninth, NumTypes };
+    // Chord types match the standalone web app's CHORD_TYPES exactly.
+    // No major/minor triads — the standalone is intentionally about
+    // open / sus / sparse voicings for ambient pads.
+    enum ChordType { Fifth, Sus2, Sus4, Maj7, Ninth, NumTypes };
 
     static juce::StringArray getChordNames()
     {
-        return { "5th", "Sus2", "Sus4", "Major", "Minor", "Maj7", "9th" };
+        return { "5th", "Sus2", "Sus4", "Maj7th", "9th" };
     }
 
     static const std::vector<int>& intervalsFor (int type)
     {
         static const std::array<std::vector<int>, (size_t) NumTypes> data
         {{
-            { 7 },          // 5th        — open root + fifth
+            { 7 },          // 5th
             { 2, 7 },       // Sus2
             { 5, 7 },       // Sus4
-            { 4, 7 },       // Major
-            { 3, 7 },       // Minor
-            { 7, 11 },      // Maj7 (sparse — no 3rd, like the standalone)
+            { 11 },         // Maj7th — sparse (root + maj7 only)
             { 7, 14 }       // 9th
         }};
         return data[(size_t) juce::jlimit (0, (int) NumTypes - 1, type)];
@@ -67,14 +68,19 @@ public:
     //                        can be updated to reflect the change
     template <typename AdvanceFn>
     void process (juce::MidiBuffer& midi, int numSamples, int channel,
-                  int targetType, bool evolveOn, float rateSeconds,
+                  int targetType, bool evolveOn,
+                  float rateBeats, double bpm,
                   AdvanceFn&& advanceTargetParam)
     {
-        // ─── Auto-evolve: advance the target chord type periodically ──
+        // ─── Auto-evolve: advance the target chord type periodically.
+        // Tempo-locked: cycle every rateBeats beats at the host BPM, so
+        // chord changes line up with the arp + drum tempo grid.
         if (evolveOn)
         {
             sampleCounter += numSamples;
-            const double samplesPerCycle = (double) juce::jmax (0.5f, rateSeconds) * sampleRate;
+            const double samplesPerCycle = (60.0 / juce::jmax (1.0, bpm))
+                                            * (double) juce::jmax (1.0f, rateBeats)
+                                            * sampleRate;
             if (sampleCounter >= samplesPerCycle)
             {
                 sampleCounter -= samplesPerCycle;

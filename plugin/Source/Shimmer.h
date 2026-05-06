@@ -94,7 +94,10 @@ public:
         auto* L = mainBuffer.getWritePointer (0);
         auto* R = nch > 1 ? mainBuffer.getWritePointer (1) : L;
 
-        constexpr float kFbGain  = 0.75f;
+        // Standalone uses 0.75 here, but our granular pitch shifter
+        // (vs phase vocoder) accumulates noise faster — drop to 0.45
+        // to keep the shimmer in tune across multiple feedback passes.
+        constexpr float kFbGain  = 0.45f;
         constexpr float kInGain  = 1.0f;
         constexpr float kChDry   = 0.6f;
         constexpr float kChWet   = 0.4f;

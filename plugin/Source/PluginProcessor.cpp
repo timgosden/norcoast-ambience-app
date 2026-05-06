@@ -73,7 +73,6 @@ NorcoastAmbienceProcessor::NorcoastAmbienceProcessor()
     textureVolParam       = apvts.getRawParameterValue (ParamID::textureVol);
     foundationSubOctParam = apvts.getRawParameterValue (ParamID::foundationSubOct);
     textureOctUpParam     = apvts.getRawParameterValue (ParamID::textureOctUp);
-    padsOctUpParam        = apvts.getRawParameterValue (ParamID::padsOctUp);
     chorusMixParam     = apvts.getRawParameterValue (ParamID::chorusMix);
     delayMixParam      = apvts.getRawParameterValue (ParamID::delayMix);
     delayFbParam       = apvts.getRawParameterValue (ParamID::delayFb);
@@ -100,7 +99,7 @@ NorcoastAmbienceProcessor::NorcoastAmbienceProcessor()
     drumPatternParam   = apvts.getRawParameterValue (ParamID::drumPattern);
     chordTypeParam     = apvts.getRawParameterValue (ParamID::chordType);
     evolveOnParam      = apvts.getRawParameterValue (ParamID::evolveOn);
-    evolveRateParam    = apvts.getRawParameterValue (ParamID::evolveRate);
+    evolveBarsParam    = apvts.getRawParameterValue (ParamID::evolveBars);
     droneOnParam       = apvts.getRawParameterValue (ParamID::droneOn);
     homeRootParam      = apvts.getRawParameterValue (ParamID::homeRoot);
 
@@ -116,7 +115,7 @@ NorcoastAmbienceProcessor::NorcoastAmbienceProcessor()
         padsSynth      .addVoice (new PadVoice (padsConfig, padsVolParam,
                                                 nullptr,
                                                 nullptr, nullptr,
-                                                padsOctUpParam));
+                                                nullptr));
     }
 }
 
@@ -253,19 +252,35 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         }
     }
 
+    // ─── Foundation renders BEFORE the chord evolver runs, so it
+    // receives the raw root note(s) only — no chord intervals. The
+    // standalone Foundation layer is intentionally a single sub
+    // root note at any moment, not a chord.
+    foundationSynth.renderNextBlock (buffer, midi, 0, n);
+
     // ─── Chord Evolve: augment user note-ons with chord intervals,
-    // optionally cycle the chord type on a timer. This runs BEFORE
+    // optionally cycle the chord type on a timer. Runs BEFORE
     // keyboardState.processNextMidiBuffer so the augmented events get
-    // recorded in the keyboard state too — arp/texture/etc. will see
-    // them as held notes.
+    // recorded in the keyboard state — arp/texture/pads see them.
+    // Tempo from host once — shared by evolve, arp, drums, delay.
+    double bpm = 120.0;
+    if (auto* ph = getPlayHead())
+        if (auto pos = ph->getPosition())
+            if (auto hostBpm = pos->getBpm())
+                bpm = *hostBpm;
+
     {
         const int targetType  = juce::jlimit (0, (int) ChordEvolver::NumTypes - 1,
                                               (int) chordTypeParam->load());
         const bool evolveOn   = evolveOnParam->load() > 0.5f;
-        const float evolveRate = evolveRateParam->load();
+
+        // Evolve in bars (musical), 4/4 assumed → beats = bars * 4.
+        static constexpr std::array<int, 6> kBars { 1, 2, 4, 8, 16, 32 };
+        const int barsIdx = juce::jlimit (0, 5, (int) evolveBarsParam->load());
+        const float beatsPerEvolve = (float) (kBars[(size_t) barsIdx] * 4);
 
         chordEvolver.process (midi, n, /*channel*/ 1,
-                              targetType, evolveOn, evolveRate,
+                              targetType, evolveOn, beatsPerEvolve, bpm,
                               [this] (int newType)
                               {
                                   if (auto* p = apvts.getParameter (ParamID::chordType))
@@ -279,8 +294,7 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
     keyboardState.processNextMidiBuffer (midi, 0, n, true);
 
-    foundationSynth.renderNextBlock (buffer, midi, 0, n);
-    padsSynth      .renderNextBlock (buffer, midi, 0, n);
+    padsSynth.renderNextBlock (buffer, midi, 0, n);
 
     // ─── Arpeggiator (additive — same FX chain as the pads) ───────────
     {
@@ -291,13 +305,6 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
             for (int note = 0; note < 128; ++note)
                 if (keyboardState.isNoteOn (1, note))
                     heldNotesScratch.push_back (note);
-
-            // Tempo from host (or 120 in standalone).
-            double bpm = 120.0;
-            if (auto* ph = getPlayHead())
-                if (auto pos = ph->getPosition())
-                    if (auto hostBpm = pos->getBpm())
-                        bpm = *hostBpm;
 
             const float rate    = arpRateParam->load();
             const int   octSpan = juce::jlimit (0, 2, (int) arpOctavesParam->load());
@@ -317,14 +324,6 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     {
         const float drumVol = drumVolParam->load();
         const int   patIdx  = juce::jlimit (0, 4, (int) drumPatternParam->load());
-
-        // Tempo from host (or 120 in standalone) — same playhead read as the arp.
-        double bpm = 120.0;
-        if (auto* ph = getPlayHead())
-            if (auto pos = ph->getPosition())
-                if (auto hostBpm = pos->getBpm())
-                    bpm = *hostBpm;
-
         drumMachine.process (buffer, 0, n, drumVol, patIdx, bpm);
     }
 
@@ -354,12 +353,7 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     // standalone's tempo-sync divisions).
     static constexpr std::array<float, 7> kDivBeats
         { 0.125f, 0.25f, 0.375f, 0.5f, 0.75f, 1.0f, 1.5f };
-    double bpmForDelay = 120.0;
-    if (auto* ph = getPlayHead())
-        if (auto pos = ph->getPosition())
-            if (auto hostBpm = pos->getBpm())
-                bpmForDelay = *hostBpm;
-    const float delayTimeSec = (60.0f / (float) bpmForDelay) * kDivBeats[(size_t) delayDivIdx];
+    const float delayTimeSec = (60.0f / (float) bpm) * kDivBeats[(size_t) delayDivIdx];
     const float reverbMix   = reverbMixParam ->load();
     const float reverbSize  = reverbSizeParam->load();
     const float reverbMod   = reverbModParam ->load();

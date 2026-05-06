@@ -68,7 +68,6 @@ private:
     std::atomic<float>* textureVolParam       = nullptr;
     std::atomic<float>* foundationSubOctParam = nullptr;
     std::atomic<float>* textureOctUpParam     = nullptr;
-    std::atomic<float>* padsOctUpParam        = nullptr;
     std::atomic<float>* chorusMixParam     = nullptr;
     std::atomic<float>* delayMixParam      = nullptr;
     std::atomic<float>* delayFbParam       = nullptr;
@@ -95,7 +94,7 @@ private:
     std::atomic<float>* drumPatternParam   = nullptr;
     std::atomic<float>* chordTypeParam     = nullptr;
     std::atomic<float>* evolveOnParam      = nullptr;
-    std::atomic<float>* evolveRateParam    = nullptr;
+    std::atomic<float>* evolveBarsParam    = nullptr;
     std::atomic<float>* droneOnParam       = nullptr;
     std::atomic<float>* homeRootParam      = nullptr;
 
