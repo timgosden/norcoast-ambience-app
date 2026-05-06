@@ -74,6 +74,10 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     addAndMakeVisible (allOffButton);
     allOffButton.onClick = [this] { owner.getKeyboardState().allNotesOff (1); };
 
+    // Live oscilloscope of the master output — sits between the buttons
+    // row and the keyboard.
+    addAndMakeVisible (owner.getOscilloscope());
+
     addAndMakeVisible (subOctButton);
     subOctButton.setClickingTogglesState (true);
     subOctAttach = std::make_unique<ButtonAttach> (
@@ -169,6 +173,10 @@ NorcoastAmbienceEditor::~NorcoastAmbienceEditor()
     for (auto& s : sections)
         for (auto* k : s.knobs)
             clearLF (*k);
+
+    // Oscilloscope is owned by the processor; detach so it isn't deleted
+    // by the editor's child-component teardown.
+    removeChildComponent (&owner.getOscilloscope());
 }
 
 void NorcoastAmbienceEditor::applyFactoryPreset (int idx)
@@ -242,7 +250,7 @@ void NorcoastAmbienceEditor::paint (juce::Graphics& g)
 
     g.setColour (juce::Colour (NorcoastLookAndFeel::kTextDim));
     g.setFont (juce::FontOptions (10.5f));
-    g.drawText ("ambient synth · v1.7 · phase 12 · texture (granular dulcimer)",
+    g.drawText ("ambient synth · v1.8 · phase 14 · texture · presets · scope",
                 top.withTrimmedLeft (8),
                 juce::Justification::centredLeft);
 
@@ -360,6 +368,11 @@ void NorcoastAmbienceEditor::resized()
     latchButton.setBounds  (buttons.removeFromLeft (buttonW));
     buttons.removeFromLeft (8);
     allOffButton.setBounds (buttons.removeFromLeft (buttonW));
+
+    // Place oscilloscope on the right side of the button row strip,
+    // filling the available width.
+    auto scopeStrip = bounds.removeFromTop (44);
+    owner.getOscilloscope().setBounds (scopeStrip.reduced (4, 4));
 
     // Keyboard
     auto kbStrip = getLocalBounds().removeFromBottom (124).reduced (16, 8);

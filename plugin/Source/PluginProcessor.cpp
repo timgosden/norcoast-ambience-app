@@ -521,6 +521,9 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         L[s] *= g;
         R[s] *= g;
     }
+
+    // ─── Tap output into the oscilloscope ─────────────────────────────
+    oscilloscope.pushBlock (L, R, n);
 }
 
 juce::AudioProcessorEditor* NorcoastAmbienceProcessor::createEditor()

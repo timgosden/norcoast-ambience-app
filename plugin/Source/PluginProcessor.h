@@ -8,6 +8,7 @@
 #include "Arpeggiator.h"
 #include "DrumMachine.h"
 #include "Texture.h"
+#include "Oscilloscope.h"
 
 class NorcoastAmbienceProcessor : public juce::AudioProcessor
 {
@@ -41,6 +42,7 @@ public:
 
     juce::MidiKeyboardState& getKeyboardState() noexcept { return keyboardState; }
     juce::AudioProcessorValueTreeState& getAPVTS() noexcept { return apvts; }
+    Oscilloscope& getOscilloscope() noexcept { return oscilloscope; }
 
 private:
     static constexpr int kVoicesPerLayer = 8;
@@ -106,6 +108,7 @@ private:
     Arpeggiator arpeggiator;
     DrumMachine drumMachine;
     Texture     texture;
+    Oscilloscope oscilloscope;
     std::vector<int> heldNotesScratch;   // reused across processBlock calls
     float lastReverbSize = -1.0f;
     float lastReverbMod  = -1.0f;
