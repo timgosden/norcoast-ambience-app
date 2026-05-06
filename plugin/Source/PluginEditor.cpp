@@ -3,43 +3,49 @@
 
 namespace
 {
-    constexpr auto kAccent = 0xffc4915e; // standalone's "warm orange"
-    constexpr auto kBg     = 0xff07090e;
-    constexpr auto kBgMid  = 0xff0b0f1a;
-    constexpr auto kBgEdge = 0xff06080d;
-    constexpr auto kRowBg  = 0xff111620;
-    constexpr auto kText   = 0xffe6e1d8;
-    constexpr auto kTextMute = 0x99ffffff;
+    constexpr int kKnobW       = 78;
+    constexpr int kKnobH       = 78;
+    constexpr int kKnobLabelH  = 16;
+    constexpr int kSectionPadX = 12;
+    constexpr int kSectionPadY = 8;
+    constexpr int kSectionHeaderH = 20;
 
-    void styleHeader (juce::Label& l, const juce::String& text)
+    // Distinct accent hue per section so sections stay visually grouped.
+    // Pulled from the standalone's slider strip palette.
+    const juce::Colour kColLayers   { 0xff5eb88a }; // Foundation green
+    const juce::Colour kColModFx    { 0xffc4b8e8 }; // chorus lavender
+    const juce::Colour kColReverbFx { 0xffc4915e }; // reverb warm orange (signature)
+    const juce::Colour kColFilter   { 0xffd46b8a }; // filter pink
+    const juce::Colour kColEq       { 0xffb07acc }; // EQ purple
+    const juce::Colour kColMaster   { 0xffe0d2a8 }; // master cream
+
+    void styleKnobLabel (juce::Label& l, const juce::String& text)
     {
         l.setText (text, juce::dontSendNotification);
-        l.setColour (juce::Label::textColourId, juce::Colour (kAccent));
-        l.setFont (juce::FontOptions (11.0f).withStyle ("Bold"));
-        l.setJustificationType (juce::Justification::centredLeft);
+        l.setJustificationType (juce::Justification::centred);
+        l.setColour (juce::Label::textColourId,
+                     juce::Colour (NorcoastLookAndFeel::kTextDim));
     }
 }
 
-void NorcoastAmbienceEditor::addControl (ParamControl& pc, const juce::String& name,
-                                         const juce::String& paramID)
+void NorcoastAmbienceEditor::setupKnob (ParamKnob& k, const juce::String& displayName,
+                                        const juce::String& paramID,
+                                        const juce::String& suffix)
 {
-    pc.label.setText (name, juce::dontSendNotification);
-    pc.label.setColour (juce::Label::textColourId, juce::Colour (kText));
-    pc.label.setFont (juce::FontOptions (11.0f));
-    pc.label.setJustificationType (juce::Justification::centredLeft);
-    addAndMakeVisible (pc.label);
+    styleKnobLabel (k.label, displayName);
+    addAndMakeVisible (k.label);
 
-    pc.slider.setSliderStyle (juce::Slider::LinearHorizontal);
-    pc.slider.setTextBoxStyle (juce::Slider::TextBoxRight, false, 56, 18);
-    pc.slider.setColour (juce::Slider::trackColourId,        juce::Colour (kAccent));
-    pc.slider.setColour (juce::Slider::backgroundColourId,   juce::Colour (kRowBg));
-    pc.slider.setColour (juce::Slider::thumbColourId,        juce::Colour (kAccent).brighter (0.2f));
-    pc.slider.setColour (juce::Slider::textBoxTextColourId,  juce::Colour (kTextMute));
-    pc.slider.setColour (juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
-    pc.slider.setColour (juce::Slider::textBoxBackgroundColourId, juce::Colours::transparentBlack);
-    addAndMakeVisible (pc.slider);
+    k.knob.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
+    k.knob.setRotaryParameters (juce::MathConstants<float>::pi * 1.25f,
+                                juce::MathConstants<float>::pi * 2.75f,
+                                true);
+    k.knob.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 64, 14);
+    k.knob.setLookAndFeel (&laf);
+    if (suffix.isNotEmpty())
+        k.knob.setTextValueSuffix (suffix);
+    addAndMakeVisible (k.knob);
 
-    pc.attach = std::make_unique<SliderAttach> (owner.getAPVTS(), paramID, pc.slider);
+    k.attach = std::make_unique<SliderAttach> (owner.getAPVTS(), paramID, k.knob);
 }
 
 NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
@@ -47,14 +53,18 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
       owner    (p),
       keyboard (p.getKeyboardState())
 {
+    setLookAndFeel (&laf);
+
     addAndMakeVisible (keyboard);
     keyboard.setLowestVisibleKey (48);
     keyboard.setColour (juce::MidiKeyboardComponent::whiteNoteColourId,
                         juce::Colour::fromRGB (0xc4, 0xc0, 0xb6));
     keyboard.setColour (juce::MidiKeyboardComponent::keySeparatorLineColourId,
-                        juce::Colour (kBgEdge));
+                        juce::Colour (NorcoastLookAndFeel::kBgEdge));
     keyboard.setColour (juce::MidiKeyboardComponent::keyDownOverlayColourId,
-                        juce::Colour (kAccent).withAlpha (0.55f));
+                        juce::Colour (NorcoastLookAndFeel::kAccent).withAlpha (0.55f));
+    keyboard.setColour (juce::MidiKeyboardComponent::mouseOverKeyOverlayColourId,
+                        juce::Colour (NorcoastLookAndFeel::kAccent).withAlpha (0.25f));
 
     addAndMakeVisible (latchButton);
     latchButton.setClickingTogglesState (true);
@@ -63,113 +73,170 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     addAndMakeVisible (allOffButton);
     allOffButton.onClick = [this] { owner.getKeyboardState().allNotesOff (1); };
 
-    styleHeader (layersHeader, "LAYERS");
-    styleHeader (fxHeader,     "FX");
-    styleHeader (eqHeader,     "EQ");
-    styleHeader (masterHeader, "MASTER");
-    addAndMakeVisible (layersHeader);
-    addAndMakeVisible (fxHeader);
-    addAndMakeVisible (eqHeader);
-    addAndMakeVisible (masterHeader);
+    setupKnob (foundationVol, "Foundation",   ParamID::foundationVol);
+    setupKnob (padsVol,       "Pads",         ParamID::padsVol);
 
-    addControl (foundationVol, "Foundation",     ParamID::foundationVol);
-    addControl (padsVol,       "Pads",           ParamID::padsVol);
+    setupKnob (chorusMix,     "Chorus",       ParamID::chorusMix);
+    setupKnob (delayMix,      "Delay",        ParamID::delayMix);
+    setupKnob (delayFb,       "Feedback",     ParamID::delayFb);
+    setupKnob (delayTimeMs,   "Time",         ParamID::delayTimeMs, " ms");
+    setupKnob (delayTone,     "Tone",         ParamID::delayTone);
 
-    addControl (chorusMix,     "Chorus",         ParamID::chorusMix);
-    addControl (delayMix,      "Delay Mix",      ParamID::delayMix);
-    addControl (delayFb,       "Delay Feedback", ParamID::delayFb);
-    addControl (delayTimeMs,   "Delay Time",     ParamID::delayTimeMs);
-    addControl (delayTone,     "Delay Tone",     ParamID::delayTone);
-    addControl (reverbMix,     "Reverb Mix",     ParamID::reverbMix);
-    addControl (reverbSize,    "Reverb Size",    ParamID::reverbSize);
-    addControl (reverbMod,     "Reverb Mod",     ParamID::reverbMod);
+    setupKnob (reverbMix,     "Reverb",       ParamID::reverbMix);
+    setupKnob (reverbSize,    "Size",         ParamID::reverbSize);
+    setupKnob (reverbMod,     "Mod",          ParamID::reverbMod);
+    setupKnob (shimmerVol,    "Shimmer",      ParamID::shimmerVol);
 
-    addControl (eqLow,         "Low (100)",      ParamID::eqLow);
-    addControl (eqLoMid,       "Lo-Mid (350)",   ParamID::eqLoMid);
-    addControl (eqHiMid,       "Hi-Mid (2.5k)",  ParamID::eqHiMid);
-    addControl (eqHigh,        "High (8k)",      ParamID::eqHigh);
+    setupKnob (hpfFreq,       "High Pass",    ParamID::hpfFreq);
+    setupKnob (lpfFreq,       "Low Pass",     ParamID::lpfFreq);
 
-    addControl (hpfFreq,       "High Pass",      ParamID::hpfFreq);
-    addControl (lpfFreq,       "Low Pass",       ParamID::lpfFreq);
-    addControl (shimmerVol,    "Shimmer",        ParamID::shimmerVol);
-    addControl (widthMod,      "Width LFO",      ParamID::widthMod);
-    addControl (satAmt,        "Saturation",     ParamID::satAmt);
-    addControl (masterVol,     "Master",         ParamID::masterVol);
+    setupKnob (eqLow,         "Low",          ParamID::eqLow,    " dB");
+    setupKnob (eqLoMid,       "Lo-Mid",       ParamID::eqLoMid,  " dB");
+    setupKnob (eqHiMid,       "Hi-Mid",       ParamID::eqHiMid,  " dB");
+    setupKnob (eqHigh,        "High",         ParamID::eqHigh,   " dB");
 
-    setSize (820, 560);
+    setupKnob (widthMod,      "Width",        ParamID::widthMod);
+    setupKnob (satAmt,        "Saturation",   ParamID::satAmt);
+    setupKnob (masterVol,     "Master",       ParamID::masterVol);
+
+    sections =
+    {{
+        { "LAYERS",           kColLayers,   {}, { &foundationVol, &padsVol } },
+        { "CHORUS  /  DELAY", kColModFx,    {}, { &chorusMix, &delayMix, &delayFb, &delayTimeMs, &delayTone } },
+        { "REVERB",           kColReverbFx, {}, { &reverbMix, &reverbSize, &reverbMod, &shimmerVol } },
+        { "FILTER",           kColFilter,   {}, { &hpfFreq, &lpfFreq } },
+        { "EQ",               kColEq,       {}, { &eqLow, &eqLoMid, &eqHiMid, &eqHigh } },
+        { "MASTER",           kColMaster,   {}, { &widthMod, &satAmt, &masterVol } }
+    }};
+
+    setSize (920, 660);
+}
+
+NorcoastAmbienceEditor::~NorcoastAmbienceEditor()
+{
+    setLookAndFeel (nullptr);
+    auto clearLF = [this] (ParamKnob& k) { k.knob.setLookAndFeel (nullptr); };
+    for (auto& s : sections)
+        for (auto* k : s.knobs)
+            clearLF (*k);
 }
 
 void NorcoastAmbienceEditor::paint (juce::Graphics& g)
 {
-    juce::ColourGradient bg (juce::Colour (kBg), 0.0f, 0.0f,
-                             juce::Colour (kBgEdge),
+    // Background
+    juce::ColourGradient bg (juce::Colour (NorcoastLookAndFeel::kBg), 0.0f, 0.0f,
+                             juce::Colour (NorcoastLookAndFeel::kBgEdge),
                              (float) getWidth(), (float) getHeight(), false);
-    bg.addColour (0.4, juce::Colour (kBgMid));
+    bg.addColour (0.45, juce::Colour (NorcoastLookAndFeel::kBgMid));
     g.setGradientFill (bg);
     g.fillAll();
 
-    auto bounds = getLocalBounds().reduced (24);
+    auto bounds = getLocalBounds().reduced (16);
 
-    g.setColour (juce::Colour (kAccent).withAlpha (0.85f));
-    g.setFont (juce::FontOptions (20.0f).withStyle ("Light"));
+    // Title
+    auto top = bounds.removeFromTop (52);
+    g.setColour (juce::Colour (NorcoastLookAndFeel::kAccent));
+    g.setFont (juce::FontOptions (24.0f).withStyle ("Light"));
     g.drawText ("NORCOAST AMBIENCE",
-                bounds.removeFromTop (32),
+                top.removeFromTop (32).withTrimmedLeft (8),
                 juce::Justification::centredLeft);
 
-    g.setColour (juce::Colour (0x33ffffff));
-    g.setFont (juce::FontOptions (11.0f));
-    g.drawText ("plugin · v1.3 · phase 6 (+ master HPF/LPF)",
-                getLocalBounds().removeFromBottom (24).reduced (12, 4),
+    g.setColour (juce::Colour (NorcoastLookAndFeel::kTextDim));
+    g.setFont (juce::FontOptions (10.5f));
+    g.drawText ("ambient synth · v1.4 · phase 7",
+                top.withTrimmedLeft (8),
+                juce::Justification::centredLeft);
+
+    // Section panels
+    for (auto& s : sections)
+    {
+        const auto r = s.bounds.toFloat();
+        if (r.isEmpty()) continue;
+
+        // Panel body
+        g.setColour (juce::Colour (NorcoastLookAndFeel::kPanelBg));
+        g.fillRoundedRectangle (r, 6.0f);
+        g.setColour (juce::Colour (NorcoastLookAndFeel::kPanelEdge));
+        g.drawRoundedRectangle (r, 6.0f, 1.0f);
+
+        // Header strip — a thin coloured line at top
+        const auto headerStrip = r.withHeight (3.0f).reduced (10.0f, 0.0f);
+        g.setColour (s.accent.withAlpha (0.85f));
+        g.fillRoundedRectangle (headerStrip, 1.5f);
+
+        // Header title
+        g.setColour (s.accent);
+        g.setFont (juce::FontOptions (10.0f).withStyle ("Bold"));
+        g.drawText (s.title,
+                    s.bounds.withTrimmedTop (8).withHeight (kSectionHeaderH).reduced (10, 0),
+                    juce::Justification::centredLeft);
+    }
+
+    // Footer
+    g.setColour (juce::Colour (0x55ffffff));
+    g.setFont (juce::FontOptions (10.0f));
+    g.drawText ("plugin · v1.4 · phase 7  (smoother shimmer · rotary GUI)",
+                getLocalBounds().removeFromBottom (24).reduced (16, 4),
                 juce::Justification::centredRight);
 }
 
 void NorcoastAmbienceEditor::resized()
 {
-    auto bounds = getLocalBounds().reduced (24);
+    auto bounds = getLocalBounds().reduced (16);
 
-    // Top bar — title is drawn in paint(); just reserve the height.
-    bounds.removeFromTop (32);
+    // Title strip
+    bounds.removeFromTop (52);
+    bounds.removeFromTop (8);
+
+    // Knob area: 2 rows × 3 columns of section panels.
+    auto knobArea = bounds.removeFromTop (340);
+    const int rowH = (knobArea.getHeight() - 8) / 2;
+    auto row1 = knobArea.removeFromTop (rowH);
+    knobArea.removeFromTop (8);
+    auto row2 = knobArea;
+
+    // Top row column widths shaped by knob counts.
+    // Layers (2), Chorus/Delay (5), Reverb (4) — total 11 knobs → ratios 2/5/4
+    const int row1Width = row1.getWidth();
+    const int col1Top = (int)(row1Width * (2.0f / 11.0f));
+    const int col2Top = (int)(row1Width * (5.0f / 11.0f));
+    sections[0].bounds = row1.removeFromLeft (col1Top).reduced (4, 0);
+    sections[1].bounds = row1.removeFromLeft (col2Top).reduced (4, 0);
+    sections[2].bounds = row1.reduced (4, 0);
+
+    // Bottom row: Filter (2), EQ (4), Master (3) — ratios 2/4/3
+    const int row2Width = row2.getWidth();
+    const int col1Bot = (int)(row2Width * (2.0f / 9.0f));
+    const int col2Bot = (int)(row2Width * (4.0f / 9.0f));
+    sections[3].bounds = row2.removeFromLeft (col1Bot).reduced (4, 0);
+    sections[4].bounds = row2.removeFromLeft (col2Bot).reduced (4, 0);
+    sections[5].bounds = row2.reduced (4, 0);
+
+    // Lay out knobs inside each section
+    for (auto& s : sections)
+    {
+        if (s.knobs.empty()) continue;
+        auto inner = s.bounds.reduced (kSectionPadX, kSectionPadY)
+                             .withTrimmedTop (kSectionHeaderH);
+        const int kW = inner.getWidth() / (int) s.knobs.size();
+        for (auto* k : s.knobs)
+        {
+            auto col = inner.removeFromLeft (kW);
+            k->label.setBounds (col.removeFromTop (kKnobLabelH));
+            k->knob .setBounds (col.reduced (4, 2));
+        }
+    }
+
     bounds.removeFromTop (12);
 
-    // Slider grid: 4 columns side by side.
-    auto grid = bounds.removeFromTop (290);
-
-    const int colW    = grid.getWidth() / 4;
-    const int rowH    = 36;
-    const int headerH = 20;
-
-    auto layoutColumn = [&] (juce::Rectangle<int> col, juce::Label& header,
-                             std::initializer_list<ParamControl*> controls)
-    {
-        col.reduce (8, 0);
-        header.setBounds (col.removeFromTop (headerH));
-        col.removeFromTop (4);
-        for (auto* c : controls)
-        {
-            auto row = col.removeFromTop (rowH);
-            c->label.setBounds  (row.removeFromTop (14));
-            c->slider.setBounds (row.removeFromTop (20));
-        }
-    };
-
-    layoutColumn (grid.removeFromLeft (colW), layersHeader,
-                  { &foundationVol, &padsVol });
-    layoutColumn (grid.removeFromLeft (colW), fxHeader,
-                  { &chorusMix, &delayMix, &delayFb, &delayTimeMs,
-                    &delayTone, &reverbMix, &reverbSize, &reverbMod });
-    layoutColumn (grid.removeFromLeft (colW), eqHeader,
-                  { &eqLow, &eqLoMid, &eqHiMid, &eqHigh });
-    layoutColumn (grid,                       masterHeader,
-                  { &hpfFreq, &lpfFreq, &shimmerVol, &widthMod, &satAmt, &masterVol });
-
-    // Latch + All Off buttons row
-    auto buttons = bounds.removeFromBottom (160).removeFromTop (32);
-    const int buttonW = 110;
+    // Buttons row
+    auto buttons = bounds.removeFromTop (32);
+    const int buttonW = 96;
     latchButton.setBounds  (buttons.removeFromLeft (buttonW));
     buttons.removeFromLeft (8);
     allOffButton.setBounds (buttons.removeFromLeft (buttonW));
 
     // Keyboard
-    auto kbStrip = getLocalBounds().removeFromBottom (124).reduced (24, 12);
+    auto kbStrip = getLocalBounds().removeFromBottom (124).reduced (16, 8);
     keyboard.setBounds (kbStrip);
 }
