@@ -855,18 +855,22 @@ void NorcoastAmbienceProcessor::setCurrentProgram (int idx)
     const auto& list = Presets::factory();
     if (idx < 0 || idx >= (int) list.size()) return;
 
-    // Snapshot the GLOBAL EQ before applying the preset so it persists
-    // across preset switches — the user wants the EQ to feel like a
-    // master output stage that doesn't get disturbed by patch recall.
-    const float eqLo = apvts.getRawParameterValue (ParamID::eqLow)  ->load();
-    const float eqLm = apvts.getRawParameterValue (ParamID::eqLoMid)->load();
-    const float eqHm = apvts.getRawParameterValue (ParamID::eqHiMid)->load();
-    const float eqHi = apvts.getRawParameterValue (ParamID::eqHigh) ->load();
+    // Snapshot the global / performance params before applying. EQ
+    // behaves like a master output stage; home root, BPM and time
+    // signature are the user's current key/tempo choices and stay
+    // with the player rather than the patch — sound presets layer
+    // onto whatever the band's currently playing.
+    const float eqLo = apvts.getRawParameterValue (ParamID::eqLow)   ->load();
+    const float eqLm = apvts.getRawParameterValue (ParamID::eqLoMid) ->load();
+    const float eqHm = apvts.getRawParameterValue (ParamID::eqHiMid) ->load();
+    const float eqHi = apvts.getRawParameterValue (ParamID::eqHigh)  ->load();
+    const float root = apvts.getRawParameterValue (ParamID::homeRoot)->load();
+    const float bpmV = apvts.getRawParameterValue (ParamID::bpm)     ->load();
+    const float ts   = apvts.getRawParameterValue (ParamID::timeSig) ->load();
 
     Presets::apply (apvts, list[(size_t) idx]);
     currentProgram = idx;
 
-    // Restore EQ values.
     auto restore = [this] (const char* paramID, float value)
     {
         if (auto* p = apvts.getParameter (paramID))
@@ -875,10 +879,13 @@ void NorcoastAmbienceProcessor::setCurrentProgram (int idx)
             p->setValueNotifyingHost (range.convertTo0to1 (value));
         }
     };
-    restore (ParamID::eqLow,   eqLo);
-    restore (ParamID::eqLoMid, eqLm);
-    restore (ParamID::eqHiMid, eqHm);
-    restore (ParamID::eqHigh,  eqHi);
+    restore (ParamID::eqLow,    eqLo);
+    restore (ParamID::eqLoMid,  eqLm);
+    restore (ParamID::eqHiMid,  eqHm);
+    restore (ParamID::eqHigh,   eqHi);
+    restore (ParamID::homeRoot, root);
+    restore (ParamID::bpm,      bpmV);
+    restore (ParamID::timeSig,  ts);
 
     // Notify any AudioProcessorListeners — host preset menus rely on this
     // to refresh their displayed program-name when state changes.

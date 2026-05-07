@@ -8,6 +8,7 @@
 #include "BitmaskPillRow.h"
 #include "StepSequencerGrid.h"
 #include "EqCurveDisplay.h"
+#include "FaderSlider.h"
 
 class NorcoastAmbienceEditor : public juce::AudioProcessorEditor,
                                private juce::Timer,
@@ -25,10 +26,13 @@ private:
     using ButtonAttach = juce::AudioProcessorValueTreeState::ButtonAttachment;
 
     // One rotary knob with a top label and APVTS attachment.
+    // Uses FaderSlider so the layer-volume strips can have their thumb
+    // positions visually scaled by stopFadeMult during the Stop fade
+    // (rotary knobs ignore the multiplier).
     struct ParamKnob
     {
         juce::Label  label;
-        juce::Slider knob;
+        FaderSlider  knob;
         std::unique_ptr<SliderAttach> attach;
     };
 
@@ -112,6 +116,11 @@ private:
     void loadPresetFromFile();
     void confirmDeleteSelectedUserPreset();
     std::unique_ptr<juce::AlertWindow> deletePromptWindow;
+
+    // Replace the APVTS state but preserve the player's "live"
+    // performance params (home root, BPM, time sig, global EQ) so a
+    // preset never overwrites the song's key/tempo.
+    void replaceStatePreservingPerformanceParams (juce::ValueTree newState);
 
     // ─── User-preset storage ────────────────────────────────────────
     // User presets live as .ncpre XML files in a known directory. The

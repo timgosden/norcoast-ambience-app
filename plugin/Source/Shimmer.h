@@ -40,7 +40,11 @@ public:
         inner.reset();
 
         const auto hpf = juce::dsp::IIR::Coefficients<float>::makeHighPass (sr,  180.0f, 0.5f);
-        const auto lpf = juce::dsp::IIR::Coefficients<float>::makeLowPass  (sr, 6500.0f, 0.5f);
+        // 4 kHz LPF in the feedback loop. The 6.5 kHz it used to be at
+        // let too much pitch-shifted high-mid through, and after a few
+        // feedback iterations the tail piled up bright energy. 4 kHz
+        // produces the warm bell tail you actually want from a shimmer.
+        const auto lpf = juce::dsp::IIR::Coefficients<float>::makeLowPass  (sr, 4000.0f, 0.5f);
         *fbHpfL.coefficients = *hpf; *fbHpfR.coefficients = *hpf;
         *fbLpfL.coefficients = *lpf; *fbLpfR.coefficients = *lpf;
         fbHpfL.reset(); fbHpfR.reset();
@@ -72,7 +76,24 @@ public:
     // octave-up reverb send into the main bus.
     void processAdd (juce::AudioBuffer<float>& mainBuffer, float wetMix)
     {
-        if (wetMix < 1e-4f) return;
+        // When the shimmer goes from off to on, the feedback buffer
+        // (and the reverb / pitch-shifter internal state) still hold
+        // whatever was last circulating in the loop. Re-engaging would
+        // dump that stale signal back into the room. Detect the
+        // transition and flush every internal store first.
+        const bool nowActive = wetMix >= 1e-4f;
+        if (nowActive && ! lastActive)
+        {
+            fbBuf.clear();
+            wetBuf.clear();
+            loopBuf.clear();
+            inner.reset();
+            fbHpfL.reset(); fbHpfR.reset();
+            fbLpfL.reset(); fbLpfR.reset();
+            shifter.reset();
+        }
+        lastActive = nowActive;
+        if (! nowActive) return;
 
         const int n   = mainBuffer.getNumSamples();
         const int nch = mainBuffer.getNumChannels();
@@ -155,4 +176,8 @@ private:
     juce::AudioBuffer<float> wetBuf;     // reverb output for this block
     juce::AudioBuffer<float> loopBuf;    // wet → filters → pitch shift staging
     juce::AudioBuffer<float> fbBuf;      // pitch-shifted feedback for next block
+
+    // Tracks whether shimmer was active last block; used to flush
+    // stale feedback when the user re-engages it after a quiet stretch.
+    bool lastActive = false;
 };

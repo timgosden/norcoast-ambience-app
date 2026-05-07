@@ -127,7 +127,11 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
                           juce::Colour (0xffd46b8a).withAlpha (0.7f));
     stopButton.onClick = [this]
     {
-        owner.setStopped (stopButton.getToggleState());
+        const bool nowStopped = stopButton.getToggleState();
+        owner.setStopped (nowStopped);
+        // Label flip so the next click's intent is obvious: when it's
+        // stopped, the button is the way to start again.
+        stopButton.setButtonText (nowStopped ? "Start" : "Stop");
     };
     stopButton.setTooltip ("Fade the dry sources to silence over the Fade Time set on the Advanced page. Reverb / delay tails ring out past the fade. Click again to fade back in.");
     saveButton.setTooltip ("Save the current state as a preset.");
@@ -211,6 +215,26 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
             const bool open = btn.getToggleState();
             *flagRefPtr = open;
             btn.setButtonText (open ? labelOn : labelOff);
+
+            // Sequencer and Custom Chord panels share the vertical
+            // budget below the EVOLVE strip. Open one and the other
+            // closes — opening both at once stomps the surrounding
+            // strips off-screen.
+            if (open)
+            {
+                if (flagRefPtr == &customChordExpanded && sequencerExpanded)
+                {
+                    sequencerExpanded = false;
+                    sequencerToggleButton.setToggleState (false, juce::dontSendNotification);
+                    sequencerToggleButton.setButtonText ("Sequencer +");
+                }
+                else if (flagRefPtr == &sequencerExpanded && customChordExpanded)
+                {
+                    customChordExpanded = false;
+                    customChordToggleButton.setToggleState (false, juce::dontSendNotification);
+                    customChordToggleButton.setButtonText ("Custom Chord +");
+                }
+            }
             resized();
             repaint();
         };
@@ -262,7 +286,7 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
                 const auto file = userPresetFiles.getReference (idx);
                 if (auto xml = juce::parseXML (file))
                     if (xml->hasTagName (owner.getAPVTS().state.getType()))
-                        owner.getAPVTS().replaceState (
+                        replaceStatePreservingPerformanceParams (
                             juce::ValueTree::fromXml (*xml));
             }
         }
@@ -618,24 +642,8 @@ void NorcoastAmbienceEditor::sliderValueChanged (juce::Slider* s)
 
 void NorcoastAmbienceEditor::timerCallback()
 {
-    bool changed = false;
-    for (size_t i = 0; i < meterLevels.size(); ++i)
-    {
-        const float raw = owner.layerLevels[i].load (std::memory_order_relaxed);
-        // dB-mapped meter: -60 dB → 0 visual, 0 dB → full bar. So a
-        // typical -20 dB peak now renders at ~67 % bar height instead
-        // of ~10 % under linear scaling — much more responsive.
-        const float dB = juce::Decibels::gainToDecibels (raw, -60.0f);
-        const float visual = juce::jlimit (0.0f, 1.0f, (dB + 60.0f) / 60.0f);
-        const float decayed = meterLevels[i] * 0.82f;
-        const float next    = juce::jmax (visual, decayed);
-        if (std::abs (next - meterLevels[i]) > 1e-3f)
-        {
-            meterLevels[i] = next;
-            changed = true;
-        }
-    }
-    if (changed) repaint();
+    // Level meters were removed; the processor still writes
+    // layerLevels[] but no editor surface reads it now.
 
     // Visual Stop fade — eases toward 0 while stopped, back to 1 when
     // released. Frame-time-independent (uses real ms delta) so it
@@ -658,18 +666,19 @@ void NorcoastAmbienceEditor::timerCallback()
             visualStopMult = juce::jmax (target, visualStopMult - step);
         if (std::abs (visualStopMult - prev) > 1e-3f)
         {
-            // Push the new multiplier to the 6 source layer faders.
-            // Master + LPF aren't included — the master fader doesn't
-            // represent a "source" the user said to fade, and LPF is a
-            // filter cutoff, not a level.
-            ParamKnob* sources[6] = {
-                &foundationVol, &padsVol, &padsVol2, &textureVol,
-                &arpVol,        &drumVol
+            // Push the new multiplier directly onto the 6 source-layer
+            // FaderSlider instances. Master + LPF are intentionally
+            // excluded (master isn't a "source", LPF is a filter
+            // cutoff, not a level). Calling repaint on each forces
+            // FaderSlider::paint to re-run with the new multiplier.
+            FaderSlider* sources[6] = {
+                &foundationVol.knob, &padsVol.knob, &padsVol2.knob, &textureVol.knob,
+                &arpVol.knob,        &drumVol.knob
             };
-            for (auto* k : sources)
+            for (auto* s : sources)
             {
-                k->knob.getProperties().set ("stopFadeMult", visualStopMult);
-                k->knob.repaint();
+                s->stopFadeMult = visualStopMult;
+                s->repaint();
             }
         }
     }
@@ -902,8 +911,42 @@ void NorcoastAmbienceEditor::loadPresetFromFile()
             if (! file.existsAsFile()) return;
             if (auto xml = juce::parseXML (file))
                 if (xml->hasTagName (owner.getAPVTS().state.getType()))
-                    owner.getAPVTS().replaceState (juce::ValueTree::fromXml (*xml));
+                    replaceStatePreservingPerformanceParams (
+                        juce::ValueTree::fromXml (*xml));
         });
+}
+
+void NorcoastAmbienceEditor::replaceStatePreservingPerformanceParams (juce::ValueTree newState)
+{
+    // Snapshot the live performance params, swap state, then put them
+    // back so a preset never recalls the player's key / BPM / time
+    // signature / global EQ.
+    auto& vts = owner.getAPVTS();
+    const float eqLo = vts.getRawParameterValue (ParamID::eqLow)   ->load();
+    const float eqLm = vts.getRawParameterValue (ParamID::eqLoMid) ->load();
+    const float eqHm = vts.getRawParameterValue (ParamID::eqHiMid) ->load();
+    const float eqHi = vts.getRawParameterValue (ParamID::eqHigh)  ->load();
+    const float root = vts.getRawParameterValue (ParamID::homeRoot)->load();
+    const float bpmV = vts.getRawParameterValue (ParamID::bpm)     ->load();
+    const float ts   = vts.getRawParameterValue (ParamID::timeSig) ->load();
+
+    vts.replaceState (newState);
+
+    auto restore = [&vts] (const char* paramID, float value)
+    {
+        if (auto* p = vts.getParameter (paramID))
+        {
+            const auto range = p->getNormalisableRange();
+            p->setValueNotifyingHost (range.convertTo0to1 (value));
+        }
+    };
+    restore (ParamID::eqLow,    eqLo);
+    restore (ParamID::eqLoMid,  eqLm);
+    restore (ParamID::eqHiMid,  eqHm);
+    restore (ParamID::eqHigh,   eqHi);
+    restore (ParamID::homeRoot, root);
+    restore (ParamID::bpm,      bpmV);
+    restore (ParamID::timeSig,  ts);
 }
 
 void NorcoastAmbienceEditor::paint (juce::Graphics& g)
@@ -985,27 +1028,8 @@ void NorcoastAmbienceEditor::paint (juce::Graphics& g)
             g.setColour (juce::Colour (NorcoastLookAndFeel::kPanelEdge).withAlpha (0.6f));
             g.drawHorizontalLine ((int) sepY, r.getX() + 12.0f, r.getRight() - 12.0f);
 
-            // Per-fader level meters — a thin orange bar inside each
-            // layer column that bounces with the audio. Painted last so
-            // it overlays the slider track.
-            ParamKnob* faders[6] = {
-                &foundationVol, &padsVol, &padsVol2, &textureVol,
-                &arpVol,        &drumVol
-            };
-            for (int i = 0; i < 6; ++i)
-            {
-                const auto fb = faders[i]->knob.getBounds().toFloat();
-                if (fb.isEmpty()) continue;
-                const float lvl = juce::jlimit (0.0f, 1.0f, meterLevels[(size_t) i]);
-                if (lvl <= 0.001f) continue;
-                const float barH = fb.getHeight() * lvl;
-                const float barX = fb.getCentreX() - 1.5f;
-                const auto bar = juce::Rectangle<float> (barX,
-                                                          fb.getBottom() - barH,
-                                                          3.0f, barH);
-                g.setColour (juce::Colour (0xffe8a45e).withAlpha (0.55f));
-                g.fillRoundedRectangle (bar, 1.5f);
-            }
+            // Level meters were removed per user feedback — too tiny to
+            // be useful, and visually crowded the fader thumbs.
         }
     }
 
@@ -1354,10 +1378,10 @@ void NorcoastAmbienceEditor::resized()
             // than overflow when space is tight.
             const int reserveBelow = 40 + 2;
             const int avail = juce::jmax (0, bounds.getHeight() - reserveBelow);
-            // Cap was 96 → bumped to 108 so each of the 3 voice rows
-            // gains ~4 px in cell height (rows split the inner area
-            // evenly: +12 px component → +4 px per row).
-            const int seqH  = juce::jmin (108, avail);
+            // Each voice row is component height / 3, so bumping the
+            // cap to 132 gives ~+8 px per row over the original 96 cap
+            // — chunky enough to hit reliably on stage.
+            const int seqH  = juce::jmin (132, avail);
             if (seqH > 0)
             {
                 stepSequencer->setBounds (bounds.removeFromTop (seqH).reduced (12, 0));
