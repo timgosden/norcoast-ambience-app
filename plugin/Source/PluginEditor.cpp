@@ -5,7 +5,7 @@
 
 namespace
 {
-    constexpr int kKnobLabelH     = 16;
+    constexpr int kKnobLabelH     = 20;     // ↑ a touch taller so the "Reverb / Shimmer / …" captions read at gigging distance.
     constexpr int kSectionPadX    = 12;
     constexpr int kSectionPadY    = 8;
     constexpr int kSectionHeaderH = 20;
@@ -45,10 +45,15 @@ void NorcoastAmbienceEditor::setupKnob (ParamKnob& k, const juce::String& displa
     addAndMakeVisible (k.label);
 
     k.knob.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
-    k.knob.setRotaryParameters (juce::MathConstants<float>::pi * 1.25f,
-                                juce::MathConstants<float>::pi * 2.75f,
-                                true);
-    k.knob.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 64, 18);
+    // Symmetric ±135° range so midpoint (0.5) lands at exactly 12 o'clock
+    // — the previous 1.25π … 2.75π range computed thumbAngle = 2π at the
+    // midpoint, mathematically equivalent to 0 but prone to float-rounding
+    // drift so the tick rendered just past straight-up.
+    {
+        const float halfRange = juce::MathConstants<float>::pi * 0.75f;
+        k.knob.setRotaryParameters (-halfRange, halfRange, true);
+    }
+    k.knob.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 64, 14);
     k.knob.setLookAndFeel (&laf);
     addAndMakeVisible (k.knob);
 
@@ -310,6 +315,19 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     setupKnob (eqHiMid,     "Hi-Mid",      ParamID::eqHiMid,  " dB");
     setupKnob (eqHigh,      "High",        ParamID::eqHigh,   " dB");
 
+    // EQ controls render as vertical sliders on the Advanced panel
+    // (visual cue: thumb position = boost/cut around 0 dB centre).
+    // Knob format/attachment is kept from setupKnob so the param + label
+    // wiring is identical; we just swap the slider style and centre the
+    // bipolar value.
+    for (auto* k : { &eqLow, &eqLoMid, &eqHiMid, &eqHigh })
+    {
+        k->knob.setSliderStyle (juce::Slider::LinearBarVertical);
+        k->knob.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 60, 14);
+        k->knob.setColour (juce::Slider::trackColourId,
+                           juce::Colour (0xffb07acc));    // EQ purple
+    }
+
     auto setAdvancedKnobsVisible = [this] (bool on)
     {
         for (auto* k : { &reverbSize, &reverbMod,
@@ -433,7 +451,7 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
                      &arpVol, &drumVol, &lpfFreq, &masterVol })
     {
         k->knob.setSliderStyle (juce::Slider::LinearVertical);
-        k->knob.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 60, 18);
+        k->knob.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 60, 14);
     }
 
     // ── Mute buttons for the 6 audio layers ──────────────────────────
@@ -674,33 +692,31 @@ void NorcoastAmbienceEditor::resized()
     // Three groups (Reverb · Delay · EQ) of knobs with section labels.
     if (advExpanded)
     {
+        // All knobs the same size — divide the whole Advanced area by the
+        // total knob count regardless of which group they belong to.
+        // EQ slot at the right is rendered as four vertical bar sliders
+        // so cuts/boosts read at a glance.
         auto adv = mixerArea.reduced (16, 18);
-        adv.removeFromTop (8);                            // breathing room
+        adv.removeFromTop (8);
 
-        const int third  = adv.getWidth() / 3;
-        auto reverbCol = adv.removeFromLeft (third);
-        auto delayCol  = adv.removeFromLeft (third);
-        auto eqCol     = adv;
-
-        auto layoutGroup = [] (juce::Rectangle<int> col,
-                               std::initializer_list<ParamKnob*> knobs)
-        {
-            const int n = (int) knobs.size();
-            const int colW = col.getWidth() / juce::jmax (1, n);
-            int i = 0;
-            for (auto* k : knobs)
-            {
-                (void) i;
-                auto c = col.removeFromLeft (colW);
-                k->label.setBounds (c.removeFromTop (kKnobLabelH));
-                k->knob .setBounds (c.reduced (4, 6));
-                ++i;
-            }
+        ParamKnob* knobs[] = {
+            &reverbSize, &reverbMod,                         // Reverb
+            &delayTimeMs, &delayFb, &delayTone,              // Delay
+            &eqLow, &eqLoMid, &eqHiMid, &eqHigh              // EQ (vertical bars)
         };
-        layoutGroup (reverbCol, { &reverbSize, &reverbMod });
-        layoutGroup (delayCol,  { &delayTimeMs, &delayFb, &delayTone });
-        layoutGroup (eqCol,     { &eqLow, &eqLoMid, &eqHiMid, &eqHigh });
-        // Skip the regular mixer layout below.
+        const int n    = (int) (sizeof (knobs) / sizeof (knobs[0]));
+        const int colW = adv.getWidth() / n;
+
+        for (int i = 0; i < n; ++i)
+        {
+            auto c = adv.removeFromLeft (colW);
+            knobs[i]->label.setBounds (c.removeFromTop (kKnobLabelH));
+            // EQ bars get more vertical bite; rotary knobs use the same
+            // square box as the FX row.
+            const bool isEq = (i >= 5);
+            knobs[i]->knob.setBounds (isEq ? c.reduced (8, 4)
+                                            : c.reduced (4, 6));
+        }
         qwertyKeyboard.setBounds (getWidth() - 2, getHeight() - 2, 1, 1);
         return;
     }
@@ -818,8 +834,10 @@ void NorcoastAmbienceEditor::resized()
         return outBounds.reduced (12, 4);     // inner padding
     };
 
-    auto labelInside = [] (juce::Rectangle<int>& strip, int width = 64)
+    auto labelInside = [] (juce::Rectangle<int>& strip, int width = 76)
     {
+        // Wider than before (was 64) so the "MOVEMENT" label has room
+        // to sit without truncating to "MOVEME...".
         return strip.removeFromLeft (width);
     };
 
@@ -830,7 +848,7 @@ void NorcoastAmbienceEditor::resized()
     // of the bars row instead of consuming pole position. Bars itself
     // is now a button row (was a tiny knob, hard to grab on stage).
     {
-        auto inner = layoutStrip (evolveStripBounds, 48);
+        auto inner = layoutStrip (evolveStripBounds, 40);
         labelInside (inner);
         customChordToggleButton.setBounds (inner.removeFromRight (140).reduced (2, 4));
         inner.removeFromRight (8);
@@ -866,7 +884,7 @@ void NorcoastAmbienceEditor::resized()
     // 4/4 vs 6/8 toggle moved up into the title bar so it lives next
     // to BPM where time-related controls naturally cluster.
     {
-        auto inner = layoutStrip (drumsStripBounds, 48);
+        auto inner = layoutStrip (drumsStripBounds, 40);
         labelInside (inner);
         sequencerToggleButton.setBounds (inner.removeFromRight (110).reduced (2, 4));
         inner.removeFromRight (8);
@@ -892,7 +910,7 @@ void NorcoastAmbienceEditor::resized()
     // [ ARP ] [ Voice 3-pill ............ ] [ Rate 5-pill ............ ]
     // Octaves moved over the Arp fader column in the mixer below.
     {
-        auto inner = layoutStrip (arpStripBounds, 48);
+        auto inner = layoutStrip (arpStripBounds, 40);
         labelInside (inner);
         const int half = inner.getWidth() / 2;
         if (arpVoiceRow != nullptr)
