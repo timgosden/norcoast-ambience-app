@@ -3,9 +3,9 @@
 #include <vector>
 #include <juce_dsp/juce_dsp.h>
 #include "DattorroReverb.h"
-#include "GranularPitchShift.h"
+#include "SmbPitchShift.h"
 
-// Shimmer v4 — proper feedback-loop shimmer reverb.
+// Shimmer v5 — feedback-loop shimmer with phase-vocoder pitch shift.
 //
 // Topology (per block):
 //   dry input + previous-block feedback   →  Dattorro plate reverb
@@ -14,14 +14,13 @@
 //                                         →  becomes next block's feedback
 //   reverb out (pre-feedback-tap)         →  user wet
 //
-// Sparkle is the reverb tail itself recursively pitched up an octave —
-// the same trick Eventide / Valhalla / Strymon use. Per-block feedback
-// adds ~1 block of latency in the loop (≈3-12 ms at typical sizes),
-// which is musically inaudible but lets the granular shifter run
-// block-rate where it sounds best.
+// v5 swaps the granular pitch shifter (which produced audible grain
+// boundary detune even with zero jitter) for a Bernsee phase-vocoder
+// shifter — the same flavour of algorithm Valhalla / Strymon use for
+// their shimmer. Single +12 st voice, no octave-fifth blend.
 //
-// Pitch shifter is from Danial Kooshki's MIT-licensed GranularPitchShift
-// (see GranularPitchShift.h for full attribution).
+// Kept GranularPitchShift.h in the tree as a fallback in case we ever
+// want to A/B compare; it's no longer included from this header.
 class Shimmer
 {
 public:
@@ -56,12 +55,13 @@ public:
         fbHpfL.reset(); fbHpfR.reset();
         fbLpfL.reset(); fbLpfR.reset();
 
-        // Granular shifter: 4 voices × 60 ms grains, zero jitter. Was
-        // 8 × 100 ms which sounded thick on paper but the stacked
-        // voices produced tiny phase mismatches that the user heard
-        // as "weird detune" on the shimmer tail. Fewer, shorter grains
-        // sound cleaner at +12 st.
-        shifter.prepare (sr, /*channels*/ 2, blockSize, /*grainMs*/ 60, /*voices*/ 4, /*jitterMs*/ 0.0f);
+        // Phase-vocoder shifter — single +12 st voice. Replaces the
+        // granular shifter that used to live here; the phase vocoder
+        // re-bins the magnitude spectrum and reconstructs phases per
+        // bin, so there are no grain boundaries to glitch on. Latency
+        // is ~32 ms at 48 kHz which is fine inside a parallel-summed
+        // shimmer wet send.
+        shifter.prepare (sr, /*channels*/ 2, blockSize);
         shifter.setSemitones (12.0f);    // octave up
         shifter.reset();
 
@@ -179,7 +179,7 @@ private:
 
     DattorroReverb inner;
     juce::dsp::IIR::Filter<float> fbHpfL, fbHpfR, fbLpfL, fbLpfR;
-    GranularPitchShift shifter;
+    SmbPitchShift shifter;
 
     juce::AudioBuffer<float> wetBuf;     // reverb output for this block
     juce::AudioBuffer<float> loopBuf;    // wet → filters → pitch shift staging
