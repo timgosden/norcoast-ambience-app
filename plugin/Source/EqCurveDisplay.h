@@ -140,12 +140,15 @@ public:
             const float x = r.getX() + freqToX (bandFreqs[i].first, r.getWidth());
             const float y = dBToY (dBs[i], r);
 
-            // Node circle (bigger when hovered/dragged).
-            const float nodeR = ((int) i == draggingBand) ? 8.0f : 6.0f;
+            // Node circle — bigger when hovered or dragged so the
+            // affordance is obvious.
+            const bool active = ((int) i == draggingBand) || ((int) i == hoverBand);
+            const float nodeR = active ? 8.0f : 6.0f;
             g.setColour (juce::Colour (0xff0d1220));
             g.fillEllipse (x - nodeR, y - nodeR, nodeR * 2.0f, nodeR * 2.0f);
             g.setColour (juce::Colour (0xffb07acc));
-            g.drawEllipse (x - nodeR, y - nodeR, nodeR * 2.0f, nodeR * 2.0f, 2.0f);
+            g.drawEllipse (x - nodeR, y - nodeR, nodeR * 2.0f, nodeR * 2.0f,
+                           active ? 2.5f : 2.0f);
             if ((int) i == draggingBand)
             {
                 g.setColour (juce::Colour (0xffe6c79c));
@@ -189,6 +192,30 @@ public:
     {
         draggingBand = -1;
         repaint();
+    }
+
+    // Hover state — change the cursor over a band node and highlight it
+    // so the user can see they're draggable.
+    void mouseMove (const juce::MouseEvent& e) override
+    {
+        const int idx = nearestBandIndex ((float) e.x);
+        if (idx != hoverBand)
+        {
+            hoverBand = idx;
+            setMouseCursor (juce::MouseCursor::PointingHandCursor);
+            repaint();
+        }
+    }
+
+    void mouseEnter (const juce::MouseEvent&) override
+    {
+        setMouseCursor (juce::MouseCursor::PointingHandCursor);
+    }
+
+    void mouseExit (const juce::MouseEvent&) override
+    {
+        if (hoverBand != -1) { hoverBand = -1; repaint(); }
+        setMouseCursor (juce::MouseCursor::NormalCursor);
     }
 
     void mouseDoubleClick (const juce::MouseEvent& e) override
@@ -261,4 +288,5 @@ private:
 
     juce::AudioProcessorValueTreeState& apvts;
     int draggingBand = -1;
+    int hoverBand    = -1;
 };
