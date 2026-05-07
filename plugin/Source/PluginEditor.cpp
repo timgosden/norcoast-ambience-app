@@ -354,7 +354,8 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     auto setAdvancedKnobsVisible = [this] (bool on)
     {
         for (auto* k : { &reverbSize, &reverbMod,
-                         &delayFb, &delayTimeMs, &delayTone })
+                         &delayFb, &delayTimeMs, &delayTone,
+                         &fadeTime, &keyXfade })
         {
             k->label.setVisible (on);
             k->knob .setVisible (on);
@@ -448,8 +449,13 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     // time signature is always visible and easily switchable on stage.
     timeSigRow = std::make_unique<ChoiceButtonRow> (
         owner.getAPVTS(), ParamID::timeSig,
-        juce::Colour (0xffe8a45e));    // drum/movement orange
+        juce::Colour (0xffe8a45e));
     addAndMakeVisible (*timeSigRow);
+    // Distinct active hues so 4/4 vs 6/8 reads at a glance:
+    //   4/4 → green (foundation/movement family)
+    //   6/8 → blue  (arp / waltz mood)
+    timeSigRow->setButtonAccent (0, juce::Colour (0xff5eb88a));
+    timeSigRow->setButtonAccent (1, juce::Colour (0xff7eb6d4));
 
     // ── BPM display + manual control ─────────────────────────────────
     addAndMakeVisible (bpmLabel);
@@ -564,6 +570,7 @@ NorcoastAmbienceEditor::~NorcoastAmbienceEditor()
                      &hpfFreq,
                      &reverbSize, &reverbMod,
                      &delayFb, &delayTimeMs, &delayTone,
+                     &fadeTime, &keyXfade,
                      &eqLow, &eqLoMid, &eqHiMid, &eqHigh })
         k->knob.setLookAndFeel (nullptr);
     bpmSlider.setLookAndFeel (nullptr);
@@ -662,7 +669,7 @@ void NorcoastAmbienceEditor::paint (juce::Graphics& g)
                     juce::Justification::centredLeft);
     };
     paintStrip (evolveStripBounds, juce::Colour (0xffc4915e), "EVOLVE");
-    paintStrip (drumsStripBounds,  juce::Colour (0xffe8a45e), "MOVEMENT");
+    paintStrip (drumsStripBounds,  juce::Colour (0xff5eb88a), "MOVEMENT");   // green — web-app accent
     paintStrip (arpStripBounds,    juce::Colour (0xff9b7fd4), "ARP");
 
     // ── Mixer surface backplane (the nanoKONTROL strip) ──────────────
@@ -794,7 +801,8 @@ void NorcoastAmbienceEditor::resized()
 
         ParamKnob* knobs[] = {
             &reverbSize, &reverbMod,
-            &delayTimeMs, &delayFb, &delayTone
+            &delayTimeMs, &delayFb, &delayTone,
+            &fadeTime,   &keyXfade
         };
         const int n    = (int) (sizeof (knobs) / sizeof (knobs[0]));
         const int colW = knobsArea.getWidth() / n;
@@ -985,13 +993,19 @@ void NorcoastAmbienceEditor::resized()
     bounds.removeFromTop (2);
 
     // Step sequencer — only visible when expanded. Bigger than before
-    // so the cells are easy to click on stage.
+    // so the cells are easy to click on stage. Clamp aggressively so
+    // the ARP strip directly below isn't pushed off-screen — the user
+    // hit that bug after opening Sequencer.
     if (stepSequencer != nullptr)
     {
         stepSequencer->setVisible (sequencerExpanded);
         if (sequencerExpanded)
         {
-            const int seqH = juce::jmin (110, juce::jmax (60, bounds.getHeight() - 220));
+            // Reserve room for: ARP strip (40) + spacing (10) + key
+            // grid (~140) + EQ row when open (78) below the sequencer.
+            const int reserveBelow = 40 + 10 + 140 + (eqCurve != nullptr && eqCurve->isVisible() ? 0 : 0);
+            const int seqH = juce::jmax (60,
+                              juce::jmin (96, bounds.getHeight() - reserveBelow));
             stepSequencer->setBounds (bounds.removeFromTop (seqH).reduced (12, 0));
             bounds.removeFromTop (4);
         }

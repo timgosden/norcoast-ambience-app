@@ -75,6 +75,18 @@ private:
         }
     }
 
+    // Override the on-colour for a single button (e.g. so 4/4 and 6/8
+    // can be different active hues for at-a-glance recognition).
+    void setButtonAccent (int visibleIndex, juce::Colour accent)
+    {
+        if (auto* b = buttons[visibleIndex])
+        {
+            b->setColour (juce::TextButton::buttonOnColourId, accent);
+            b->setColour (juce::TextButton::textColourOffId, accent.withAlpha (0.6f));
+            b->repaint();
+        }
+    }
+
     juce::AudioProcessorValueTreeState& apvts;
     juce::String paramID;
     juce::Colour accentColour;
