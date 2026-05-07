@@ -34,8 +34,13 @@ public:
         inner.setBandwidth        (0.9999f);
         inner.setDamping          (0.04f);
         inner.setDecay            (0.85f);
-        inner.setExcursionRate    (0.35f);
-        inner.setExcursionDepthMs (0.6f);
+        // Drop excursion depth from 0.6 → 0.2 ms — the chorusy pitch
+        // wobble was stacking with the +12 st pitch shifter and the
+        // user heard the combined modulation as "too much detune".
+        // 0.2 ms keeps a tiny bit of life in the tail without
+        // detuning the sparkle.
+        inner.setExcursionRate    (0.25f);
+        inner.setExcursionDepthMs (0.2f);
         inner.setPreDelaySamples  ((int) (0.005 * sr));
         inner.reset();
 

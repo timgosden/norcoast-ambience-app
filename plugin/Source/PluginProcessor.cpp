@@ -799,8 +799,12 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     // 30 ms ramp + ~5 ms block size the scalar moves in 5-step
     // increments toward target, smooth enough to avoid clicks on
     // preset recall.
+    // Cap shimmer max effect at 0.5x — the previous 1.5 multiplier
+    // pushed the pitched feedback loop hard enough that the detune
+    // artefacts dominated the tail. 0.5 keeps the shimmer present
+    // without smearing the pads.
     shimmerVolSmooth.skip (n);
-    shimmer.processAdd (buffer, shimmerVolSmooth.getCurrentValue() * 1.5f);
+    shimmer.processAdd (buffer, shimmerVolSmooth.getCurrentValue() * 0.5f);
 
     // ─── Width LFO (master pan modulation, 0.3 Hz) ────────────────────
     if (widthMod > 1e-4f)

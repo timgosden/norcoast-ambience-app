@@ -350,11 +350,12 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     setupKnob (delayMix,      "Delay",        ParamID::delayMix);
     setupKnob (reverbMix,     "Reverb",       ParamID::reverbMix);
     setupKnob (shimmerVol,    "Shimmer",      ParamID::shimmerVol);
-    // Shimmer audio range is 0..0.5 internally — surface that to the
-    // user as 0..100% so the knob feels right at full position.
+    // Shimmer audio is capped at 0.5x internally — display the slider
+    // as 0..100% so the player sees a normal-looking knob and the
+    // engine never goes past the (now tame) max.
     shimmerVol.knob.textFromValueFunction = [] (double v) -> juce::String
     {
-        return juce::String ((int) std::round (v * 200.0)) + "%";
+        return juce::String ((int) std::round (v * 100.0)) + "%";
     };
     shimmerVol.knob.updateText();
 
@@ -1183,12 +1184,13 @@ void NorcoastAmbienceEditor::resized()
         int extra = 0;
         if (sequencerExpanded)   extra += 108;
         if (customChordExpanded) extra +=  32;
-        // Cap key-grid max at 138 — was 160, which left the mixer 4-12 px
-        // short of its full kMixerHeight budget and clipped the fader
-        // bottoms visibly. The grid still scales up nicely on bigger
-        // window heights but never starves the mixer.
-        const int keyH = juce::jlimit (88, 138,
-                                       bounds.getHeight() - (kMixerHeight + 130 + extra));
+        // Cap key-grid max at 132 — leaves the mixer its full
+        // kMixerHeight budget given 3 strips × 40 + 3 inter-strip gaps
+        // × 8 + 8 px after keyRow = 152 px of fixed below-keyRow
+        // furniture. The grid still scales up nicely on bigger window
+        // heights but never starves the mixer.
+        const int keyH = juce::jlimit (88, 132,
+                                       bounds.getHeight() - (kMixerHeight + 152 + extra));
         rootKeyRow->setBounds (bounds.removeFromTop (keyH));
         bounds.removeFromTop (8);
     }
@@ -1211,7 +1213,7 @@ void NorcoastAmbienceEditor::resized()
         inner.removeFromRight (8);
         if (chordPoolRow != nullptr) chordPoolRow->setBounds (inner.reduced (0, 2));
     }
-    bounds.removeFromTop (2);
+    bounds.removeFromTop (8);
 
     if (customDegreesRow != nullptr)
     {
@@ -1237,7 +1239,7 @@ void NorcoastAmbienceEditor::resized()
         if (drumPatternRow != nullptr)
             drumPatternRow->setBounds (inner.reduced (0, 2));
     }
-    bounds.removeFromTop (2);
+    bounds.removeFromTop (8);
 
     if (stepSequencer != nullptr)
     {
@@ -1270,7 +1272,7 @@ void NorcoastAmbienceEditor::resized()
         if (arpRateRow != nullptr)
             arpRateRow->setBounds (inner.reduced (0, 2));
     }
-    bounds.removeFromTop (2);
+    bounds.removeFromTop (8);
 
     // ── Mixer slab — anchored immediately under the ARP strip so
     // there's no dead band between the two halves of the editor. ───
