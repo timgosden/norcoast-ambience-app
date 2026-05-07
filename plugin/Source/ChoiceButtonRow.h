@@ -42,6 +42,18 @@ public:
 
     ~ChoiceButtonRow() override { stopTimer(); }
 
+    // Override the on-colour for a single visible button (e.g. so 4/4
+    // and 6/8 can show different active hues for at-a-glance reading).
+    void setButtonAccent (int visibleIndex, juce::Colour accent)
+    {
+        if (auto* b = buttons[visibleIndex])
+        {
+            b->setColour (juce::TextButton::buttonOnColourId, accent);
+            b->setColour (juce::TextButton::textColourOffId, accent.withAlpha (0.6f));
+            b->repaint();
+        }
+    }
+
     void resized() override
     {
         if (buttons.isEmpty()) return;
@@ -72,18 +84,6 @@ private:
         {
             const float n = p->getNormalisableRange().convertTo0to1 ((float) i);
             p->setValueNotifyingHost (juce::jlimit (0.0f, 1.0f, n));
-        }
-    }
-
-    // Override the on-colour for a single button (e.g. so 4/4 and 6/8
-    // can be different active hues for at-a-glance recognition).
-    void setButtonAccent (int visibleIndex, juce::Colour accent)
-    {
-        if (auto* b = buttons[visibleIndex])
-        {
-            b->setColour (juce::TextButton::buttonOnColourId, accent);
-            b->setColour (juce::TextButton::textColourOffId, accent.withAlpha (0.6f));
-            b->repaint();
         }
     }
 
