@@ -271,7 +271,7 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     };
     shimmerVol.knob.updateText();
 
-    setupKnob (hpfFreq,       "High Pass",    ParamID::hpfFreq);
+    setupKnob (hpfFreq,       "HPF",          ParamID::hpfFreq);
     setupKnob (lpfFreq,       "LPF",          ParamID::lpfFreq);
 
     // Filter knobs format the 0..1 fader value as Hz / kHz.
@@ -373,7 +373,7 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     };
 
     setupKnob (widthMod,      "Width",        ParamID::widthMod);
-    setupKnob (satAmt,        "Saturation",   ParamID::satAmt);
+    setupKnob (satAmt,        "Drive",        ParamID::satAmt);
     setupKnob (masterVol,     "Master",       ParamID::masterVol);
 
     setupKnob (arpVol,        "Arp",          ParamID::arpVol);
@@ -618,10 +618,12 @@ void NorcoastAmbienceEditor::paint (juce::Graphics& g)
         g.setColour (juce::Colour (NorcoastLookAndFeel::kPanelBg).withAlpha (0.6f));
         g.fillRoundedRectangle (rf, 4.0f);
         g.setColour (accent.withAlpha (0.55f));
-        g.fillRect (rf.withWidth (3.0f));         // colour bar on the left
+        g.fillRect (rf.withWidth (3.0f));
         g.setColour (accent);
         g.setFont (juce::FontOptions (12.0f).withStyle ("Bold"));
-        g.drawText (title, r.reduced (12, 0).withWidth (60),
+        // Paint inside a 96-px slot so MOVEMENT (the longest label) fits
+        // without truncation. Was hard-coded to 60 px.
+        g.drawText (title, r.reduced (12, 0).withWidth (96),
                     juce::Justification::centredLeft);
     };
     paintStrip (evolveStripBounds, juce::Colour (0xffc4915e), "EVOLVE");

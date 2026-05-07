@@ -52,17 +52,27 @@ public:
             g.drawHorizontalLine ((int) y, r.getX() + 4.0f, r.getRight() - 4.0f);
         }
 
-        // Decade labels.
-        g.setColour (juce::Colour (0xff596275));
+        // Decade labels along the bottom.
+        g.setColour (juce::Colour (0xff8a93a8));
         g.setFont (juce::FontOptions (10.0f).withStyle ("Regular"));
         for (auto p : std::array<std::pair<float, juce::String>, 3> {{
-            { 100.0f,   "100" },
-            { 1000.0f,  "1k"  },
-            { 10000.0f, "10k" } }})
+            { 100.0f,   "100 Hz" },
+            { 1000.0f,  "1 kHz"  },
+            { 10000.0f, "10 kHz" } }})
         {
             const float x = r.getX() + freqToX (p.first, r.getWidth());
-            g.drawText (p.second, juce::Rectangle<float> (x - 14.0f, r.getBottom() - 14.0f, 28.0f, 12.0f),
+            g.drawText (p.second, juce::Rectangle<float> (x - 22.0f, r.getBottom() - 14.0f, 44.0f, 12.0f),
                         juce::Justification::centred);
+        }
+
+        // dB scale ticks on the right edge.
+        g.setColour (juce::Colour (0xff596275));
+        for (auto dB : { -12, -6, 0, 6, 12 })
+        {
+            const float y = dBToY ((float) dB, r);
+            const juce::String txt = (dB > 0 ? "+" + juce::String (dB) : juce::String (dB));
+            g.drawText (txt, juce::Rectangle<float> (r.getRight() - 36.0f, y - 7.0f, 32.0f, 12.0f),
+                        juce::Justification::centredRight);
         }
 
         // Build coefficients from current param values (dB).
@@ -109,24 +119,49 @@ public:
                                                     juce::PathStrokeType::curved,
                                                     juce::PathStrokeType::rounded));
 
-        // Four draggable band nodes.
-        const std::array<std::pair<float, float>, 4> nodes {{
-            { 100.0f,   dBLow   },
-            { 350.0f,   dBLoMid },
-            { 2500.0f,  dBHiMid },
-            { 8000.0f,  dBHigh  } }};
-        for (size_t i = 0; i < nodes.size(); ++i)
+        // Four draggable band nodes (with frequency tag underneath).
+        const std::array<std::pair<float, juce::String>, 4> bandFreqs {{
+            { 100.0f,  "100" },
+            { 350.0f,  "350" },
+            { 2500.0f, "2.5k" },
+            { 8000.0f, "8k"  } }};
+        const std::array<float, 4> dBs { dBLow, dBLoMid, dBHiMid, dBHigh };
+
+        g.setFont (juce::FontOptions (10.0f).withStyle ("Regular"));
+        for (size_t i = 0; i < bandFreqs.size(); ++i)
         {
-            const float x = r.getX() + freqToX (nodes[i].first, r.getWidth());
-            const float y = dBToY (nodes[i].second, r);
+            const float x = r.getX() + freqToX (bandFreqs[i].first, r.getWidth());
+            const float y = dBToY (dBs[i], r);
+
+            // Node circle (bigger when hovered/dragged).
+            const float nodeR = ((int) i == draggingBand) ? 8.0f : 6.0f;
             g.setColour (juce::Colour (0xff0d1220));
-            g.fillEllipse (x - 6, y - 6, 12, 12);
+            g.fillEllipse (x - nodeR, y - nodeR, nodeR * 2.0f, nodeR * 2.0f);
             g.setColour (juce::Colour (0xffb07acc));
-            g.drawEllipse (x - 6, y - 6, 12, 12, 2.0f);
+            g.drawEllipse (x - nodeR, y - nodeR, nodeR * 2.0f, nodeR * 2.0f, 2.0f);
             if ((int) i == draggingBand)
             {
                 g.setColour (juce::Colour (0xffe6c79c));
                 g.fillEllipse (x - 3, y - 3, 6, 6);
+            }
+
+            // Frequency tag below the band node — small, dim.
+            g.setColour (juce::Colour (0xff596275));
+            g.drawText (bandFreqs[i].second,
+                        juce::Rectangle<float> (x - 22.0f, y + nodeR + 2.0f, 44.0f, 12.0f),
+                        juce::Justification::centred);
+
+            // dB readout floating above the node while dragging.
+            if ((int) i == draggingBand)
+            {
+                const juce::String dbTxt = (dBs[i] >= 0.0f ? "+" : "")
+                                           + juce::String (dBs[i], 1) + " dB";
+                g.setColour (juce::Colour (0xffe6c79c));
+                g.setFont (juce::FontOptions (11.0f).withStyle ("Bold"));
+                g.drawText (dbTxt,
+                            juce::Rectangle<float> (x - 36.0f, y - nodeR - 18.0f, 72.0f, 14.0f),
+                            juce::Justification::centred);
+                g.setFont (juce::FontOptions (10.0f).withStyle ("Regular"));
             }
         }
     }
