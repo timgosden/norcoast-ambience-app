@@ -7,27 +7,68 @@ C++ codebase.
 This lives alongside the standalone web app in this repo as a **fully
 parallel experiment**. The web app under `/public/` is unaffected.
 
-## Status: phase 2c — Foundation with full LFO modulation
+## Status: phase 6 — + master HPF/LPF (pre-FX, log fader curves)
 
-`PadVoice` now matches the standalone Foundation layer including
-modulation:
+All FX have been moved off hard-coded constants and onto host-visible
+`AudioParameterFloat`s, exposed both to the host (for automation) and
+to a slider grid in the editor. The processor caches atom pointers
+(`std::atomic<float>*`) for realtime-safe reads, recomputes IIR
+coefficients only when the underlying dB value changes, and uses a
+`SmoothedValue` master gain to avoid pops on big fader moves.
 
-- Filter LFO 1: `fRate = 0.1 Hz`, depth `fMod = 30 Hz` modulates LP cutoff
-- Filter LFO 2: ~0.027–0.040 Hz incommensurate, depth `fMod * 0.45`, random phase
-- Amp LFO: `aRate = 0.12 Hz`, depth `aMod = 0.03` (±3% gain)
-- Breath LFO: ~0.011–0.017 Hz, depth 0.03 (~80 s breathing period)
-- Per-voice detune LFOs: 0.01–0.06 Hz, depth ~0.1–0.94 cents
+New master DSP added in this phase:
+  - **Width LFO** (0.3 Hz, depth `widthMod * 0.5`) — pans the master
+    image left/right via the same equation as Web Audio's
+    StereoPanner.
+  - **Saturation** — `tanh(x * amt*3.5) / tanh(amt*3.5)` with a
+    `1 - amt*0.3` makeup-gain compensation. Verbatim port of the
+    standalone's `buildSatCurve`.
+  - **Master volume** — `juce::SmoothedValue` ramped over 50 ms.
+
+GUI is a 4-column slider grid (Layers / FX / EQ / Master) with the
+existing on-screen keyboard + Latch + All-Off + MIDI/Audio settings
+buttons below.
+
+Both pad layers from `PAD_LAYERS` in the standalone now run in
+parallel as separate `juce::Synthesiser`s sharing the same MIDI
+input. `PadVoice` is layer-agnostic — driven by a `LayerConfig`
+struct (`Source/LayerConfig.h`) so adding more layers later is just
+a matter of defining another config.
+
+Foundation (15 oscs/voice, octave −1, `fBase 200`, `fRate 0.1`) and
+Pads (30 oscs/voice across two octaves, `fBase 1200`, `fRate 0.042`,
+4 timbres: lush + warm + choir + celestial) are sonically
+interchangeable with the web app's first two layers.
 
 LFOs run at block rate (one tick per `processBlock`) — at sub-Hz
 rates the per-block step is sub-percent so audio stays smooth.
 
-Pads / Texture / FX in phase 3.
+Master FX chain (signal flow): synth → chorus → delay → reverb → EQ.
 
-Test: open the Standalone, click a low key on the on-screen
-keyboard. Compare against the standalone Foundation layer (load the
-web app, mute Pads + Texture, raise Foundation). Should now feel
-alive — subtle filter movement, gentle amp wobble, slow breathing
-in the background.
+- **Chorus**: Juno-style stereo. Two modulated delays — dL at
+  7 ms ± 2.5 ms @ 0.55 Hz panned −0.65, dR at 9 ms ± 3 ms @ 0.73 Hz
+  panned +0.65. Wet mix 0.175 (`chorusMix * 0.5`).
+- **Delay**: 60/70 s (≈857 ms, quarter @ 70 BPM), feedback 0.57,
+  wet send 0.322, feedback path low-passed at 3 kHz, wet send
+  brightened with a +12 dB high-shelf at 1200 Hz. Matches the
+  standalone's `delayNode → dLP → delayFB / delayGainN → dToneNode`
+  topology.
+- **Reverb**: Dattorro plate (`Source/DattorroReverb.h`) — direct
+  C++ port of `public/dattorro-reverb-worklet.js`. 12 delay lines,
+  pre-delay buffer, 3 one-pole LPFs, two cubic-interpolated
+  excursion taps, 14 stereo output taps. Defaults match the
+  standalone (`reverbSize 0.92` → decay 0.829, `reverbMod 0.74`
+  → excursion 1.558 Hz / 1.11 ms). Wet/dry mix at 0.71/0.29.
+- **EQ**: 4-band master, lowshelf 100 Hz / peak 350 Hz Q 0.7 / peak
+  2.5 kHz Q 0.9 / highshelf 8 kHz at the standalone's default gains
+  (0, −0.6, −2.0, +1.4 dB).
+
+Texture (granular) and shimmer in phase 3f+.
+
+Test: open the Standalone, click a chord on the on-screen
+keyboard. Compare against the standalone with Texture muted. Should
+sound nearly identical — the FX chain (reverb / delay / chorus /
+shimmer) is the remaining gap.
 
 ## Phases
 

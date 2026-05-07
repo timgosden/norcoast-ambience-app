@@ -1,6 +1,14 @@
 #pragma once
 
 #include <juce_audio_processors/juce_audio_processors.h>
+#include <juce_dsp/juce_dsp.h>
+#include "LayerConfig.h"
+#include "DattorroReverb.h"
+#include "Shimmer.h"
+#include "Arpeggiator.h"
+#include "DrumMachine.h"
+#include "Texture.h"
+#include "ChordEvolver.h"
 
 class NorcoastAmbienceProcessor : public juce::AudioProcessor
 {
@@ -19,12 +27,16 @@ public:
     bool acceptsMidi()   const override { return true; }
     bool producesMidi()  const override { return false; }
     bool isMidiEffect()  const override { return false; }
-    double getTailLengthSeconds() const override { return 8.0; } // matches longest release
+    double getTailLengthSeconds() const override { return 8.0; }
 
-    int  getNumPrograms()              override { return 1; }
-    int  getCurrentProgram()           override { return 0; }
-    void setCurrentProgram (int)       override {}
-    const juce::String getProgramName (int)            override { return {}; }
+    // Programs are wired to the factory preset bank (Source/Presets.h),
+    // so the host's preset menu shows our presets and recalling one
+    // applies it via APVTS. Custom user state still serializes through
+    // getStateInformation / setStateInformation independently.
+    int  getNumPrograms()              override;
+    int  getCurrentProgram()           override { return currentProgram; }
+    void setCurrentProgram (int)       override;
+    const juce::String getProgramName (int)            override;
     void changeProgramName (int, const juce::String&)  override {}
 
     void getStateInformation (juce::MemoryBlock&)   override;
@@ -32,15 +44,188 @@ public:
 
     bool isBusesLayoutSupported (const BusesLayout&) const override;
 
-    // Exposed so the editor can render an on-screen MidiKeyboardComponent
-    // that injects notes into the same MIDI stream the synth consumes.
     juce::MidiKeyboardState& getKeyboardState() noexcept { return keyboardState; }
+    juce::AudioProcessorValueTreeState& getAPVTS() noexcept { return apvts; }
+
+    // Editor calls this when the Latch button toggles. While true, all
+    // MIDI note-off events are dropped before reaching the synths so
+    // hardware-keyboard releases stop releasing too.
+    void setLatchOn (bool b) noexcept { latchOn.store (b, std::memory_order_release); }
+    bool isLatchOn()    const noexcept { return latchOn.load (std::memory_order_acquire); }
+
+    // Stop fades the master output to silence over ~1 second. Re-enable
+    // by clicking Stop again — the audio fades back in to the user's
+    // master-vol setting. Doesn't affect parameter state, so toggling
+    // stop is non-destructive.
+    void setStopped (bool b) noexcept { stopped.store (b, std::memory_order_release); }
+    bool isStopped() const noexcept { return stopped.load (std::memory_order_acquire); }
 
 private:
-    static constexpr int kMaxVoices = 8;
+    static constexpr int kVoicesPerLayer = 8;
 
-    juce::Synthesiser synth;
+    LayerConfig foundationConfig;
+    LayerConfig padsConfig;
+    LayerConfig padsConfig2;        // bright/glassy alt pad layer
+
+    juce::AudioProcessorValueTreeState apvts;
+    int currentProgram = 0;
+
+    // Cached parameter atom pointers — read once per block in processBlock.
+    std::atomic<float>* foundationVolParam    = nullptr;
+    std::atomic<float>* padsVolParam          = nullptr;
+    std::atomic<float>* padsVol2Param         = nullptr;
+    std::atomic<float>* textureVolParam       = nullptr;
+    std::atomic<float>* foundationSubOctParam = nullptr;
+    std::atomic<float>* padsSubOctParam       = nullptr;
+    std::atomic<float>* pads2SubOctParam      = nullptr;
+    std::atomic<float>* textureOctUpParam     = nullptr;
+    std::atomic<float>* foundationMuteParam   = nullptr;
+    std::atomic<float>* padsMuteParam         = nullptr;
+    std::atomic<float>* pads2MuteParam        = nullptr;
+    std::atomic<float>* textureMuteParam      = nullptr;
+    std::atomic<float>* arpMuteParam          = nullptr;
+    std::atomic<float>* drumMuteParam         = nullptr;
+    std::atomic<float>* chorusMixParam     = nullptr;
+    std::atomic<float>* delayMixParam      = nullptr;
+    std::atomic<float>* delayFbParam       = nullptr;
+    std::atomic<float>* delayDivParam      = nullptr;
+    std::atomic<float>* delayToneParam     = nullptr;
+    std::atomic<float>* reverbMixParam     = nullptr;
+    std::atomic<float>* reverbSizeParam    = nullptr;
+    std::atomic<float>* reverbModParam     = nullptr;
+    std::atomic<float>* lpfFreqParam       = nullptr;
+    std::atomic<float>* hpfFreqParam       = nullptr;
+    std::atomic<float>* shimmerVolParam    = nullptr;
+    std::atomic<float>* widthModParam      = nullptr;
+    std::atomic<float>* satAmtParam        = nullptr;
+    std::atomic<float>* masterVolParam     = nullptr;
+    std::atomic<float>* eqLowParam         = nullptr;
+    std::atomic<float>* eqLoMidParam       = nullptr;
+    std::atomic<float>* eqHiMidParam       = nullptr;
+    std::atomic<float>* eqHighParam        = nullptr;
+    std::atomic<float>* arpVolParam        = nullptr;
+    std::atomic<float>* arpRateParam       = nullptr;
+    std::atomic<float>* arpOctavesParam    = nullptr;
+    std::atomic<float>* arpVoiceParam      = nullptr;
+    std::atomic<float>* drumVolParam       = nullptr;
+    std::atomic<float>* drumPatternParam   = nullptr;
+    std::atomic<float>* drumCustomLoParam  = nullptr;
+    std::atomic<float>* drumCustomMdParam  = nullptr;
+    std::atomic<float>* drumCustomHhParam  = nullptr;
+    std::atomic<float>* timeSigParam       = nullptr;
+    std::atomic<float>* bpmParam           = nullptr;
+    std::atomic<float>* fadeTimeParam      = nullptr;
+    std::atomic<float>* keyXfadeParam      = nullptr;
+    std::atomic<float>* chordTypeParam       = nullptr;
+    std::atomic<float>* customChordMaskParam   = nullptr;
+    std::atomic<float>* enabledChordsMaskParam = nullptr;
+    std::atomic<float>* evolveOnParam          = nullptr;
+    std::atomic<float>* evolveBarsParam      = nullptr;
+    std::atomic<float>* droneOnParam       = nullptr;
+    std::atomic<float>* homeRootParam      = nullptr;
+
+    juce::Synthesiser foundationSynth;
+    juce::Synthesiser padsSynth;
+    juce::Synthesiser padsSynth2;
     juce::MidiKeyboardState keyboardState;
+
+    // Scratch buffer used to render each layer in isolation so we can
+    // apply the per-layer mute gate (a smoothed 50 ms fade) before
+    // summing the layer back into the main mix bus.
+    juce::AudioBuffer<float> layerScratch;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> muteFoundation { 1.0f };
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> mutePads       { 1.0f };
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> mutePads2      { 1.0f };
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> muteTexture    { 1.0f };
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> muteArp        { 1.0f };
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> muteDrum       { 1.0f };
+
+public:
+    // Per-layer peak amplitude for the GUI meters. Audio thread writes
+    // here at the end of each layer's render; the editor polls them at
+    // refresh rate and applies its own visual decay.
+    // Order: 0 = Foundation, 1 = Anchor, 2 = Aurora, 3 = Texture,
+    //        4 = Arp, 5 = Movement.
+    std::array<std::atomic<float>, 6> layerLevels {};
+private:
+
+    // ─── Master FX chain ──────────────────────────────────────────────
+    // Order: synth → chorus → delay → reverb → width LFO → saturation
+    //              → EQ → master gain.
+
+    juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Linear> chorusDelayL { 4096 };
+    juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Linear> chorusDelayR { 4096 };
+    double chorusPhaseL = 0.0, chorusPhaseIncL = 0.0;
+    double chorusPhaseR = 0.0, chorusPhaseIncR = 0.0;
+
+    juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Linear> delayLine { 1 << 18 };
+    juce::dsp::IIR::Filter<float> delayFbLpfL, delayFbLpfR;
+    juce::dsp::IIR::Filter<float> delayWetShelfL, delayWetShelfR;
+    float lastDelayToneDb = -1000.0f;
+
+    DattorroReverb reverb;
+    juce::AudioBuffer<float> reverbBuffer;
+
+    Shimmer shimmer;
+    Arpeggiator arpeggiator;
+    DrumMachine drumMachine;
+    Texture     texture;
+    ChordEvolver chordEvolver;
+
+    int  currentDroneNote = -1;        // MIDI note currently held by the drone, or -1
+
+    // Shared monotonic sample clock for arp + drums + evolve. Increments by
+    // numSamples each block regardless of host transport state, so all three
+    // grid-locked modules derive their step boundaries from the same divisor
+    // base and stay phase-aligned with each other.
+    juce::int64 transportSamples = 0;
+    // Last BPM seen by processBlock. When BPM changes we rescale
+    // transportSamples so the current beat position is preserved —
+    // the arp/drum/evolve grids glide to the new tempo instead of
+    // jumping a step boundary.
+    double lastBpmForClock = 0.0;
+    std::atomic<bool> latchOn { false };
+    std::atomic<bool> stopped { false };
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> stopFade;
+    double stopFadeRampTimeSec = 0.0;     // last fadeTime we configured into stopFade
+    std::vector<int> heldNotesScratch;   // reused across processBlock calls
+    float lastReverbSize = -1.0f;
+    float lastReverbMod  = -1.0f;
+
+    double widthPhase = 0.0;
+    double widthPhaseInc = 0.0;
+
+    using StereoIIR = juce::dsp::ProcessorDuplicator<juce::dsp::IIR::Filter<float>,
+                                                     juce::dsp::IIR::Coefficients<float>>;
+    StereoIIR masterLpf, masterHpf;
+    StereoIIR reverbSendHpf;            // ~120 Hz on the wet send only
+    float lastLpfHz = -1.0f, lastHpfHz = -1.0f;
+
+    StereoIIR eqLow, eqLoMid, eqHiMid, eqHigh;
+    float lastEqLowDb = -1000.0f, lastEqLoMidDb = -1000.0f,
+          lastEqHiMidDb = -1000.0f, lastEqHighDb = -1000.0f;
+
+    // Smoothed master gain so big fader moves don't pop.
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> masterGain;
+
+    // Saturation post-stage 1-pole low-pass state (tames bright tanh
+    // harmonics at high drive). The amount itself is per-sample
+    // smoothed so engaging Drive doesn't click — see processBlock.
+    float satLpL = 0.0f, satLpR = 0.0f;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> satAmtSmoothed { 0.0f };
+
+    // FX mix scalars — per-sample smoothed so preset switches and
+    // direct param edits glide instead of stepping. ~30 ms ramp is
+    // short enough to feel instant and long enough to eliminate the
+    // zipper noise / clicks the user heard when recalling presets.
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> reverbMixSmooth  { 0.0f };
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> delayMixSmooth   { 0.0f };
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> chorusMixSmooth  { 0.0f };
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> shimmerVolSmooth { 0.0f };
+    // Per-sample scratch for the smoothed reverb mix — two stereo
+    // channels read the same per-sample value without advancing the
+    // smoother twice.
+    std::vector<float> reverbMixRamp;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (NorcoastAmbienceProcessor)
 };
