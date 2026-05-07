@@ -111,6 +111,7 @@ private:
     std::atomic<float>* drumCustomMdParam  = nullptr;
     std::atomic<float>* drumCustomHhParam  = nullptr;
     std::atomic<float>* timeSigParam       = nullptr;
+    std::atomic<float>* bpmParam           = nullptr;
     std::atomic<float>* chordTypeParam       = nullptr;
     std::atomic<float>* customChordMaskParam   = nullptr;
     std::atomic<float>* enabledChordsMaskParam = nullptr;

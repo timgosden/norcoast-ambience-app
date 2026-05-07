@@ -58,6 +58,7 @@ namespace ParamID
     inline constexpr const char* drumCustomMd    = "drumCustomMd";
     inline constexpr const char* drumCustomHh    = "drumCustomHh";
     inline constexpr const char* timeSig         = "timeSig";        // 0=4/4, 1=6/8
+    inline constexpr const char* bpm             = "bpm";            // manual fallback BPM
 
     inline constexpr const char* chordType         = "chordType";
     inline constexpr const char* customChordMask   = "customChordMask";
@@ -216,6 +217,13 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
     layout.add (std::make_unique<juce::AudioParameterChoice> (
         juce::ParameterID { ParamID::timeSig, 1 }, "Time Sig",
         juce::StringArray { "4/4", "6/8" }, 0));
+
+    // Manual BPM — used by arp / drums / evolve when the host doesn't
+    // provide a playhead BPM (e.g. Standalone). Default 70 matches the
+    // web app's worship-tempo default.
+    add (std::make_unique<FloatParam> (juce::ParameterID { ParamID::bpm, 1 },
+                                        "BPM",
+                                        NormRange { 30.0f, 200.0f, 1.0f }, 70.0f));
 
     // 16-step bitmasks for the Custom pattern, one per voice (lo / md / hh).
     layout.add (std::make_unique<juce::AudioParameterInt> (

@@ -132,6 +132,7 @@ NorcoastAmbienceProcessor::NorcoastAmbienceProcessor()
     drumCustomMdParam  = apvts.getRawParameterValue (ParamID::drumCustomMd);
     drumCustomHhParam  = apvts.getRawParameterValue (ParamID::drumCustomHh);
     timeSigParam       = apvts.getRawParameterValue (ParamID::timeSig);
+    bpmParam           = apvts.getRawParameterValue (ParamID::bpm);
     chordTypeParam       = apvts.getRawParameterValue (ParamID::chordType);
     customChordMaskParam   = apvts.getRawParameterValue (ParamID::customChordMask);
     enabledChordsMaskParam = apvts.getRawParameterValue (ParamID::enabledChordsMask);
@@ -344,11 +345,14 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     // keyboardState.processNextMidiBuffer so the augmented events get
     // recorded in the keyboard state — arp/texture/pads see them.
     // Tempo from host once — shared by evolve, arp, drums, delay.
-    double bpm = 120.0;
+    // Manual BPM fallback — used when the host doesn't provide a
+    // playhead (e.g. Standalone) or when its tempo is invalid.
+    double bpm = bpmParam != nullptr ? (double) bpmParam->load() : 70.0;
     if (auto* ph = getPlayHead())
         if (auto pos = ph->getPosition())
             if (auto hostBpm = pos->getBpm())
-                bpm = *hostBpm;
+                if (*hostBpm > 1.0)
+                    bpm = *hostBpm;
 
     {
         const int targetType   = juce::jlimit (0, (int) ChordEvolver::NumTypes - 1,

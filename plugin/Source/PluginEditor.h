@@ -68,10 +68,25 @@ private:
     std::unique_ptr<ButtonAttach> evolveAttach;
     std::unique_ptr<ButtonAttach> droneAttach;
 
-    // EQ panel is collapsed by default — matches the web app's "EQ ▾"
-    // toggle. Click expands the four EQ knobs into row 2.
-    juce::TextButton  eqToggleButton   { "EQ ▾" };
-    bool              eqExpanded       = false;
+    // EQ / Custom Chord / Step Sequencer panels are collapsed by default.
+    // Each toggle button flips the panel and triggers a re-layout.
+    juce::TextButton  eqToggleButton          { "EQ +" };
+    juce::TextButton  customChordToggleButton { "Custom Chord +" };
+    juce::TextButton  sequencerToggleButton   { "Sequencer +" };
+    bool              eqExpanded          = false;
+    bool              customChordExpanded = false;
+    bool              sequencerExpanded   = false;
+
+    // 4/4 vs 6/8 selector — important enough to live next to the drum
+    // pattern pills so the time-sig is always visible.
+    std::unique_ptr<ChoiceButtonRow> timeSigRow;
+
+    // Manual BPM. The plugin reads bpm from the host playhead when one
+    // is provided; otherwise it falls back to this user-controllable
+    // value (default 70). The Slider exposes ±/scroll editing.
+    juce::Label  bpmLabel;
+    juce::Slider bpmSlider;
+    std::unique_ptr<SliderAttach> bpmAttach;
 
 
     juce::ComboBox    presetBox;
@@ -85,6 +100,14 @@ private:
     // Bottom-strip backplane: a single rounded panel that frames the
     // 8-knob FX row + 8-fader mixer row.
     juce::Rectangle<int> mixerPanelBounds;
+
+    // Top-half coloured-strip backgrounds — drawn in paint() to give
+    // each control row its own section accent (matches the web app's
+    // colour-per-section design language).
+    juce::Rectangle<int> evolveStripBounds;
+    juce::Rectangle<int> drumsStripBounds;
+    juce::Rectangle<int> arpStripBounds;
+    juce::Rectangle<int> layersStripBounds;
 
     // ─── Mixer surface: 8 vertical faders across the bottom half ─────
     // Foundation, Pads 1, Pads 2, Texture, Arp, Movement (drums),

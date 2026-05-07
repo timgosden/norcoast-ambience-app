@@ -37,7 +37,14 @@ juce_add_plugin(NorcoastAmbience
     NEEDS_MIDI_INPUT          TRUE
     NEEDS_MIDI_OUTPUT         FALSE
     EDITOR_WANTS_KEYBOARD_FOCUS TRUE
-    COPY_PLUGIN_AFTER_BUILD   FALSE
+    # Auto-install built bundles into the SYSTEM-WIDE Mac plugin folders
+    # so Logic / Reaper / Live see them right after a rebuild. These
+    # paths usually require admin write access — if the build hits a
+    # permissions error, run once: sudo chown -R $(whoami) /Library/Audio/Plug-Ins
+    # (or build with sudo) so the post-build copy can succeed.
+    COPY_PLUGIN_AFTER_BUILD   TRUE
+    AU_COPY_DIR               "/Library/Audio/Plug-Ins/Components"
+    VST3_COPY_DIR             "/Library/Audio/Plug-Ins/VST3"
     # App / standalone bundle icon — rendered from public/icons/icon.svg.
     # JUCE expects PNGs and packs both sizes into the AU/VST3/Standalone
     # bundles; macOS Finder / DAW preset menus pick the larger one.
