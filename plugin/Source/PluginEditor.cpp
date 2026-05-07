@@ -262,7 +262,7 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     reverbSize.knob.updateText();
 
     setupKnob (hpfFreq,       "High Pass",    ParamID::hpfFreq);
-    setupKnob (lpfFreq,       "Low Pass",     ParamID::lpfFreq);
+    setupKnob (lpfFreq,       "LPF",          ParamID::lpfFreq);
 
     // Filter knobs format the 0..1 fader value as Hz / kHz.
     auto formatLpf = [] (double v) -> juce::String
@@ -292,7 +292,7 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     setupKnob (satAmt,        "Saturation",   ParamID::satAmt);
     setupKnob (masterVol,     "Master",       ParamID::masterVol);
 
-    setupKnob (arpVol,        "Vol",          ParamID::arpVol);
+    setupKnob (arpVol,        "Arp",          ParamID::arpVol);
     setupKnob (arpRate,       "Rate",         ParamID::arpRate);
     {
         static const juce::StringArray rateChoices { "1/16", "1/8", "1/4", "1/2", "1 bar" };
@@ -309,7 +309,7 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
         juce::Colour (0xff7eb6d4));
     addAndMakeVisible (*arpOctavesRow);
 
-    setupKnob (drumVol,       "Vol",          ParamID::drumVol);
+    setupKnob (drumVol,       "Movement",     ParamID::drumVol);
 
     // Voice / Pattern pickers as pill button rows (knobs are awkward
     // for short discrete choices).
@@ -322,21 +322,45 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     addAndMakeVisible (*arpVoiceRow);
     addAndMakeVisible (*drumPatternRow);
 
-    sections =
-    {{
-        { "LAYERS",     kColLayers,   {}, { &foundationVol, &padsVol, &textureVol } },
-        { "EVOLVE",     kColEvolve,   {}, { &evolveRate } },
-        { "CHORUS",     kColChorus,   {}, { &chorusMix } },
-        { "DELAY",      kColDelay,    {}, { &delayMix, &delayFb, &delayTimeMs, &delayTone } },
-        { "REVERB",     kColReverbFx, {}, { &reverbMix, &reverbSize, &reverbMod, &shimmerVol } },
-        { "FILTER",     kColFilter,   {}, { &hpfFreq, &lpfFreq } },
-        { "EQ",         kColEq,       {}, { &eqLow, &eqLoMid, &eqHiMid, &eqHigh } },
-        { "ARP",        kColArp,      {}, { &arpVol, &arpRate } },
-        { "DRUMS",      kColDrums,    {}, { &drumVol } },
-        { "MASTER",     kColMaster,   {}, { &widthMod, &satAmt, &masterVol } }
-    }};
+    // ── Pads 2 fader (new alt-pad layer) ──────────────────────────────
+    setupKnob (padsVol2, "Pads 2", ParamID::padsVol2);
 
-    setSize (980, 730);
+    // ── Convert layer / output knobs into vertical faders for the
+    // bottom-half mixer surface. The knobs were already wired by
+    // setupKnob earlier; we just swap their slider style and dump the
+    // text box (the value sits in a tooltip via the slider's
+    // showLabelOnDrag behaviour).
+    for (auto* k : { &foundationVol, &padsVol, &padsVol2, &textureVol,
+                     &arpVol, &drumVol, &lpfFreq, &masterVol })
+    {
+        k->knob.setSliderStyle (juce::Slider::LinearVertical);
+        k->knob.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 60, 14);
+    }
+
+    // ── Mute buttons for the 6 audio layers ──────────────────────────
+    auto setupMute = [this] (juce::TextButton& btn,
+                             std::unique_ptr<ButtonAttach>& attach,
+                             const juce::String& paramID,
+                             juce::Colour onColour)
+    {
+        addAndMakeVisible (btn);
+        btn.setClickingTogglesState (true);
+        btn.setColour (juce::TextButton::buttonColourId,
+                       juce::Colour (NorcoastLookAndFeel::kPanelBg));
+        btn.setColour (juce::TextButton::buttonOnColourId, onColour);
+        btn.setColour (juce::TextButton::textColourOnId,
+                       juce::Colour (NorcoastLookAndFeel::kBg));
+        attach = std::make_unique<ButtonAttach> (
+            owner.getAPVTS(), paramID, btn);
+    };
+    setupMute (foundationMuteBtn, foundationMuteAttach, ParamID::foundationMute, juce::Colour (0xffd46b8a));
+    setupMute (padsMuteBtn,       padsMuteAttach,       ParamID::padsMute,       juce::Colour (0xffd46b8a));
+    setupMute (pads2MuteBtn,      pads2MuteAttach,      ParamID::pads2Mute,      juce::Colour (0xffd46b8a));
+    setupMute (textureMuteBtn,    textureMuteAttach,    ParamID::textureMute,    juce::Colour (0xffd46b8a));
+    setupMute (arpMuteBtn,        arpMuteAttach,        ParamID::arpMute,        juce::Colour (0xffd46b8a));
+    setupMute (drumMuteBtn,       drumMuteAttach,       ParamID::drumMute,       juce::Colour (0xffd46b8a));
+
+    setSize (1080, 760);
 
     // Give the qwerty keyboard focus so computer-keyboard keys map to MIDI.
     juce::MessageManager::callAsync ([safeThis = juce::Component::SafePointer (&qwertyKeyboard)]
@@ -348,10 +372,17 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
 NorcoastAmbienceEditor::~NorcoastAmbienceEditor()
 {
     setLookAndFeel (nullptr);
-    auto clearLF = [] (ParamKnob& k) { k.knob.setLookAndFeel (nullptr); };
-    for (auto& s : sections)
-        for (auto* k : s.knobs)
-            clearLF (*k);
+
+    // Detach the LAF from every ParamKnob we own so the slider
+    // destructors don't dereference a dangling LAF pointer.
+    for (auto* k : { &foundationVol, &padsVol, &padsVol2, &textureVol,
+                     &arpVol, &drumVol, &lpfFreq, &masterVol,
+                     &reverbMix, &reverbSize, &shimmerVol, &chorusMix,
+                     &delayMix, &delayFb, &widthMod, &satAmt,
+                     &evolveRate, &delayTimeMs, &delayTone, &reverbMod,
+                     &hpfFreq, &eqLow, &eqLoMid, &eqHiMid, &eqHigh,
+                     &arpRate })
+        k->knob.setLookAndFeel (nullptr);
 }
 
 void NorcoastAmbienceEditor::applyFactoryPreset (int idx)
@@ -412,8 +443,7 @@ void NorcoastAmbienceEditor::paint (juce::Graphics& g)
     g.setGradientFill (bg);
     g.fillAll();
 
-    // Logo: small accent-orange circle with a sine wave arc through it,
-    // top-left. Drawn here rather than as a Component for simplicity.
+    // Logo: small accent-orange circle with a sine wave arc through it.
     {
         const float cx = 36.0f, cy = 38.0f, r = 14.0f;
         g.setColour (juce::Colour (NorcoastLookAndFeel::kAccent));
@@ -429,43 +459,31 @@ void NorcoastAmbienceEditor::paint (juce::Graphics& g)
         g.strokePath (wave, juce::PathStrokeType (1.6f));
     }
 
-    for (auto& s : sections)
+    // ── Mixer surface backplane (the nanoKONTROL strip) ──────────────
+    if (! mixerPanelBounds.isEmpty())
     {
-        const auto r = s.bounds.toFloat();
-        if (r.isEmpty()) continue;
-
+        const auto r = mixerPanelBounds.toFloat();
         g.setColour (juce::Colour (NorcoastLookAndFeel::kPanelBg));
-        g.fillRoundedRectangle (r, 6.0f);
+        g.fillRoundedRectangle (r, 8.0f);
         g.setColour (juce::Colour (NorcoastLookAndFeel::kPanelEdge));
-        g.drawRoundedRectangle (r, 6.0f, 1.0f);
+        g.drawRoundedRectangle (r, 8.0f, 1.0f);
 
-        const auto headerStrip = r.withHeight (3.0f).reduced (10.0f, 0.0f);
-        g.setColour (s.accent.withAlpha (0.85f));
-        g.fillRoundedRectangle (headerStrip, 1.5f);
-
-        // Skip drawing the EQ panel's title text when the EQ is
-        // collapsed — eqToggleButton fills that space instead.
-        if (&s == &sections[6] && ! eqExpanded)
-            continue;
-
-        g.setColour (s.accent);
-        g.setFont (juce::FontOptions (10.0f).withStyle ("Bold"));
-        g.drawText (s.title,
-                    s.bounds.withTrimmedTop (8).withHeight (kSectionHeaderH).reduced (10, 0),
-                    juce::Justification::centredLeft);
+        // Thin separator between knobs row and faders row.
+        const float kKnobsHeight = 96.0f;
+        const float sepY = r.getY() + kKnobsHeight + 4.0f;
+        g.setColour (juce::Colour (NorcoastLookAndFeel::kPanelEdge).withAlpha (0.6f));
+        g.drawHorizontalLine ((int) sepY, r.getX() + 12.0f, r.getRight() - 12.0f);
     }
-
 }
 
 void NorcoastAmbienceEditor::resized()
 {
     auto bounds = getLocalBounds().reduced (16);
 
-    // Title strip — logo (drawn in paint), chord state header centred,
-    // preset bar + Stop on the right.
+    // ── Title strip: logo (drawn in paint), chord header, preset+stop ──
     {
         auto title = bounds.removeFromTop (52);
-        title.removeFromLeft (60);                  // leave room for logo
+        title.removeFromLeft (60);
 
         auto right = title.removeFromRight (300).reduced (0, 10);
         loadButton.setBounds (right.removeFromRight (44));
@@ -474,124 +492,179 @@ void NorcoastAmbienceEditor::resized()
         right.removeFromRight (6);
         stopButton.setBounds (right.removeFromRight (52));
         right.removeFromRight (8);
-        presetBox.setBounds  (right);
+        presetBox.setBounds (right);
 
         chordHeader.setBounds (title);
     }
-    bounds.removeFromTop (8);
+    bounds.removeFromTop (6);
 
-    // 10 panels in a 5+5 grid.
-    auto knobArea = bounds.removeFromTop (440);
-    const int rowH = (knobArea.getHeight() - 8) / 2;
-    auto row1 = knobArea.removeFromTop (rowH);
-    knobArea.removeFromTop (8);
-    auto row2 = knobArea;
+    // ── Bottom half: nanoKONTROL-style mixer surface ──────────────────
+    // Reserve the bottom slab; everything above it is the performance
+    // controls (key grid, evolve panel, sequencer, etc.).
+    constexpr int kFaderRowHeight = 220;   // fader (180) + label + mute
+    constexpr int kKnobsRowHeight =  96;
+    constexpr int kMixerHeight    = kKnobsRowHeight + kFaderRowHeight + 16;
 
-    // Top: LAYERS (3) · EVOLVE (4) · CHORUS (2) · DELAY (4) · REVERB (4) → 17 units
-    // EVOLVE bumped 3→4 so the 6 chord-pool pills fit; CHORUS 1→2.
+    auto mixerArea = bounds.removeFromBottom (kMixerHeight);
+    mixerPanelBounds = mixerArea;
+    auto mixerInner  = mixerArea.reduced (12, 8);
+
+    // 8 columns evenly distributed across the mixer.
+    auto layoutEightCols = [] (juce::Rectangle<int> r,
+                                std::array<juce::Rectangle<int>, 8>& out)
     {
-        const int w = row1.getWidth();
-        const int colA = (int)(w * (3.0f / 17.0f));
-        const int colB = (int)(w * (4.0f / 17.0f));
-        const int colC = (int)(w * (2.0f / 17.0f));
-        const int colD = (int)(w * (4.0f / 17.0f));
-        sections[0].bounds = row1.removeFromLeft (colA).reduced (4, 0);
-        sections[1].bounds = row1.removeFromLeft (colB).reduced (4, 0);
-        sections[2].bounds = row1.removeFromLeft (colC).reduced (4, 0);
-        sections[3].bounds = row1.removeFromLeft (colD).reduced (4, 0);
-        sections[4].bounds = row1.reduced (4, 0);
+        const int colW = r.getWidth() / 8;
+        for (int i = 0; i < 8; ++i)
+            out[(size_t) i] = r.removeFromLeft (colW).reduced (3, 0);
+    };
+
+    // Top of mixer: 8 FX mix knobs (labels + rotary sliders).
+    {
+        auto knobsArea = mixerInner.removeFromTop (kKnobsRowHeight);
+        std::array<juce::Rectangle<int>, 8> cols;
+        layoutEightCols (knobsArea, cols);
+
+        ParamKnob* fxKnobs[8] = {
+            &reverbMix, &reverbSize, &shimmerVol, &chorusMix,
+            &delayMix,  &delayFb,    &widthMod,   &satAmt
+        };
+        for (int i = 0; i < 8; ++i)
+        {
+            auto col = cols[(size_t) i];
+            fxKnobs[i]->label.setBounds (col.removeFromTop (kKnobLabelH));
+            fxKnobs[i]->knob .setBounds (col.reduced (2, 2));
+        }
     }
+    mixerInner.removeFromTop (8);   // separator strip drawn in paint
 
-    // Bottom: FILTER (2) · EQ (4 expanded / 1 collapsed) · ARP (3) · DRUMS (3) · MASTER (3)
-    // DRUMS bumped 2→3 so its 6 pattern pills fit. EQ shrinks to a slim
-    // toggle column when collapsed, returning that real estate to the
-    // surrounding sections.
+    // Bottom of mixer: 8 vertical faders with mute buttons + labels.
     {
-        const int w = row2.getWidth();
-        const float eqUnits      = eqExpanded ? 4.0f : 1.0f;
-        const float totalUnits   = 2.0f + eqUnits + 3.0f + 3.0f + 3.0f;
-        const int colA = (int)(w * (2.0f / totalUnits));
-        const int colB = (int)(w * (eqUnits / totalUnits));
-        const int colC = (int)(w * (3.0f / totalUnits));
-        const int colD = (int)(w * (3.0f / totalUnits));
-        sections[5].bounds = row2.removeFromLeft (colA).reduced (4, 0);
-        sections[6].bounds = row2.removeFromLeft (colB).reduced (4, 0);
-        sections[7].bounds = row2.removeFromLeft (colC).reduced (4, 0);
-        sections[8].bounds = row2.removeFromLeft (colD).reduced (4, 0);
-        sections[9].bounds = row2.reduced (4, 0);
+        auto fadersArea = mixerInner.removeFromTop (kFaderRowHeight);
+        std::array<juce::Rectangle<int>, 8> cols;
+        layoutEightCols (fadersArea, cols);
 
-        // Toggle button overlays the EQ section's title strip whether
-        // collapsed or expanded — clicking it flips eqExpanded.
-        eqToggleButton.setBounds (sections[6].bounds.reduced (6, 6));
-    }
-
-    // Knobs + per-section toggle button row (LAYERS / EVOLVE).
-    for (auto& s : sections)
-    {
-        if (s.knobs.empty()) continue;
-        auto inner = s.bounds.reduced (kSectionPadX, kSectionPadY)
-                             .withTrimmedTop (kSectionHeaderH);
-
-        if (&s == &sections[0])           // LAYERS — 2 toggles
+        struct Strip
         {
-            auto row = inner.removeFromBottom (24).reduced (4, 0);
-            const int half = row.getWidth() / 2;
-            subOctButton    .setBounds (row.removeFromLeft (half).reduced (2, 0));
-            textureOctButton.setBounds (row.reduced (2, 0));
-        }
-        else if (&s == &sections[7] && arpVoiceRow && arpOctavesRow)  // ARP
-        {
-            auto voiceRow = inner.removeFromBottom (22).reduced (4, 0);
-            arpVoiceRow->setBounds (voiceRow);
-            inner.removeFromBottom (3);
-            auto octRow   = inner.removeFromBottom (22).reduced (4, 0);
-            arpOctavesRow->setBounds (octRow);
-        }
-        else if (&s == &sections[8] && drumPatternRow)     // DRUMS — pattern pills
-        {
-            auto row = inner.removeFromBottom (24).reduced (4, 0);
-            drumPatternRow->setBounds (row);
-        }
-        else if (&s == &sections[1])      // EVOLVE — pill row, knob, then toggles
-        {
-            // Chord type pill row at the top of the content area.
-            auto pillRow = inner.removeFromTop (28).reduced (2, 0);
-            if (chordPoolRow != nullptr) chordPoolRow->setBounds (pillRow);
-            inner.removeFromTop (4);
+            ParamKnob*       fader;
+            juce::TextButton* mute;     // null for LPF / Master
+        };
+        const Strip strips[8] = {
+            { &foundationVol, &foundationMuteBtn },
+            { &padsVol,       &padsMuteBtn       },
+            { &padsVol2,      &pads2MuteBtn      },
+            { &textureVol,    &textureMuteBtn    },
+            { &arpVol,        &arpMuteBtn        },
+            { &drumVol,       &drumMuteBtn       },
+            { &lpfFreq,       nullptr            },
+            { &masterVol,     nullptr            }
+        };
 
-            // Drone + Evolve toggles docked at the bottom.
-            auto buttonRow = inner.removeFromBottom (24).reduced (4, 0);
-            const int half = buttonRow.getWidth() / 2;
-            droneButton .setBounds (buttonRow.removeFromLeft (half).reduced (2, 0));
-            evolveButton.setBounds (buttonRow.reduced (2, 0));
-        }
-
-        // EQ knobs are hidden until the user expands the panel.
-        if (&s == &sections[6] && ! eqExpanded)
-            continue;
-
-        const int kW = inner.getWidth() / (int) s.knobs.size();
-        for (auto* k : s.knobs)
+        for (int i = 0; i < 8; ++i)
         {
-            auto col = inner.removeFromLeft (kW);
-            k->label.setBounds (col.removeFromTop (kKnobLabelH));
-            k->knob .setBounds (col.reduced (4, 2));
+            auto col = cols[(size_t) i];
+            strips[i].fader->label.setBounds (col.removeFromTop (kKnobLabelH));
+
+            // Mute pill across the top of the fader column. Sits under
+            // the label, just like the web app's mute dot above the
+            // slider.
+            const int muteH = 18;
+            auto muteRow = col.removeFromTop (muteH);
+            if (strips[i].mute != nullptr)
+                strips[i].mute->setBounds (muteRow.reduced (10, 1));
+            col.removeFromTop (4);
+
+            // The fader fills the rest of the column.
+            strips[i].fader->knob.setBounds (col.reduced (8, 2));
         }
     }
 
-    // ─── Bottom rows: custom-chord degrees + 12-key root grid ────────
-    bounds.removeFromTop (8);
+    // ── Top half (everything above the mixer slab) ──────────────────
+    bounds.removeFromBottom (10);
 
-    auto degreesRow = bounds.removeFromTop (28);
-    if (customDegreesRow != nullptr) customDegreesRow->setBounds (degreesRow);
+    // Row: chord-pool pills · drone · evolve · evolve bars knob.
+    {
+        auto evolveRow = bounds.removeFromTop (32);
+        if (chordPoolRow != nullptr)
+            chordPoolRow->setBounds (evolveRow.removeFromLeft (evolveRow.getWidth() * 5 / 9).reduced (2, 2));
+        evolveRow.removeFromLeft (8);
+
+        auto barsLabel = evolveRow.removeFromLeft (40);
+        evolveRate.label.setBounds (barsLabel);
+        evolveRate.knob.setBounds (evolveRow.removeFromLeft (60).reduced (0, 2));
+        evolveRow.removeFromLeft (8);
+        droneButton .setBounds (evolveRow.removeFromLeft (60).reduced (2, 4));
+        evolveRow.removeFromLeft (4);
+        evolveButton.setBounds (evolveRow.removeFromLeft (60).reduced (2, 4));
+    }
     bounds.removeFromTop (4);
 
-    auto keyRow = bounds.removeFromTop (44);
-    if (rootKeyRow != nullptr) rootKeyRow->setBounds (keyRow);
+    // Row: custom-chord degree pills.
+    {
+        auto degreesRow = bounds.removeFromTop (28);
+        if (customDegreesRow != nullptr)
+            customDegreesRow->setBounds (degreesRow);
+    }
+    bounds.removeFromTop (4);
 
-    bounds.removeFromTop (8);
-    auto seqRow = bounds.removeFromTop (78);
-    if (stepSequencer != nullptr) stepSequencer->setBounds (seqRow);
+    // Row: 12-key root grid (full width).
+    {
+        auto keyRow = bounds.removeFromTop (44);
+        if (rootKeyRow != nullptr) rootKeyRow->setBounds (keyRow);
+    }
+    bounds.removeFromTop (6);
+
+    // Row: drum pattern pills · arp pills (rate as knob, voice + octaves) · sub/tex toggles · EQ.
+    {
+        auto controlsRow = bounds.removeFromTop (28);
+        if (drumPatternRow != nullptr)
+            drumPatternRow->setBounds (controlsRow.removeFromLeft (controlsRow.getWidth() * 6 / 13).reduced (2, 0));
+        controlsRow.removeFromLeft (6);
+        if (arpVoiceRow != nullptr)
+            arpVoiceRow->setBounds (controlsRow.removeFromLeft (controlsRow.getWidth() / 3).reduced (2, 0));
+        controlsRow.removeFromLeft (4);
+        if (arpOctavesRow != nullptr)
+            arpOctavesRow->setBounds (controlsRow.removeFromLeft (controlsRow.getWidth() / 2).reduced (2, 0));
+        controlsRow.removeFromLeft (4);
+        subOctButton    .setBounds (controlsRow.removeFromLeft (controlsRow.getWidth() / 3).reduced (2, 0));
+        controlsRow.removeFromLeft (2);
+        textureOctButton.setBounds (controlsRow.removeFromLeft (controlsRow.getWidth() / 2).reduced (2, 0));
+        controlsRow.removeFromLeft (2);
+        eqToggleButton  .setBounds (controlsRow.reduced (2, 0));
+    }
+    bounds.removeFromTop (4);
+
+    // Row: arp rate knob + HPF knob + (when expanded) EQ knobs.
+    {
+        auto knobsRow = bounds.removeFromTop (76);
+        const int colW = eqExpanded ? knobsRow.getWidth() / 6 : knobsRow.getWidth() / 2;
+
+        auto arpCol = knobsRow.removeFromLeft (colW);
+        arpRate.label.setBounds (arpCol.removeFromTop (kKnobLabelH));
+        arpRate.knob .setBounds (arpCol.reduced (4, 2));
+
+        auto hpfCol = knobsRow.removeFromLeft (colW);
+        hpfFreq.label.setBounds (hpfCol.removeFromTop (kKnobLabelH));
+        hpfFreq.knob .setBounds (hpfCol.reduced (4, 2));
+
+        if (eqExpanded)
+        {
+            ParamKnob* eqs[4] = { &eqLow, &eqLoMid, &eqHiMid, &eqHigh };
+            for (auto* eq : eqs)
+            {
+                auto col = knobsRow.removeFromLeft (colW);
+                eq->label.setBounds (col.removeFromTop (kKnobLabelH));
+                eq->knob .setBounds (col.reduced (4, 2));
+            }
+        }
+    }
+    bounds.removeFromTop (6);
+
+    // Row: drum step sequencer (16 × 3).
+    if (stepSequencer != nullptr)
+    {
+        const int seqH = juce::jmin (78, bounds.getHeight());
+        stepSequencer->setBounds (bounds.removeFromTop (seqH));
+    }
 
     // Park the invisible qwerty-keyboard 1×1 in the bottom-right corner.
     qwertyKeyboard.setBounds (getWidth() - 2, getHeight() - 2, 1, 1);

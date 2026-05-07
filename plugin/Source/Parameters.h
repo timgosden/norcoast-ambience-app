@@ -9,9 +9,20 @@ namespace ParamID
 {
     inline constexpr const char* foundationVol    = "foundationVol";
     inline constexpr const char* padsVol          = "padsVol";
+    inline constexpr const char* padsVol2         = "padsVol2";       // alt pads layer
     inline constexpr const char* textureVol       = "textureVol";
     inline constexpr const char* foundationSubOct = "foundationSubOct";
     inline constexpr const char* textureOctUp     = "textureOctUp";
+
+    // Per-layer mutes for the gigging mixer surface. A bool gate that
+    // doesn't disturb the fader value, so unmuting brings the layer back
+    // at the level the player set.
+    inline constexpr const char* foundationMute = "foundationMute";
+    inline constexpr const char* padsMute       = "padsMute";
+    inline constexpr const char* pads2Mute      = "pads2Mute";
+    inline constexpr const char* textureMute    = "textureMute";
+    inline constexpr const char* arpMute        = "arpMute";
+    inline constexpr const char* drumMute       = "drumMute";
 
     inline constexpr const char* chorusMix     = "chorusMix";
 
@@ -73,9 +84,27 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
     add (std::make_unique<FloatParam> (juce::ParameterID { ParamID::padsVol, 1 },
                                         "Pads",
                                         NormRange { 0.0f, 1.0f, 0.001f }, 0.50f));
+    add (std::make_unique<FloatParam> (juce::ParameterID { ParamID::padsVol2, 1 },
+                                        "Pads 2",
+                                        NormRange { 0.0f, 1.0f, 0.001f }, 0.0f));
     add (std::make_unique<FloatParam> (juce::ParameterID { ParamID::textureVol, 1 },
                                         "Texture",
                                         NormRange { 0.0f, 1.0f, 0.001f }, 0.85f));
+
+    // Per-layer mute gates. Independent from the volume fader so a
+    // muted-then-unmuted layer returns at the same level.
+    layout.add (std::make_unique<juce::AudioParameterBool> (
+        juce::ParameterID { ParamID::foundationMute, 1 }, "Foundation Mute", false));
+    layout.add (std::make_unique<juce::AudioParameterBool> (
+        juce::ParameterID { ParamID::padsMute,       1 }, "Pads Mute",       false));
+    layout.add (std::make_unique<juce::AudioParameterBool> (
+        juce::ParameterID { ParamID::pads2Mute,      1 }, "Pads 2 Mute",     false));
+    layout.add (std::make_unique<juce::AudioParameterBool> (
+        juce::ParameterID { ParamID::textureMute,    1 }, "Texture Mute",    false));
+    layout.add (std::make_unique<juce::AudioParameterBool> (
+        juce::ParameterID { ParamID::arpMute,        1 }, "Arp Mute",        false));
+    layout.add (std::make_unique<juce::AudioParameterBool> (
+        juce::ParameterID { ParamID::drumMute,       1 }, "Drum Mute",       false));
 
     layout.add (std::make_unique<juce::AudioParameterBool> (
         juce::ParameterID { ParamID::foundationSubOct, 1 }, "Foundation Sub-Oct", true));

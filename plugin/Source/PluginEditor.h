@@ -82,28 +82,42 @@ private:
     void savePresetToFile();
     void loadPresetFromFile();
 
-    // Six logical sections, drawn as rounded-rect panels with a header.
-    // Each holds one or more knobs.
-    struct Section
-    {
-        juce::String title;
-        juce::Colour accent;
-        juce::Rectangle<int> bounds;
-        std::vector<ParamKnob*> knobs;
-    };
-    std::array<Section, 10> sections;
+    // Bottom-strip backplane: a single rounded panel that frames the
+    // 8-knob FX row + 8-fader mixer row.
+    juce::Rectangle<int> mixerPanelBounds;
 
-    // Knobs (allocated as members so their lifetime matches the editor)
-    ParamKnob foundationVol, padsVol, textureVol;
+    // ─── Mixer surface: 8 vertical faders across the bottom half ─────
+    // Foundation, Pads 1, Pads 2, Texture, Arp, Movement (drums),
+    // Low-Pass Filter, Master Vol — like a Korg nanoKONTROL strip.
+    ParamKnob foundationVol, padsVol, padsVol2, textureVol;
+    ParamKnob arpVol, drumVol, lpfFreq, masterVol;
+
+    // Mute buttons for the 6 audio layers (LPF and Master never mute).
+    juce::TextButton foundationMuteBtn { "M" };
+    juce::TextButton padsMuteBtn       { "M" };
+    juce::TextButton pads2MuteBtn      { "M" };
+    juce::TextButton textureMuteBtn    { "M" };
+    juce::TextButton arpMuteBtn        { "M" };
+    juce::TextButton drumMuteBtn       { "M" };
+    std::unique_ptr<ButtonAttach> foundationMuteAttach;
+    std::unique_ptr<ButtonAttach> padsMuteAttach;
+    std::unique_ptr<ButtonAttach> pads2MuteAttach;
+    std::unique_ptr<ButtonAttach> textureMuteAttach;
+    std::unique_ptr<ButtonAttach> arpMuteAttach;
+    std::unique_ptr<ButtonAttach> drumMuteAttach;
+
+    // ─── 8 FX mix knobs row above the faders ─────────────────────────
+    // Reverb, Reverb Size, Shimmer, Chorus, Delay, Delay Feedback,
+    // Width, Drive — all "amount" controls.
+    ParamKnob reverbMix, reverbSize, shimmerVol, chorusMix;
+    ParamKnob delayMix, delayFb, widthMod, satAmt;
+
+    // ─── Other controls (top half) ───────────────────────────────────
     ParamKnob evolveRate;
-    ParamKnob chorusMix, delayMix, delayFb, delayTimeMs, delayTone;
-    ParamKnob reverbMix, reverbSize, reverbMod, shimmerVol;
-    ParamKnob hpfFreq, lpfFreq;
+    ParamKnob delayTimeMs, delayTone, reverbMod;
+    ParamKnob hpfFreq;
     ParamKnob eqLow, eqLoMid, eqHiMid, eqHigh;
-    ParamKnob widthMod, satAmt, masterVol;
-
-    ParamKnob arpVol, arpRate;
-    ParamKnob drumVol;
+    ParamKnob arpRate;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (NorcoastAmbienceEditor)
 };

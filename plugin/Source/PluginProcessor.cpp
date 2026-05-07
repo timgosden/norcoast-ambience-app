@@ -51,6 +51,29 @@ namespace
         return c;
     }
 
+    LayerConfig makePadsConfig2()
+    {
+        // Bright / glassy alt-pad layer — sits an octave above Pads 1 so
+        // a player can blend it in for sparkle without crowding the main
+        // pad's harmonic content.
+        LayerConfig c;
+        c.name    = "Pads 2";
+        c.timbres =
+        {
+            { WaveType::Glass,     4,  9.0f, 0.018f, 0.70f },
+            { WaveType::Celestial, 3, 12.0f, 0.010f, 0.85f },
+            { WaveType::Choir,     2, 15.0f, 0.008f, 0.90f }
+        };
+        c.octaves   = { 1, 2 };
+        c.fBase     = 2400.0f;
+        c.fMod      = 600.0f;
+        c.fRate     = 0.055f;
+        c.aMod      = 0.08f;
+        c.aRate     = 0.07f;
+        c.layerGain = 0.42f;
+        return c;
+    }
+
     // reverbSizeToFB(v) = 10^(-1.5/(1+v*19))  — exact match to standalone.
     inline float reverbSizeToFB (float v) noexcept
     {
@@ -63,6 +86,7 @@ NorcoastAmbienceProcessor::NorcoastAmbienceProcessor()
         .withOutput ("Output", juce::AudioChannelSet::stereo(), true)),
       foundationConfig (makeFoundationConfig()),
       padsConfig       (makePadsConfig()),
+      padsConfig2      (makePadsConfig2()),
       apvts (*this, nullptr, "PARAMS", createParameterLayout())
 {
     Waves::init();
@@ -70,9 +94,16 @@ NorcoastAmbienceProcessor::NorcoastAmbienceProcessor()
     // Cache atom pointers for realtime-safe param reads.
     foundationVolParam    = apvts.getRawParameterValue (ParamID::foundationVol);
     padsVolParam          = apvts.getRawParameterValue (ParamID::padsVol);
+    padsVol2Param         = apvts.getRawParameterValue (ParamID::padsVol2);
     textureVolParam       = apvts.getRawParameterValue (ParamID::textureVol);
     foundationSubOctParam = apvts.getRawParameterValue (ParamID::foundationSubOct);
     textureOctUpParam     = apvts.getRawParameterValue (ParamID::textureOctUp);
+    foundationMuteParam   = apvts.getRawParameterValue (ParamID::foundationMute);
+    padsMuteParam         = apvts.getRawParameterValue (ParamID::padsMute);
+    pads2MuteParam        = apvts.getRawParameterValue (ParamID::pads2Mute);
+    textureMuteParam      = apvts.getRawParameterValue (ParamID::textureMute);
+    arpMuteParam          = apvts.getRawParameterValue (ParamID::arpMute);
+    drumMuteParam         = apvts.getRawParameterValue (ParamID::drumMute);
     chorusMixParam     = apvts.getRawParameterValue (ParamID::chorusMix);
     delayMixParam      = apvts.getRawParameterValue (ParamID::delayMix);
     delayFbParam       = apvts.getRawParameterValue (ParamID::delayFb);
@@ -111,6 +142,7 @@ NorcoastAmbienceProcessor::NorcoastAmbienceProcessor()
 
     foundationSynth.addSound (new PadSound());
     padsSynth      .addSound (new PadSound());
+    padsSynth2     .addSound (new PadSound());
 
     for (int i = 0; i < kVoicesPerLayer; ++i)
     {
@@ -122,6 +154,10 @@ NorcoastAmbienceProcessor::NorcoastAmbienceProcessor()
                                                 nullptr,
                                                 nullptr, nullptr,
                                                 nullptr));
+        padsSynth2     .addVoice (new PadVoice (padsConfig2, padsVol2Param,
+                                                nullptr,
+                                                nullptr, nullptr,
+                                                nullptr));
     }
 }
 
@@ -129,6 +165,16 @@ void NorcoastAmbienceProcessor::prepareToPlay (double sampleRate, int samplesPer
 {
     foundationSynth.setCurrentPlaybackSampleRate (sampleRate);
     padsSynth      .setCurrentPlaybackSampleRate (sampleRate);
+    padsSynth2     .setCurrentPlaybackSampleRate (sampleRate);
+
+    layerScratch.setSize (2, samplesPerBlock, false, false, true);
+
+    for (auto* m : { &muteFoundation, &mutePads, &mutePads2,
+                     &muteTexture,    &muteArp,  &muteDrum })
+    {
+        m->reset (sampleRate, 0.05);             // 50 ms ramp
+        m->setCurrentAndTargetValue (1.0f);
+    }
 
     juce::dsp::ProcessSpec spec;
     spec.sampleRate       = sampleRate;
@@ -264,11 +310,34 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         }
     }
 
+    // Helper: takes whatever the previous step rendered into layerScratch,
+    // applies the smoothed mute fade for that layer, and sums it onto the
+    // main bus. Mute toggles ramp over 50 ms (configured in prepareToPlay)
+    // so a click on the mute button doesn't actually click.
+    auto sumLayerWithMute = [&] (juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear>& gain,
+                                 std::atomic<float>* muteParam)
+    {
+        gain.setTargetValue (muteParam != nullptr && muteParam->load() > 0.5f ? 0.0f : 1.0f);
+        auto* sL = layerScratch.getReadPointer (0);
+        auto* sR = layerScratch.getReadPointer (1);
+        auto* mL = buffer.getWritePointer (0);
+        auto* mR = buffer.getNumChannels() > 1 ? buffer.getWritePointer (1) : mL;
+        for (int s = 0; s < n; ++s)
+        {
+            const float g = gain.getNextValue();
+            mL[s] += sL[s] * g;
+            mR[s] += sR[s] * g;
+        }
+    };
+
+    if (layerScratch.getNumSamples() < n)
+        layerScratch.setSize (2, n, false, false, true);
+
     // ─── Foundation renders BEFORE the chord evolver runs, so it
-    // receives the raw root note(s) only — no chord intervals. The
-    // standalone Foundation layer is intentionally a single sub
-    // root note at any moment, not a chord.
-    foundationSynth.renderNextBlock (buffer, midi, 0, n);
+    // receives the raw root note(s) only — no chord intervals.
+    layerScratch.clear();
+    foundationSynth.renderNextBlock (layerScratch, midi, 0, n);
+    sumLayerWithMute (muteFoundation, foundationMuteParam);
 
     // ─── Chord Evolve: augment user note-ons with chord intervals,
     // optionally cycle the chord type on a timer. Runs BEFORE
@@ -310,7 +379,13 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
     keyboardState.processNextMidiBuffer (midi, 0, n, true);
 
-    padsSynth.renderNextBlock (buffer, midi, 0, n);
+    layerScratch.clear();
+    padsSynth.renderNextBlock (layerScratch, midi, 0, n);
+    sumLayerWithMute (mutePads, padsMuteParam);
+
+    layerScratch.clear();
+    padsSynth2.renderNextBlock (layerScratch, midi, 0, n);
+    sumLayerWithMute (mutePads2, pads2MuteParam);
 
     // ─── Arpeggiator (additive — same FX chain as the pads) ───────────
     {
@@ -331,12 +406,13 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         const auto  voice   = static_cast<Arpeggiator::VoiceKind> (
                                   juce::jlimit (0, 2, (int) arpVoiceParam->load()));
 
-        // Always call process() — when muted it keeps the step grid in
-        // lockstep with the shared transport and lets in-flight voices
-        // ring out instead of cutting them off.
-        arpeggiator.process (buffer, 0, n, heldNotesScratch,
+        // Render to scratch + sum-with-mute so the mute button cuts the arp
+        // cleanly; the shared transport keeps the step grid locked.
+        layerScratch.clear();
+        arpeggiator.process (layerScratch, 0, n, heldNotesScratch,
                              arpVol, rate, bpm, octSpan, voice,
                              transportSamples);
+        sumLayerWithMute (muteArp, arpMuteParam);
     }
 
     // ─── Drums (additive — same FX chain as the pads) ─────────────────
@@ -347,14 +423,17 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         const int   mdMask  = (int) drumCustomMdParam->load();
         const int   hhMask  = (int) drumCustomHhParam->load();
         const int   timeSig = juce::jlimit (0, 1, (int) timeSigParam->load());
-        drumMachine.process (buffer, 0, n, drumVol, patIdx, bpm,
+        layerScratch.clear();
+        drumMachine.process (layerScratch, 0, n, drumVol, patIdx, bpm,
                              loMask, mdMask, hhMask,
                              timeSig, transportSamples);
+        sumLayerWithMute (muteDrum, drumMuteParam);
     }
 
     // ─── Texture (granular dulcimer — only fires while notes are held) ─
     {
         const float textureVol = textureVolParam->load();
+        layerScratch.clear();
         if (textureVol > 1e-4f)
         {
             heldNotesScratch.clear();
@@ -363,8 +442,9 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
                     heldNotesScratch.push_back (note);
 
             const bool octUp = textureOctUpParam->load() > 0.5f;
-            texture.process (buffer, 0, n, heldNotesScratch, textureVol, octUp);
+            texture.process (layerScratch, 0, n, heldNotesScratch, textureVol, octUp);
         }
+        sumLayerWithMute (muteTexture, textureMuteParam);
     }
 
     // Snapshot params once per block.

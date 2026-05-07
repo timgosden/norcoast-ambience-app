@@ -65,6 +65,7 @@ private:
 
     LayerConfig foundationConfig;
     LayerConfig padsConfig;
+    LayerConfig padsConfig2;        // bright/glassy alt pad layer
 
     juce::AudioProcessorValueTreeState apvts;
     int currentProgram = 0;
@@ -72,9 +73,16 @@ private:
     // Cached parameter atom pointers — read once per block in processBlock.
     std::atomic<float>* foundationVolParam    = nullptr;
     std::atomic<float>* padsVolParam          = nullptr;
+    std::atomic<float>* padsVol2Param         = nullptr;
     std::atomic<float>* textureVolParam       = nullptr;
     std::atomic<float>* foundationSubOctParam = nullptr;
     std::atomic<float>* textureOctUpParam     = nullptr;
+    std::atomic<float>* foundationMuteParam   = nullptr;
+    std::atomic<float>* padsMuteParam         = nullptr;
+    std::atomic<float>* pads2MuteParam        = nullptr;
+    std::atomic<float>* textureMuteParam      = nullptr;
+    std::atomic<float>* arpMuteParam          = nullptr;
+    std::atomic<float>* drumMuteParam         = nullptr;
     std::atomic<float>* chorusMixParam     = nullptr;
     std::atomic<float>* delayMixParam      = nullptr;
     std::atomic<float>* delayFbParam       = nullptr;
@@ -113,7 +121,19 @@ private:
 
     juce::Synthesiser foundationSynth;
     juce::Synthesiser padsSynth;
+    juce::Synthesiser padsSynth2;
     juce::MidiKeyboardState keyboardState;
+
+    // Scratch buffer used to render each layer in isolation so we can
+    // apply the per-layer mute gate (a smoothed 50 ms fade) before
+    // summing the layer back into the main mix bus.
+    juce::AudioBuffer<float> layerScratch;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> muteFoundation { 1.0f };
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> mutePads       { 1.0f };
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> mutePads2      { 1.0f };
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> muteTexture    { 1.0f };
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> muteArp        { 1.0f };
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> muteDrum       { 1.0f };
 
     // ─── Master FX chain ──────────────────────────────────────────────
     // Order: synth → chorus → delay → reverb → width LFO → saturation
