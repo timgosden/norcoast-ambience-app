@@ -623,11 +623,17 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     // Drive the per-fader level meters at ~24 Hz refresh.
     startTimerHz (24);
 
-    // Give the qwerty keyboard focus so computer-keyboard keys map to MIDI.
-    juce::MessageManager::callAsync ([safeThis = juce::Component::SafePointer (&qwertyKeyboard)]
+    // Grab keyboard focus ONLY in the standalone wrapper. Hosted
+    // plugins (Logic, Live, MainStage…) don't appreciate the editor
+    // stealing keyboard from the host — MainStage in particular won't
+    // load the AU at all if the editor steals focus on open.
+    if (owner.wrapperType == juce::AudioProcessor::wrapperType_Standalone)
     {
-        if (safeThis != nullptr) safeThis->grabKeyboardFocus();
-    });
+        juce::MessageManager::callAsync ([safeThis = juce::Component::SafePointer (&qwertyKeyboard)]
+        {
+            if (safeThis != nullptr) safeThis->grabKeyboardFocus();
+        });
+    }
 }
 
 void NorcoastAmbienceEditor::sliderDragStarted (juce::Slider* s)
@@ -1182,15 +1188,19 @@ void NorcoastAmbienceEditor::resized()
         // open, give it room by shrinking the home-root grid; otherwise
         // the panel computes 0 height and refuses to open. Sequencer
         // wants ~108 px; the chord-degree row needs ~32 px.
+        // When the sequencer or chord-degrees panel is open we need
+        // space for the panel + its 4 px gap. Sequencer min height is
+        // now 70 px (was 96) so a 720 px window can fit the panel +
+        // shrunken key grid + full-height mixer simultaneously.
         int extra = 0;
-        if (sequencerExpanded)   extra += 108;
-        if (customChordExpanded) extra +=  32;
+        if (sequencerExpanded)   extra += 74;   // 70 panel + 4 gap
+        if (customChordExpanded) extra += 32;   // 28 pills + 4 gap
         // Cap key-grid max at 132 — leaves the mixer its full
-        // kMixerHeight budget given 3 strips × 40 + 3 inter-strip gaps
-        // × 8 + 8 px after keyRow = 152 px of fixed below-keyRow
-        // furniture. The grid still scales up nicely on bigger window
-        // heights but never starves the mixer.
-        const int keyH = juce::jlimit (88, 132,
+        // kMixerHeight budget. When a panel is open the min drops to
+        // 56 so the panel can fit alongside the mixer; otherwise the
+        // grid stays a comfortable 88+ px.
+        const int keyMin = sequencerExpanded ? 56 : 88;
+        const int keyH = juce::jlimit (keyMin, 132,
                                        bounds.getHeight() - (kMixerHeight + 152 + extra));
         rootKeyRow->setBounds (bounds.removeFromTop (keyH));
         bounds.removeFromTop (8);
@@ -1247,11 +1257,16 @@ void NorcoastAmbienceEditor::resized()
         stepSequencer->setVisible (sequencerExpanded);
         if (sequencerExpanded)
         {
-            const int reserveBelow = 40 + 2 + kMixerHeight;  // ARP + gap + mixer
+            // Reserve = arp strip + arp gap + mixer; matches the post-
+            // phase-61 inter-strip gap of 8 px (was 2 here, which left
+            // the layout 6 px short and visibly clipped the fader
+            // bottoms when the sequencer was open).
+            const int reserveBelow = 40 + 8 + kMixerHeight;
             const int avail = juce::jmax (0, bounds.getHeight() - reserveBelow);
-            // Force at least 96 px so the 16 step pads have a clickable
-            // size — the rootKeyRow is shrunk above to make room.
-            const int seqH  = juce::jlimit (96, 132, avail);
+            // Min 70 px, max 132 px. 70 keeps the 16 step pads visible
+            // and clickable while letting the layout fit a 720 px
+            // window with key grid + mixer at full height.
+            const int seqH  = juce::jlimit (70, 132, avail);
             stepSequencer->setBounds (bounds.removeFromTop (seqH).reduced (12, 0));
             bounds.removeFromTop (4);
         }
