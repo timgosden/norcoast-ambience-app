@@ -88,9 +88,9 @@ public:
         const float dBHiMid = apvts.getRawParameterValue (ParamID::eqHiMid)->load();
         const float dBHigh  = apvts.getRawParameterValue (ParamID::eqHigh) ->load();
 
-        const auto cLow   = juce::dsp::IIR::Coefficients<float>::makeLowShelf  (kSr,  100.0f, 0.7f, juce::Decibels::decibelsToGain (dBLow));
-        const auto cLoMid = juce::dsp::IIR::Coefficients<float>::makePeakFilter (kSr,  350.0f, 1.0f, juce::Decibels::decibelsToGain (dBLoMid));
-        const auto cHiMid = juce::dsp::IIR::Coefficients<float>::makePeakFilter (kSr, 2500.0f, 1.0f, juce::Decibels::decibelsToGain (dBHiMid));
+        const auto cLow   = juce::dsp::IIR::Coefficients<float>::makeLowShelf  (kSr,   80.0f, 0.7f, juce::Decibels::decibelsToGain (dBLow));
+        const auto cLoMid = juce::dsp::IIR::Coefficients<float>::makePeakFilter (kSr,  220.0f, 1.0f, juce::Decibels::decibelsToGain (dBLoMid));
+        const auto cHiMid = juce::dsp::IIR::Coefficients<float>::makePeakFilter (kSr, 1600.0f, 1.0f, juce::Decibels::decibelsToGain (dBHiMid));
         const auto cHigh  = juce::dsp::IIR::Coefficients<float>::makeHighShelf (kSr, 8000.0f, 0.7f, juce::Decibels::decibelsToGain (dBHigh));
 
         // Build the response curve sampled across the visible width.
@@ -128,9 +128,9 @@ public:
 
         // Four draggable band nodes (with frequency tag underneath).
         const std::array<std::pair<float, juce::String>, 4> bandFreqs {{
-            { 100.0f,  "100" },
-            { 350.0f,  "350" },
-            { 2500.0f, "2.5k" },
+            { 80.0f,   "80"  },
+            { 220.0f,  "220" },
+            { 1600.0f, "1.6k"},
             { 8000.0f, "8k"  } }};
         const std::array<float, 4> dBs { dBLow, dBLoMid, dBHiMid, dBHigh };
 
@@ -249,7 +249,7 @@ private:
     int nearestBandIndex (float mouseX) const
     {
         const auto r = getLocalBounds().toFloat().reduced (1.0f);
-        const std::array<float, 4> freqs { 100.0f, 350.0f, 2500.0f, 8000.0f };
+        const std::array<float, 4> freqs { 80.0f, 220.0f, 1600.0f, 8000.0f };
         int   bestIdx = 0;
         float bestDist = 1.0e9f;
         for (int i = 0; i < 4; ++i)

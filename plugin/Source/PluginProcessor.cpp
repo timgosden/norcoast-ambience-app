@@ -609,17 +609,17 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     refreshEQ (eqLow,   lastEqLowDb,   eqLowParam  ->load(),
                [sr](float db) {
                    return juce::dsp::IIR::Coefficients<float>::makeLowShelf (
-                       sr, 100.0f, 0.7071f, juce::Decibels::decibelsToGain (db));
+                       sr, 80.0f, 0.7071f, juce::Decibels::decibelsToGain (db));
                });
     refreshEQ (eqLoMid, lastEqLoMidDb, eqLoMidParam->load(),
                [sr](float db) {
                    return juce::dsp::IIR::Coefficients<float>::makePeakFilter (
-                       sr, 350.0f, 0.7f, juce::Decibels::decibelsToGain (db));
+                       sr, 220.0f, 0.7f, juce::Decibels::decibelsToGain (db));
                });
     refreshEQ (eqHiMid, lastEqHiMidDb, eqHiMidParam->load(),
                [sr](float db) {
                    return juce::dsp::IIR::Coefficients<float>::makePeakFilter (
-                       sr, 2500.0f, 0.9f, juce::Decibels::decibelsToGain (db));
+                       sr, 1600.0f, 0.9f, juce::Decibels::decibelsToGain (db));
                });
     refreshEQ (eqHigh,  lastEqHighDb,  eqHighParam ->load(),
                [sr](float db) {
