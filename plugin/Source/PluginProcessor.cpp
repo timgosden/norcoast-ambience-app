@@ -412,10 +412,11 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
         // Render to scratch + sum-with-mute so the mute button cuts the arp
         // cleanly; the shared transport keeps the step grid locked.
+        const int timeSig = juce::jlimit (0, 1, (int) timeSigParam->load());
         layerScratch.clear();
         arpeggiator.process (layerScratch, 0, n, heldNotesScratch,
                              arpVol, rate, bpm, octSpan, voice,
-                             transportSamples);
+                             transportSamples, timeSig);
         sumLayerWithMute (muteArp, arpMuteParam);
     }
 

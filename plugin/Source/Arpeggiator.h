@@ -42,16 +42,28 @@ public:
 
     // transportSamples: shared monotonic sample clock used by arp + drums +
     // evolve so all three lock to the same beat grid. Wraps every step.
+    // timeSig: 0 = 4/4 (pattern wraps over all held notes), 1 = 6/8
+    // (pattern wraps every 3 held notes per octave so the arp groups
+    // naturally with the dotted-quarter pulse).
     void process (juce::AudioBuffer<float>& buffer, int startSample, int numSamples,
                   const std::vector<int>& heldNotes,
                   float vol, float rateBeats, double bpm,
                   int octSpan, VoiceKind voiceKind,
-                  juce::int64 transportSamples)
+                  juce::int64 transportSamples,
+                  int timeSig = 0)
     {
         const bool noteSourceLive = vol >= 1e-4f && ! heldNotes.empty();
 
+        // 6/8 pattern groups in threes — cap effective held-note count
+        // at 3 so the arp loops every dotted-quarter pulse instead of
+        // sprawling over more notes than the bar contains.
+        const int held = (int) heldNotes.size();
+        const int effHeld = (timeSig == 1)
+            ? juce::jmin (3, juce::jmax (1, held))
+            : juce::jmax (1, held);
+
         const int patternSize  = noteSourceLive
-            ? (int) heldNotes.size() * (octSpan + 1) : 1;
+            ? effHeld * (octSpan + 1) : 1;
         const int tickSamples  = juce::jmax (1, (int) ((60.0 / bpm) * rateBeats * sampleRate));
         const int noteDurSamps = (int) (tickSamples * 0.88f);
 
@@ -66,7 +78,7 @@ public:
 
             if (noteSourceLive && stepNow != lastFiredStep)
             {
-                triggerArpNote (heldNotes, octSpan, voiceKind, vol, noteDurSamps);
+                triggerArpNote (heldNotes, octSpan, voiceKind, vol, noteDurSamps, effHeld);
                 stepIdx = (stepIdx + 1) % juce::jmax (1, patternSize);
                 lastFiredStep = stepNow;
             }
@@ -174,11 +186,17 @@ private:
     }
 
     // ─── Triggers ─────────────────────────────────────────────────────
+    // effHeld is the effective number of held notes the arp wraps over
+    // — capped to 3 in 6/8 (process() decides), so arp groups in 3s.
     void triggerArpNote (const std::vector<int>& heldNotes, int octSpan,
-                         VoiceKind kind, float vol, int noteDurSamps)
+                         VoiceKind kind, float vol, int noteDurSamps,
+                         int effHeld)
     {
-        const int idx = stepIdx % (int) heldNotes.size();
-        const int oct = (stepIdx / (int) heldNotes.size()) % (octSpan + 1);
+        const int held = (int) heldNotes.size();
+        if (held <= 0) return;
+        const int wrap = juce::jmax (1, juce::jmin (effHeld, held));
+        const int idx = stepIdx % wrap;
+        const int oct = (stepIdx / wrap) % (octSpan + 1);
         const int midi = heldNotes[(size_t) idx] + oct * 12;
         const float freq = (float) juce::MidiMessage::getMidiNoteInHertz (midi);
 
