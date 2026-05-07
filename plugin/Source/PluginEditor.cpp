@@ -256,6 +256,14 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     setupKnob (delayMix,      "Delay",        ParamID::delayMix);
     setupKnob (reverbMix,     "Reverb",       ParamID::reverbMix);
     setupKnob (shimmerVol,    "Shimmer",      ParamID::shimmerVol);
+    // Shimmer audio range is 0..0.5 internally — surface that to the
+    // user as 0..100% so the knob feels right at full position.
+    shimmerVol.knob.textFromValueFunction = [] (double v) -> juce::String
+    {
+        return juce::String ((int) std::round (v * 200.0)) + "%";
+    };
+    shimmerVol.knob.updateText();
+
     setupKnob (hpfFreq,       "High Pass",    ParamID::hpfFreq);
     setupKnob (lpfFreq,       "LPF",          ParamID::lpfFreq);
 
@@ -680,19 +688,6 @@ void NorcoastAmbienceEditor::resized()
     // ── Top half (everything above the mixer slab) ──────────────────
     bounds.removeFromBottom (10);
 
-    // 12-key root grid — 3 rows × 4 columns of chunky chord pads.
-    // Constrain width so cells aren't ridiculously wide / thin.
-    {
-        constexpr int kKeyRowH    = 132;     // 3 rows × 44 px
-        constexpr int kKeyRowMaxW = 720;     // ~180 px / cell
-        auto fullRow = bounds.removeFromTop (kKeyRowH);
-        const int margin = juce::jmax (0, (fullRow.getWidth() - kKeyRowMaxW) / 2);
-        fullRow.removeFromLeft (margin);
-        fullRow.removeFromRight (margin);
-        if (rootKeyRow != nullptr) rootKeyRow->setBounds (fullRow);
-    }
-    bounds.removeFromTop (8);
-
     // Helper: lay out a control strip and remember its bounds for paint().
     auto layoutStrip = [&] (juce::Rectangle<int>& outBounds, int height)
     {
@@ -736,20 +731,13 @@ void NorcoastAmbienceEditor::resized()
         }
     }
 
-    // Bars + drone + evolve thin sub-row (these were squeezed into the
-    // EVOLVE strip; now they get their own line so the buttons can
-    // actually be the same size as the rest of the row above).
-    {
-        auto sub = bounds.removeFromTop (32).reduced (12, 2);
-        sub.removeFromLeft (64);                          // align under "EVOLVE" label
-        droneButton .setBounds (sub.removeFromRight (90).reduced (2, 2));
-        sub.removeFromRight (4);
-        evolveButton.setBounds (sub.removeFromRight (90).reduced (2, 2));
-        sub.removeFromRight (8);
-        if (evolveBarsRow != nullptr)
-            evolveBarsRow->setBounds (sub.reduced (0, 2));
-    }
-    bounds.removeFromTop (4);
+    // Drone / Evolve / Bars row removed from the surface — those are
+    // now hard defaults (drone = on, evolve = on, bars = 4). The
+    // params still exist and are reachable from the host's automation
+    // panel, but the gigging surface doesn't need them.
+    droneButton  .setVisible (false);
+    evolveButton .setVisible (false);
+    if (evolveBarsRow != nullptr) evolveBarsRow->setVisible (false);
 
     // ── DRUMS strip ──────────────────────────────────────────────────
     {
@@ -765,14 +753,15 @@ void NorcoastAmbienceEditor::resized()
     }
     bounds.removeFromTop (2);
 
-    // Step sequencer — only visible when expanded.
+    // Step sequencer — only visible when expanded. Bigger than before
+    // so the cells are easy to click on stage.
     if (stepSequencer != nullptr)
     {
         stepSequencer->setVisible (sequencerExpanded);
         if (sequencerExpanded)
         {
-            const int seqH = juce::jmin (78, bounds.getHeight() - 80);
-            stepSequencer->setBounds (bounds.removeFromTop (seqH).reduced (24, 0));
+            const int seqH = juce::jmin (110, juce::jmax (60, bounds.getHeight() - 220));
+            stepSequencer->setBounds (bounds.removeFromTop (seqH).reduced (12, 0));
             bounds.removeFromTop (4);
         }
     }
@@ -796,15 +785,28 @@ void NorcoastAmbienceEditor::resized()
     }
     bounds.removeFromTop (2);
 
-    // (LAYERS strip removed entirely — Sub Oct / Tex +Oct moved into
-    // the mixer above their fader columns, EQ toggle moved up into
-    // the title bar.)
+    // (LAYERS strip removed — Sub Oct / Tex +Oct moved into the mixer
+    // above their fader columns, EQ toggle moved up into the title bar.)
 
-    // EQ knobs row — only visible when expanded.
+    bounds.removeFromTop (6);
+
+    // EQ knobs row — when expanded, takes a band off the BOTTOM of the
+    // top half (just above the mixer) so it doesn't push the keys
+    // around.
+    juce::Rectangle<int> eqRow;
     if (eqExpanded)
     {
-        bounds.removeFromTop (4);
-        auto eqRow = bounds.removeFromTop (juce::jmin (76, bounds.getHeight()));
+        const int eqH = juce::jmin (76, juce::jmax (40, bounds.getHeight() - 80));
+        eqRow = bounds.removeFromBottom (eqH);
+        bounds.removeFromBottom (6);
+    }
+
+    // Pad keys (12-key root grid) — full width, fills whatever vertical
+    // space is left between the ARP strip and the mixer / EQ row.
+    if (rootKeyRow != nullptr) rootKeyRow->setBounds (bounds);
+
+    if (eqExpanded)
+    {
         const int colW = eqRow.getWidth() / 4;
         ParamKnob* eqs[4] = { &eqLow, &eqLoMid, &eqHiMid, &eqHigh };
         for (auto* eq : eqs)

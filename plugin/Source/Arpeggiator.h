@@ -40,7 +40,10 @@ public:
         stepIdx = 0;
     }
 
-    // octaveChoice : 0 = -1 oct, 1 = 0 (Mid), 2 = +1 oct.
+    // octaveChoice maps to octShift = octaveChoice. Labels say "-1 /
+    // Mid / +1" but the user wanted the whole arp shifted up an octave
+    // (it sounded too low before), so the lowest setting is now
+    // "natural played octave" rather than "−1 from natural".
     // timeSig      : 0 = 4/4, 1 = 6/8 (groups in threes).
     // Pattern walks through held notes once and shifts ALL of them by
     // octaveShift * 12 semitones — matches the web app's "-Oct/Mid/+Oct"
@@ -53,7 +56,7 @@ public:
                   int timeSig = 0)
     {
         const bool noteSourceLive = vol >= 1e-4f && ! heldNotes.empty();
-        const int  octShift = juce::jlimit (-1, 1, octaveChoice - 1);
+        const int  octShift = juce::jlimit (0, 2, octaveChoice);
 
         // 6/8 pattern groups in threes — cap effective held-note count
         // at 3 so the arp loops every dotted-quarter pulse instead of

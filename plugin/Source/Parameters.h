@@ -153,12 +153,11 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
                                         "High Pass",
                                         NormRange { 0.0f, 1.0f, 0.001f }, 0.0f));
 
-    // Shimmer max capped at 0.3 — the granular pitch shifter is a
-    // simplified phase-vocoder substitute, so even at "max" the wet
-    // send stays musically usable instead of accumulating into noise.
+    // Shimmer mix range — internally caps at 50% wet which the user
+    // sees as 100% on the knob (display formatter scales ×200).
     add (std::make_unique<FloatParam> (juce::ParameterID { ParamID::shimmerVol, 1 },
                                         "Shimmer",
-                                        NormRange { 0.0f, 0.3f, 0.001f }, 0.0f));
+                                        NormRange { 0.0f, 0.5f, 0.001f }, 0.0f));
 
     // ─── Master ───────────────────────────────────────────────────────
     add (std::make_unique<FloatParam> (juce::ParameterID { ParamID::widthMod, 1 },
@@ -253,11 +252,11 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
         "Evolve Pool", 0, 63, 63));
     layout.add (std::make_unique<juce::AudioParameterBool> (
         juce::ParameterID { ParamID::evolveOn, 1 }, "Evolve", true));
-    // Evolve in BARS so the chord changes line up with the arp + drum
-    // tempo grid. 4/4 assumed; default 8 bars matches the web app.
+    // Evolve in BARS — default 4 bars (the chord-change cadence is now
+    // fixed UI-side, so the user doesn't need to fiddle with this).
     layout.add (std::make_unique<juce::AudioParameterChoice> (
         juce::ParameterID { ParamID::evolveBars, 1 }, "Evolve Bars",
-        juce::StringArray { "1", "2", "4", "8", "16", "32" }, 3));
+        juce::StringArray { "1", "2", "4", "8", "16", "32" }, 2));
 
     // Drone — ON by default so the synth auto-plays a chord on load
     // (matches the standalone web app's behaviour). When on, a single
