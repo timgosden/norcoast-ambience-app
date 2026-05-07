@@ -207,7 +207,12 @@ private:
         fft->perform (s.fftIn.data(), s.fftOut.data(), true);
 
         // 8. Window + overlap-add into outAccum.
-        const float scale = 2.0f / ((float) kHalf * (float) kOversamp);
+        //    Scale factor accounts for the analysis-magnitude doubling
+        //    (×2 because we built the spectrum from positive freqs and
+        //    mirrored to negative freqs) and the windowed-OLA gain
+        //    (Hann sum-of-squares ≈ 1.5 at osamp=4). JUCE's IFFT is
+        //    already normalised by 1/N so we don't divide by N again.
+        const float scale = 2.0f / (float) kOversamp;
         for (int k = 0; k < kFftSize; ++k)
             s.outAccum[(size_t) k] += window[(size_t) k]
                                        * s.fftOut[(size_t) k].real()
