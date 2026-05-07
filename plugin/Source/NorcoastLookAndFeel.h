@@ -83,10 +83,78 @@ public:
         g.fillPath (tick, juce::AffineTransform::rotation (thumbAngle).translated (cx, cy));
     }
 
-    // Linear faders honour an optional "stopFadeMult" component
-    // property (0..1). When < 1 we visually pull the thumb toward the
-    // zero end of the track without touching the slider's value — the
-    // editor uses this to fade the layer faders down during Stop.
+    juce::Font getLabelFont (juce::Label& label) override
+    {
+        return juce::FontOptions ((float) label.getHeight() * 0.7f).withStyle ("Regular");
+    }
+
+    juce::Font getTextButtonFont (juce::TextButton&, int buttonHeight) override
+    {
+        return juce::FontOptions ((float) buttonHeight * 0.5f).withStyle ("Regular");
+    }
+
+    // Web-app-style button: dark rounded card with a subtle border. The
+    // toggled state does NOT fill the whole button (which felt heavy in
+    // the plugin); instead the border + text colour shift to the on
+    // colour, mirroring the standalone's pill-button look.
+    void drawButtonBackground (juce::Graphics& g, juce::Button& button,
+                               const juce::Colour& /*bg*/, bool over, bool down) override
+    {
+        const auto bounds   = button.getLocalBounds().toFloat().reduced (1.0f);
+        const auto onColour = button.findColour (juce::TextButton::buttonOnColourId);
+
+        // Dark slate fill — same shade for on/off so toggling doesn't
+        // produce a visual jolt. Hover / down nudge the brightness a
+        // touch so the affordance is still readable.
+        const auto baseFill = juce::Colour (0xff141a26);
+        const auto fill = down  ? baseFill.brighter (0.12f)
+                       : over   ? baseFill.brighter (0.06f)
+                                : baseFill;
+        g.setColour (fill);
+        g.fillRoundedRectangle (bounds, 8.0f);
+
+        // Border: dim outline normally; on-state uses the accent colour
+        // at full opacity so the active pill reads instantly. A 1.4 px
+        // stroke gives the on state extra emphasis without filling.
+        if (button.getToggleState())
+        {
+            g.setColour (onColour.withAlpha (0.85f));
+            g.drawRoundedRectangle (bounds, 8.0f, 1.4f);
+        }
+        else
+        {
+            g.setColour (juce::Colour (0xff2a3142));
+            g.drawRoundedRectangle (bounds, 8.0f, 1.0f);
+        }
+    }
+
+    // Pill-button text: when toggled, paint with the on-colour so the
+    // border + text colour shift together. Off-state stays bright white-
+    // ish so the label is always legible against the slate.
+    void drawButtonText (juce::Graphics& g, juce::TextButton& button,
+                         bool /*over*/, bool /*down*/) override
+    {
+        g.setFont (getTextButtonFont (button, button.getHeight()));
+        // Pull the button's own off-state colour so per-button accents
+        // (e.g. the pink Stop pill) survive the LAF override.
+        const auto on  = button.findColour (juce::TextButton::textColourOnId);
+        const auto off = button.findColour (juce::TextButton::textColourOffId);
+        // Use textColourOnId if it's set to something visible; otherwise
+        // fall back to the buttonOnColourId so the active accent shows.
+        const auto onResolved = (on.getAlpha() > 16
+                                  && on != juce::Colour (kBg)
+                                  && on != juce::Colour (kPanelBg))
+            ? on
+            : button.findColour (juce::TextButton::buttonOnColourId);
+        g.setColour (button.getToggleState() ? onResolved : off);
+        const int pad = juce::jmin (button.getHeight(), button.getWidth()) / 4;
+        g.drawFittedText (button.getButtonText(),
+                          button.getLocalBounds().reduced (pad, 0),
+                          juce::Justification::centred, 2);
+    }
+
+    // Linear slider: thin track with a prominent white-ish circular
+    // thumb — matches the web app's gigging-friendly horizontal sliders.
     void drawLinearSlider (juce::Graphics& g,
                            int x, int y, int w, int h,
                            float sliderPos,
@@ -94,6 +162,8 @@ public:
                            const juce::Slider::SliderStyle style,
                            juce::Slider& slider) override
     {
+        // Stop-fade visual scrub for vertical faders — same logic as
+        // before, just tweaks sliderPos toward the bottom of the track.
         if (style == juce::Slider::LinearVertical)
         {
             const auto prop = slider.getProperties()["stopFadeMult"];
@@ -105,10 +175,6 @@ public:
                     const float range = maxSliderPos - minSliderPos;
                     if (std::abs (range) > 1e-3f)
                     {
-                        // Normalised thumb position in the track (0 at
-                        // minSliderPos, 1 at maxSliderPos). Scale the
-                        // distance from min by the multiplier so the
-                        // thumb visually slides toward zero.
                         const float n        = (sliderPos - minSliderPos) / range;
                         const float scaledN  = n * m;
                         sliderPos            = minSliderPos + scaledN * range;
@@ -116,34 +182,59 @@ public:
                 }
             }
         }
+
+        if (style == juce::Slider::LinearHorizontal
+         || style == juce::Slider::LinearVertical)
+        {
+            const float trackW = 3.0f;
+            const auto bounds = juce::Rectangle<float> ((float) x, (float) y,
+                                                         (float) w, (float) h);
+            const auto fillCol  = slider.findColour (juce::Slider::rotarySliderFillColourId);
+            const auto trackCol = juce::Colour (0xff2a3142);
+
+            const bool horiz = style == juce::Slider::LinearHorizontal;
+            const auto centreX = bounds.getCentreX();
+            const auto centreY = bounds.getCentreY();
+
+            juce::Rectangle<float> track;
+            juce::Rectangle<float> filled;
+            if (horiz)
+            {
+                track  = juce::Rectangle<float> (bounds.getX(),  centreY - trackW * 0.5f,
+                                                 bounds.getWidth(), trackW);
+                filled = juce::Rectangle<float> (bounds.getX(),  centreY - trackW * 0.5f,
+                                                 sliderPos - bounds.getX(), trackW);
+            }
+            else
+            {
+                track  = juce::Rectangle<float> (centreX - trackW * 0.5f, bounds.getY(),
+                                                 trackW, bounds.getHeight());
+                // For vertical, sliderPos = top is max, bottom is min.
+                filled = juce::Rectangle<float> (centreX - trackW * 0.5f, sliderPos,
+                                                 trackW, bounds.getBottom() - sliderPos);
+            }
+            g.setColour (trackCol);
+            g.fillRoundedRectangle (track, trackW * 0.5f);
+            g.setColour (fillCol.withAlpha (0.85f));
+            g.fillRoundedRectangle (filled, trackW * 0.5f);
+
+            // White-ish thumb circle — sized so it reads at gigging
+            // distance but doesn't dominate the strip. Drop a subtle
+            // shadow ring so it pops on the dark slate.
+            const float thumbR = horiz ? juce::jmin (10.0f, h * 0.48f)
+                                       : juce::jmin (10.0f, w * 0.48f);
+            const float tx = horiz ? sliderPos : centreX;
+            const float ty = horiz ? centreY  : sliderPos;
+            g.setColour (juce::Colours::black.withAlpha (0.35f));
+            g.fillEllipse (tx - thumbR - 0.5f, ty - thumbR + 1.0f,
+                           thumbR * 2.0f + 1.0f, thumbR * 2.0f + 1.0f);
+            g.setColour (juce::Colour (0xfff5f3ee));
+            g.fillEllipse (tx - thumbR, ty - thumbR, thumbR * 2.0f, thumbR * 2.0f);
+            return;
+        }
+
         juce::LookAndFeel_V4::drawLinearSlider (g, x, y, w, h,
                                                  sliderPos, minSliderPos, maxSliderPos,
                                                  style, slider);
-    }
-
-    juce::Font getLabelFont (juce::Label& label) override
-    {
-        return juce::FontOptions ((float) label.getHeight() * 0.7f).withStyle ("Regular");
-    }
-
-    juce::Font getTextButtonFont (juce::TextButton&, int buttonHeight) override
-    {
-        return juce::FontOptions ((float) buttonHeight * 0.5f).withStyle ("Regular");
-    }
-
-    void drawButtonBackground (juce::Graphics& g, juce::Button& button,
-                               const juce::Colour& /*bg*/, bool over, bool down) override
-    {
-        const auto bounds = button.getLocalBounds().toFloat().reduced (1.0f);
-        const auto onColour  = button.findColour (juce::TextButton::buttonOnColourId);
-        const auto offColour = button.findColour (juce::TextButton::buttonColourId);
-        const auto base = button.getToggleState()
-            ? onColour
-            : (down ? offColour.brighter (0.1f)
-                    : (over ? offColour.brighter (0.05f) : offColour));
-        g.setColour (base);
-        g.fillRoundedRectangle (bounds, 4.0f);
-        g.setColour (juce::Colour (kPanelEdge));
-        g.drawRoundedRectangle (bounds, 4.0f, 1.0f);
     }
 };

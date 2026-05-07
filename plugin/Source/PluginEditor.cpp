@@ -986,12 +986,15 @@ void NorcoastAmbienceEditor::paint (juce::Graphics& g)
     {
         if (r.isEmpty()) return;
         const auto rf = r.toFloat();
-        g.setColour (juce::Colour (NorcoastLookAndFeel::kPanelBg).withAlpha (0.6f));
-        g.fillRoundedRectangle (rf, 4.0f);
-        g.setColour (accent.withAlpha (0.55f));
-        g.fillRect (rf.withWidth (3.0f));
-        g.setColour (accent);
-        g.setFont (juce::FontOptions (12.0f).withStyle ("Bold"));
+        // Web-app card look: dark slate fill, no left accent strip,
+        // bigger rounded corners. The accent only colours the heading
+        // text — keeps the surface clean.
+        g.setColour (juce::Colour (0xff121826).withAlpha (0.85f));
+        g.fillRoundedRectangle (rf, 8.0f);
+        g.setColour (juce::Colour (0xff242a36));
+        g.drawRoundedRectangle (rf, 8.0f, 1.0f);
+        g.setColour (accent.withAlpha (0.9f));
+        g.setFont (juce::FontOptions (11.0f).withStyle ("Bold"));
         // Paint inside a 96-px slot so MOVEMENT (the longest label) fits
         // without truncation. Was hard-coded to 60 px.
         g.drawText (title, r.reduced (12, 0).withWidth (96),
@@ -1033,37 +1036,32 @@ void NorcoastAmbienceEditor::paint (juce::Graphics& g)
     if (! mixerPanelBounds.isEmpty())
     {
         const auto r = mixerPanelBounds.toFloat();
-        // Tint the panel a touch differently when Advanced is on so
-        // the user has a clear visual cue the bottom half just swapped.
+        // Web-app card: bigger corner radius, softer slate tint, much
+        // dimmer border. Advanced state nudges the tint cooler and
+        // tints the border purple so the page swap is obvious.
         g.setColour (advExpanded
-                     ? juce::Colour (0xff1a2030).withAlpha (0.9f)   // cool slate
-                     : juce::Colour (NorcoastLookAndFeel::kPanelBg));
-        g.fillRoundedRectangle (r, 8.0f);
+                     ? juce::Colour (0xff141a28).withAlpha (0.92f)
+                     : juce::Colour (0xff121826).withAlpha (0.85f));
+        g.fillRoundedRectangle (r, 12.0f);
         g.setColour (advExpanded
-                     ? juce::Colour (0xffb07acc).withAlpha (0.5f)    // EQ purple border
-                     : juce::Colour (NorcoastLookAndFeel::kPanelEdge));
-        g.drawRoundedRectangle (r, 8.0f, advExpanded ? 1.5f : 1.0f);
+                     ? juce::Colour (0xffb07acc).withAlpha (0.45f)
+                     : juce::Colour (0xff242a36));
+        g.drawRoundedRectangle (r, 12.0f, advExpanded ? 1.4f : 1.0f);
 
         if (! advExpanded)
         {
             // FX rack sub-panel — distinctly tinted (cooler / darker
-            // than the surrounding mixer plate) and edged in accent
-            // orange so it visibly reads as a separate "FX section"
-            // sitting above the layer faders. The accent border is
-            // enough to demarcate FX vs faders — no extra horizontal
-            // separator strip below.
-            // Height now matches the full knobs row (label + rotary +
-            // value text below) plus a few px of breathing room — at
-            // the previous height the bottom value caption was clipped.
+            // than the surrounding mixer plate). Border is now the same
+            // dim slate as the rest, with a small "FX" sticker for
+            // identity instead of an accent border (which read as
+            // "warning" on the dark background).
             const float kKnobsHeight = 96.0f;
             auto knobs = r.withHeight (kKnobsHeight + 16.0f).reduced (8.0f, 4.0f);
-            g.setColour (juce::Colour (0xff0c1019).withAlpha (0.95f));
-            g.fillRoundedRectangle (knobs, 6.0f);
-            g.setColour (juce::Colour (NorcoastLookAndFeel::kAccent).withAlpha (0.35f));
-            g.drawRoundedRectangle (knobs, 6.0f, 1.5f);
+            g.setColour (juce::Colour (0xff0c1019).withAlpha (0.92f));
+            g.fillRoundedRectangle (knobs, 10.0f);
+            g.setColour (juce::Colour (0xff242a36));
+            g.drawRoundedRectangle (knobs, 10.0f, 1.0f);
 
-            // "FX" sticker on the left of the rack so the user reads
-            // the section identity at a glance.
             g.setColour (juce::Colour (NorcoastLookAndFeel::kAccent).withAlpha (0.55f));
             g.setFont (juce::FontOptions (10.0f).withStyle ("Bold"));
             g.drawText ("FX", knobs.toNearestInt().reduced (10, 6).withHeight (12),
@@ -1182,7 +1180,11 @@ void NorcoastAmbienceEditor::resized()
         int extra = 0;
         if (sequencerExpanded)   extra += 108;
         if (customChordExpanded) extra +=  32;
-        const int keyH = juce::jlimit (88, 160,
+        // Cap key-grid max at 138 — was 160, which left the mixer 4-12 px
+        // short of its full kMixerHeight budget and clipped the fader
+        // bottoms visibly. The grid still scales up nicely on bigger
+        // window heights but never starves the mixer.
+        const int keyH = juce::jlimit (88, 138,
                                        bounds.getHeight() - (kMixerHeight + 130 + extra));
         rootKeyRow->setBounds (bounds.removeFromTop (keyH));
         bounds.removeFromTop (8);

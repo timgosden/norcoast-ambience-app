@@ -28,7 +28,10 @@ public:
             b->setColour (juce::TextButton::buttonOnColourId, accent);
             b->setColour (juce::TextButton::textColourOnId,
                           juce::Colour (NorcoastLookAndFeel::kBg));
-            b->setColour (juce::TextButton::textColourOffId, accent.withAlpha (0.55f));
+            // Web-app pill style: dim white when off, accent on the
+            // active state.
+            b->setColour (juce::TextButton::textColourOffId,
+                          juce::Colour (0xffd6dae6).withAlpha (0.55f));
             b->onClick = [this, i] { toggleBit (i); };
             addAndMakeVisible (b);
         }

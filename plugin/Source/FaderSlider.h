@@ -25,9 +25,16 @@ public:
         // Compute min / current / max thumb pixel positions ourselves
         // (matching JUCE's internal getLinearSliderPos), then scale
         // the current position toward the min by stopFadeMult.
+        // Inset the track endpoints by half the thumb radius so the
+        // round thumb stays fully inside the slider bounds — at the
+        // un-inset extents the bottom half of the thumb drew below the
+        // mixer panel border, which the user saw as "the bottom of the
+        // fader is cut off when I press Stop".
         const auto bounds = getLocalBounds();
-        const float trackTop    = (float) bounds.getY();
-        const float trackBottom = (float) (bounds.getY() + bounds.getHeight());
+        const float thumbR = (float) juce::jmin (15, bounds.getHeight() / 2);
+        const float thumbHalf = thumbR * 0.5f;
+        const float trackTop    = (float) bounds.getY() + thumbHalf;
+        const float trackBottom = (float) (bounds.getY() + bounds.getHeight()) - thumbHalf;
 
         const double valueRange = getMaximum() - getMinimum();
         if (valueRange <= 0.0)

@@ -32,7 +32,11 @@ public:
                 b->setColour (juce::TextButton::buttonOnColourId, accent);
                 b->setColour (juce::TextButton::textColourOnId,
                               juce::Colour (NorcoastLookAndFeel::kBg));
-                b->setColour (juce::TextButton::textColourOffId, accent.withAlpha (0.6f));
+                // Web-app style: inactive pill text is dim white (not
+                // accent-tinted), so the active pill can light up
+                // distinctly when toggled.
+                b->setColour (juce::TextButton::textColourOffId,
+                              juce::Colour (0xffd6dae6).withAlpha (0.55f));
                 b->onClick = [this, i] { selectIndex (i); };
                 addAndMakeVisible (b);
             }
@@ -49,7 +53,10 @@ public:
         if (auto* b = buttons[visibleIndex])
         {
             b->setColour (juce::TextButton::buttonOnColourId, accent);
-            b->setColour (juce::TextButton::textColourOffId, accent.withAlpha (0.6f));
+            // Off-state stays dim white; the accent only shows when
+            // the pill is active.
+            b->setColour (juce::TextButton::textColourOffId,
+                          juce::Colour (0xffd6dae6).withAlpha (0.55f));
             b->repaint();
         }
     }
