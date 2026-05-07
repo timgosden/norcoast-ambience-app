@@ -27,8 +27,11 @@ public:
         const int chordIdx = juce::jlimit (0, (int) ChordEvolver::NumTypes - 1,
                               (int) apvts.getRawParameterValue (ParamID::chordType)->load());
 
+        // Match the homeRoot param's choice list (Parameters.h) so the
+        // big root display in the header uses the same spelling as the
+        // root-key picker below it.
         static const juce::StringArray rootNames
-            { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
+            { "C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B" };
         const auto chordNames = ChordEvolver::getChordNames();
 
         const auto bounds = getLocalBounds().toFloat();

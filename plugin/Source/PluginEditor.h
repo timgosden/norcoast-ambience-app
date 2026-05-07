@@ -110,6 +110,19 @@ private:
     void savePresetToFile();
     void loadPresetFromFile();
 
+    // ─── User-preset storage ────────────────────────────────────────
+    // User presets live as .ncpre XML files in a known directory. The
+    // dropdown shows factory presets first, then a "— User —" header,
+    // then user presets discovered on disk; the IDs above kUserItemBase
+    // identify a user-preset file by its index in userPresetFiles.
+    static constexpr int kUserItemBase = 1000;
+    juce::Array<juce::File> userPresetFiles;
+    juce::File getUserPresetDir() const;
+    void rebuildPresetMenu (int selectFactoryIdx = -1,
+                            int selectUserIdx    = -1);
+    void promptSaveUserPreset();
+    std::unique_ptr<juce::AlertWindow> savePromptWindow;
+
     // Bottom-strip backplane: a single rounded panel that frames the
     // 8-knob FX row + 8-fader mixer row.
     juce::Rectangle<int> mixerPanelBounds;

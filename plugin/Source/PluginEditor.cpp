@@ -179,8 +179,16 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
 
     addAndMakeVisible (droneButton);
     droneButton.setClickingTogglesState (true);
+    droneButton.setColour (juce::TextButton::buttonColourId,
+                           juce::Colour (NorcoastLookAndFeel::kPanelBg));
+    droneButton.setColour (juce::TextButton::buttonOnColourId,
+                           juce::Colour (0xff8a6fb3));   // a softer purple
+    droneButton.setColour (juce::TextButton::textColourOnId,
+                           juce::Colour (NorcoastLookAndFeel::kBg));
+    droneButton.setTooltip ("Drone: hold the home root continuously underneath whatever you play.");
     droneAttach = std::make_unique<ButtonAttach> (
         owner.getAPVTS(), ParamID::droneOn, droneButton);
+    droneButton.setVisible (false);
 
     // ── Collapsible-panel toggle buttons ────────────────────────────────
     // Custom-chord pills + drum step sequencer are collapsed by default;
@@ -215,7 +223,7 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
 
     setupToggle (sequencerToggleButton,
                  "Sequencer -", "Sequencer +",
-                 juce::Colour (0xffe8a45e),     // orange — movement accent
+                 juce::Colour (0xff5eb88a),     // green — matches MOVEMENT strip
                  &sequencerExpanded);
 
     // ── Preset bar ──────────────────────────────────────────────────────
@@ -226,20 +234,38 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
                          juce::Colour (NorcoastLookAndFeel::kAccent));
     presetBox.setColour (juce::ComboBox::arrowColourId,
                          juce::Colour (NorcoastLookAndFeel::kAccent));
-    int id = 1;
-    for (const auto& preset : Presets::factory())
-        presetBox.addItem (preset.name, id++);
+    rebuildPresetMenu();
     presetBox.setText ("Preset", juce::dontSendNotification);
     presetBox.onChange = [this]
     {
-        const int idx = presetBox.getSelectedId() - 1;
-        if (idx >= 0)
-            owner.setCurrentProgram (idx);
+        const int picked = presetBox.getSelectedId();
+        if (picked <= 0) return;
+
+        if (picked < kUserItemBase)
+        {
+            // Factory: 1..N
+            owner.setCurrentProgram (picked - 1);
+        }
+        else
+        {
+            // User: kUserItemBase + index into userPresetFiles
+            const int idx = picked - kUserItemBase;
+            if (idx >= 0 && idx < userPresetFiles.size())
+            {
+                const auto file = userPresetFiles.getReference (idx);
+                if (auto xml = juce::parseXML (file))
+                    if (xml->hasTagName (owner.getAPVTS().state.getType()))
+                        owner.getAPVTS().replaceState (
+                            juce::ValueTree::fromXml (*xml));
+            }
+        }
     };
 
     addAndMakeVisible (saveButton);
-    saveButton.onClick = [this] { savePresetToFile(); };
+    saveButton.setTooltip ("Save current state as a user preset (added to the Preset menu).");
+    saveButton.onClick = [this] { promptSaveUserPreset(); };
     addAndMakeVisible (loadButton);
+    loadButton.setTooltip ("Load a preset .ncpre file from disk.");
     loadButton.onClick = [this] { loadPresetFromFile(); };
 
     setupKnob (foundationVol, "Foundation",   ParamID::foundationVol);
@@ -409,9 +435,10 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
         if (arpOctavesRow != nullptr)
             arpOctavesRow->setVisible (! advExpanded);
         lpfHzLabel.setVisible (! advExpanded);
-        // Evolve On/Off lives on the Advanced surface — hidden on the
-        // mixer view, visible when Advanced is open.
+        // Evolve / Drone on/off pills live on the Advanced surface —
+        // hidden on the mixer view, visible when Advanced is open.
         evolveButton.setVisible (advExpanded);
+        droneButton .setVisible (advExpanded);
         resized();
         repaint();
     };
@@ -439,7 +466,7 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
         juce::Colour (0xff7eb6d4));    // arp blue
     drumPatternRow = std::make_unique<ChoiceButtonRow> (
         owner.getAPVTS(), ParamID::drumPattern,
-        juce::Colour (0xffe8a45e),     // movement orange
+        juce::Colour (0xff5eb88a),     // movement green (matches strip)
         /*rowsHint*/ 1,
         /*skipFirstN*/ 1);              // hide "Off" — fader mutes instead
     addAndMakeVisible (*arpVoiceRow);
@@ -611,25 +638,37 @@ void NorcoastAmbienceEditor::timerCallback()
     }
 
     // Custom-chord pill labels follow the home root: 1·C, 2·D, 3·E, …
-    // Major-scale semitone offsets from root.
+    // Each key uses its conventional spelling — sharps in sharp keys
+    // (G major has F#, not Gb), flats in flat keys (Eb major has Bb,
+    // not A#). Gb major uses Cb because that's the proper diatonic
+    // 4th — this is the only place Cb shows up.
     if (customDegreesRow != nullptr)
     {
         const int rootIdx = juce::jlimit (0, 11,
             (int) owner.getAPVTS().getRawParameterValue (ParamID::homeRoot)->load());
         if (rootIdx != lastHomeRootForLabels)
         {
-            static const char* kNoteNames[12] = {
-                "C", "Db", "D", "Eb", "E", "F",
-                "Gb", "G", "Ab", "A", "Bb", "B"
+            // 12 rows × 7 cols — the major-scale spelling for each
+            // home-root choice. homeRoot order matches Parameters.h:
+            //   C, Db, D, Eb, E, F, Gb, G, Ab, A, Bb, B.
+            static const char* kMajorScale[12][7] = {
+                /* C  */ { "C",  "D",  "E",  "F",  "G",  "A",  "B"  },
+                /* Db */ { "Db", "Eb", "F",  "Gb", "Ab", "Bb", "C"  },
+                /* D  */ { "D",  "E",  "F#", "G",  "A",  "B",  "C#" },
+                /* Eb */ { "Eb", "F",  "G",  "Ab", "Bb", "C",  "D"  },
+                /* E  */ { "E",  "F#", "G#", "A",  "B",  "C#", "D#" },
+                /* F  */ { "F",  "G",  "A",  "Bb", "C",  "D",  "E"  },
+                /* Gb */ { "Gb", "Ab", "Bb", "Cb", "Db", "Eb", "F"  },
+                /* G  */ { "G",  "A",  "B",  "C",  "D",  "E",  "F#" },
+                /* Ab */ { "Ab", "Bb", "C",  "Db", "Eb", "F",  "G"  },
+                /* A  */ { "A",  "B",  "C#", "D",  "E",  "F#", "G#" },
+                /* Bb */ { "Bb", "C",  "D",  "Eb", "F",  "G",  "A"  },
+                /* B  */ { "B",  "C#", "D#", "E",  "F#", "G#", "A#" },
             };
-            static const int kMajorOffsets[7] = { 0, 2, 4, 5, 7, 9, 11 };
             for (int i = 0; i < 7; ++i)
-            {
-                const int n = (rootIdx + kMajorOffsets[i]) % 12;
                 customDegreesRow->setLabel (i,
                     juce::String (i + 1) + juce::String::fromUTF8 (" \xc2\xb7 ")
-                                         + kNoteNames[n]);
-            }
+                                         + kMajorScale[rootIdx][i]);
             lastHomeRootForLabels = rootIdx;
         }
     }
@@ -661,26 +700,110 @@ void NorcoastAmbienceEditor::applyFactoryPreset (int idx)
     Presets::apply (owner.getAPVTS(), list[(size_t) idx]);
 }
 
-void NorcoastAmbienceEditor::savePresetToFile()
+juce::File NorcoastAmbienceEditor::getUserPresetDir() const
 {
-    fileChooser = std::make_unique<juce::FileChooser> (
-        "Save preset",
-        juce::File::getSpecialLocation (juce::File::userDocumentsDirectory)
-            .getChildFile ("Norcoast Ambience"),
-        "*.ncpre");
+    return juce::File::getSpecialLocation (juce::File::userDocumentsDirectory)
+                .getChildFile ("Norcoast Ambience")
+                .getChildFile ("Presets");
+}
 
-    fileChooser->launchAsync (juce::FileBrowserComponent::saveMode
-                              | juce::FileBrowserComponent::canSelectFiles,
-        [this] (const juce::FileChooser& fc)
-        {
-            const auto file = fc.getResult();
-            if (file == juce::File()) return;
-            file.getParentDirectory().createDirectory();
+void NorcoastAmbienceEditor::rebuildPresetMenu (int selectFactoryIdx,
+                                                int selectUserIdx)
+{
+    presetBox.clear (juce::dontSendNotification);
 
-            auto state = owner.getAPVTS().copyState();
-            if (auto xml = state.createXml())
-                file.withFileExtension ("ncpre").replaceWithText (xml->toString());
-        });
+    // Factory section.
+    auto* root = presetBox.getRootMenu();
+    if (root != nullptr)
+        root->addSectionHeader ("Factory");
+    int id = 1;
+    for (const auto& preset : Presets::factory())
+        presetBox.addItem (preset.name, id++);
+
+    // Re-scan the user-preset directory.
+    userPresetFiles.clear();
+    const auto dir = getUserPresetDir();
+    if (dir.isDirectory())
+    {
+        juce::Array<juce::File> found;
+        dir.findChildFiles (found, juce::File::findFiles, /*recursive*/ false,
+                            "*.ncpre");
+        // Stable alphabetical order so the menu doesn't shuffle.
+        std::sort (found.begin(), found.end(),
+                   [] (const juce::File& a, const juce::File& b)
+                   {
+                       return a.getFileNameWithoutExtension()
+                                .compareIgnoreCase (b.getFileNameWithoutExtension()) < 0;
+                   });
+        userPresetFiles = std::move (found);
+    }
+
+    if (! userPresetFiles.isEmpty())
+    {
+        if (root != nullptr)
+            root->addSectionHeader ("User");
+        for (int i = 0; i < userPresetFiles.size(); ++i)
+            presetBox.addItem (userPresetFiles[i].getFileNameWithoutExtension(),
+                               kUserItemBase + i);
+    }
+
+    if (selectFactoryIdx >= 0)
+        presetBox.setSelectedId (selectFactoryIdx + 1, juce::dontSendNotification);
+    else if (selectUserIdx >= 0)
+        presetBox.setSelectedId (kUserItemBase + selectUserIdx,
+                                 juce::dontSendNotification);
+}
+
+void NorcoastAmbienceEditor::promptSaveUserPreset()
+{
+    savePromptWindow = std::make_unique<juce::AlertWindow> (
+        "Save user preset",
+        "Enter a name for this preset. It will appear in the Preset menu.",
+        juce::MessageBoxIconType::QuestionIcon);
+
+    savePromptWindow->addTextEditor ("name", "My Preset", "Name:");
+    savePromptWindow->addButton ("Save",   1, juce::KeyPress (juce::KeyPress::returnKey));
+    savePromptWindow->addButton ("Cancel", 0, juce::KeyPress (juce::KeyPress::escapeKey));
+
+    savePromptWindow->enterModalState (true,
+        juce::ModalCallbackFunction::create (
+            [this] (int result)
+            {
+                if (result != 1 || savePromptWindow == nullptr)
+                {
+                    savePromptWindow.reset();
+                    return;
+                }
+
+                auto name = savePromptWindow->getTextEditorContents ("name").trim();
+                savePromptWindow.reset();
+
+                if (name.isEmpty()) return;
+                // Sanitise — strip path-illegal characters so the
+                // filename matches what the user typed.
+                name = juce::File::createLegalFileName (name);
+                if (name.isEmpty()) return;
+
+                const auto dir = getUserPresetDir();
+                dir.createDirectory();
+                auto file = dir.getChildFile (name).withFileExtension ("ncpre");
+
+                auto state = owner.getAPVTS().copyState();
+                if (auto xml = state.createXml())
+                    file.replaceWithText (xml->toString());
+
+                rebuildPresetMenu();
+
+                // Select the freshly-saved preset so the dropdown
+                // reflects it as the active state.
+                for (int i = 0; i < userPresetFiles.size(); ++i)
+                    if (userPresetFiles[i] == file)
+                    {
+                        presetBox.setSelectedId (kUserItemBase + i,
+                                                 juce::dontSendNotification);
+                        break;
+                    }
+            }));
 }
 
 void NorcoastAmbienceEditor::loadPresetFromFile()
@@ -809,29 +932,21 @@ void NorcoastAmbienceEditor::paint (juce::Graphics& g)
     // ── Active-fader dB readout (drag tooltip) ──────────────────────
     // Painted last so it overlays everything else. Same visual style as
     // the EQ band-node drag readout for consistency.
-    if (activeFader != nullptr && ! advExpanded)
+    // LPF has its own persistent Hz label above the column, so we skip
+    // the floating drag tooltip for it — only the gain faders get one.
+    if (activeFader != nullptr && activeFader != &lpfFreq.knob && ! advExpanded)
     {
         const auto fb = activeFader->getBounds();
         const float v = (float) activeFader->getValue();
 
         juce::String txt;
-        if (activeFader == &lpfFreq.knob)
-        {
-            // LPF is a curve fader, not a gain — show its Hz mapping.
-            const float hz = std::exp (4.6051702f + (v * v) * 5.298375f);
-            txt = hz < 1000.0f ? juce::String ((int) hz) + " Hz"
-                               : juce::String (hz / 1000.0f, 1) + " kHz";
-        }
+        // Volume faders: convert linear 0..1 → dB.
+        if (v <= 1e-4f)
+            txt = "-inf dB";
         else
         {
-            // Volume faders: convert linear 0..1 → dB.
-            if (v <= 1e-4f)
-                txt = "-inf dB";
-            else
-            {
-                const float dB = juce::Decibels::gainToDecibels (v, -60.0f);
-                txt = (dB >= 0 ? "+" : "") + juce::String (dB, 1) + " dB";
-            }
+            const float dB = juce::Decibels::gainToDecibels (v, -60.0f);
+            txt = (dB >= 0 ? "+" : "") + juce::String (dB, 1) + " dB";
         }
 
         // Position the readout above the slider thumb. For LinearVertical
@@ -937,13 +1052,18 @@ void NorcoastAmbienceEditor::resized()
             knobs[i]->label.setBounds (c.removeFromTop (kKnobLabelH));
             knobs[i]->knob .setBounds (c.reduced (4, 4));
         }
-        // Evolve On/Off pill sits at the head of the bars row so the
-        // toggle is right next to the bars choice that depends on it.
+        // Evolve / Drone on/off pills sit at the head of the bars row.
+        // [Evolve] [Drone] | [bars choice ...] — toggles cluster on the
+        // left so the bars choice that depends on Evolve sits next to
+        // its master switch.
         {
             auto evRow = barsArea;
-            auto evToggle = evRow.removeFromLeft (90);
-            evRow.removeFromLeft (8);
+            auto evToggle = evRow.removeFromLeft (78);
+            evRow.removeFromLeft (4);
+            auto drToggle = evRow.removeFromLeft (78);
+            evRow.removeFromLeft (10);
             evolveButton.setBounds (evToggle.reduced (2, 2));
+            droneButton .setBounds (drToggle.reduced (2, 2));
             if (evolveBarsRow != nullptr)
                 evolveBarsRow->setBounds (evRow.reduced (0, 2));
         }
