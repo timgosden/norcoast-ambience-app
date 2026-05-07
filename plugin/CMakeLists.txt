@@ -38,6 +38,11 @@ juce_add_plugin(NorcoastAmbience
     NEEDS_MIDI_OUTPUT         FALSE
     EDITOR_WANTS_KEYBOARD_FOCUS TRUE
     COPY_PLUGIN_AFTER_BUILD   FALSE
+    # App / standalone bundle icon — rendered from public/icons/icon.svg.
+    # JUCE expects PNGs and packs both sizes into the AU/VST3/Standalone
+    # bundles; macOS Finder / DAW preset menus pick the larger one.
+    ICON_BIG                  "${CMAKE_CURRENT_SOURCE_DIR}/Resources/icon/icon-256.png"
+    ICON_SMALL                "${CMAKE_CURRENT_SOURCE_DIR}/Resources/icon/icon-64.png"
 )
 
 target_sources(NorcoastAmbience PRIVATE
