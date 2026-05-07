@@ -142,9 +142,17 @@ private:
 
     // ─── Other surfaced controls ─────────────────────────────────────
     // HPF lives in the mixer above the LPF fader.
-    // EQ params still exist in APVTS (so saved presets keep loading)
-    // but they no longer have a UI surface — the user removed it.
+    // The remaining knobs are surfaced only on the Advanced panel
+    // (toggled by advButton in the title bar). When Advanced is OFF
+    // these are invisible; their params still affect audio.
     ParamKnob hpfFreq;
+    ParamKnob reverbSize, reverbMod;
+    ParamKnob delayFb, delayTimeMs, delayTone;
+    ParamKnob eqLow, eqLoMid, eqHiMid, eqHigh;
+
+    // ─── Advanced panel toggle ───────────────────────────────────────
+    juce::TextButton advButton { "Adv" };
+    bool             advExpanded = false;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (NorcoastAmbienceEditor)
 };

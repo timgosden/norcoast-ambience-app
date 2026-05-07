@@ -283,9 +283,74 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     lpfFreq.knob.updateText();
     hpfFreq.knob.updateText();
 
-    // EQ knobs were dropped from the editor entirely (the user removed
-    // the panel). The eq* APVTS params still exist so saved presets
-    // load; the audio path keeps reading them.
+    // ── Advanced-panel knobs ─────────────────────────────────────────
+    // Surfaced only when the Adv toggle is on; otherwise hidden.
+    setupKnob (reverbSize,  "Size",        ParamID::reverbSize);
+    reverbSize.knob.textFromValueFunction = [] (double v) -> juce::String
+    {
+        return juce::String ((int) std::round (1.0 + v * 9.0)) + "s";
+    };
+    reverbSize.knob.updateText();
+    setupKnob (reverbMod,   "Mod",         ParamID::reverbMod);
+
+    setupKnob (delayFb,     "Feedback",    ParamID::delayFb);
+    setupKnob (delayTimeMs, "Div",         ParamID::delayDiv);
+    {
+        delayTimeMs.knob.textFromValueFunction = [] (double v) -> juce::String
+        {
+            static const juce::StringArray names { "1/32", "1/16", "1/16.", "1/8", "1/8.", "1/4", "1/4." };
+            return names[juce::jlimit (0, names.size() - 1, (int) std::round (v))];
+        };
+        delayTimeMs.knob.updateText();
+    }
+    setupKnob (delayTone,   "Tone",        ParamID::delayTone);
+
+    setupKnob (eqLow,       "Low",         ParamID::eqLow,    " dB");
+    setupKnob (eqLoMid,     "Lo-Mid",      ParamID::eqLoMid,  " dB");
+    setupKnob (eqHiMid,     "Hi-Mid",      ParamID::eqHiMid,  " dB");
+    setupKnob (eqHigh,      "High",        ParamID::eqHigh,   " dB");
+
+    auto setAdvancedKnobsVisible = [this] (bool on)
+    {
+        for (auto* k : { &reverbSize, &reverbMod,
+                         &delayFb, &delayTimeMs, &delayTone,
+                         &eqLow, &eqLoMid, &eqHiMid, &eqHigh })
+        {
+            k->label.setVisible (on);
+            k->knob .setVisible (on);
+        }
+    };
+    setAdvancedKnobsVisible (false);
+
+    addAndMakeVisible (advButton);
+    advButton.setClickingTogglesState (true);
+    advButton.setColour (juce::TextButton::buttonColourId,
+                         juce::Colour (NorcoastLookAndFeel::kPanelBg));
+    advButton.setColour (juce::TextButton::buttonOnColourId,
+                         juce::Colour (NorcoastLookAndFeel::kAccent).withAlpha (0.4f));
+    advButton.onClick = [this, setAdvancedKnobsVisible]
+    {
+        advExpanded = advButton.getToggleState();
+        setAdvancedKnobsVisible (advExpanded);
+        // Hide the mixer's faders + FX knobs when Advanced is on.
+        for (auto* k : { &foundationVol, &padsVol, &padsVol2, &textureVol,
+                         &arpVol, &drumVol, &lpfFreq, &masterVol,
+                         &reverbMix, &shimmerVol, &chorusMix, &delayMix,
+                         &widthMod, &satAmt, &hpfFreq })
+        {
+            k->label.setVisible (! advExpanded);
+            k->knob .setVisible (! advExpanded);
+        }
+        for (auto* b : { &subOctButton, &padsSubOctButton, &pads2SubOctButton,
+                         &textureOctButton,
+                         &foundationMuteBtn, &padsMuteBtn, &pads2MuteBtn,
+                         &textureMuteBtn, &arpMuteBtn, &drumMuteBtn })
+            b->setVisible (! advExpanded);
+        if (arpOctavesRow != nullptr)
+            arpOctavesRow->setVisible (! advExpanded);
+        resized();
+        repaint();
+    };
 
     setupKnob (widthMod,      "Width",        ParamID::widthMod);
     setupKnob (satAmt,        "Saturation",   ParamID::satAmt);
@@ -421,7 +486,10 @@ NorcoastAmbienceEditor::~NorcoastAmbienceEditor()
                      &arpVol, &drumVol, &lpfFreq, &masterVol,
                      &reverbMix, &shimmerVol, &chorusMix,
                      &delayMix, &widthMod, &satAmt,
-                     &hpfFreq })
+                     &hpfFreq,
+                     &reverbSize, &reverbMod,
+                     &delayFb, &delayTimeMs, &delayTone,
+                     &eqLow, &eqLoMid, &eqHiMid, &eqHigh })
         k->knob.setLookAndFeel (nullptr);
     bpmSlider.setLookAndFeel (nullptr);
 }
@@ -563,7 +631,7 @@ void NorcoastAmbienceEditor::resized()
         auto title = bounds.removeFromTop (kStripH);
         title.removeFromLeft (60);                           // logo space
 
-        auto right = title.removeFromRight (3 * kBtnW + 3 * kGap + 110 /*preset*/)
+        auto right = title.removeFromRight (4 * kBtnW + 4 * kGap + 110 /*preset*/)
                           .reduced (0, kBtnInsetV);
         stopButton.setBounds (right.removeFromRight (kBtnW));
         right.removeFromRight (kGap);
@@ -571,7 +639,9 @@ void NorcoastAmbienceEditor::resized()
         right.removeFromRight (kGap);
         loadButton.setBounds (right.removeFromRight (kBtnW));
         right.removeFromRight (kGap);
-        presetBox.setBounds  (right);
+        presetBox.setBounds  (right.removeFromRight (110));
+        right.removeFromRight (kGap);
+        advButton.setBounds (right.removeFromRight (kBtnW));
 
         title.removeFromRight (kGap * 2);
 
@@ -599,6 +669,41 @@ void NorcoastAmbienceEditor::resized()
     auto mixerArea = bounds.removeFromBottom (kMixerHeight);
     mixerPanelBounds = mixerArea;
     auto mixerInner  = mixerArea.reduced (12, 8);
+
+    // ── Advanced panel — replaces the mixer when advExpanded is on ───
+    // Three groups (Reverb · Delay · EQ) of knobs with section labels.
+    if (advExpanded)
+    {
+        auto adv = mixerArea.reduced (16, 18);
+        adv.removeFromTop (8);                            // breathing room
+
+        const int third  = adv.getWidth() / 3;
+        auto reverbCol = adv.removeFromLeft (third);
+        auto delayCol  = adv.removeFromLeft (third);
+        auto eqCol     = adv;
+
+        auto layoutGroup = [] (juce::Rectangle<int> col,
+                               std::initializer_list<ParamKnob*> knobs)
+        {
+            const int n = (int) knobs.size();
+            const int colW = col.getWidth() / juce::jmax (1, n);
+            int i = 0;
+            for (auto* k : knobs)
+            {
+                (void) i;
+                auto c = col.removeFromLeft (colW);
+                k->label.setBounds (c.removeFromTop (kKnobLabelH));
+                k->knob .setBounds (c.reduced (4, 6));
+                ++i;
+            }
+        };
+        layoutGroup (reverbCol, { &reverbSize, &reverbMod });
+        layoutGroup (delayCol,  { &delayTimeMs, &delayFb, &delayTone });
+        layoutGroup (eqCol,     { &eqLow, &eqLoMid, &eqHiMid, &eqHigh });
+        // Skip the regular mixer layout below.
+        qwertyKeyboard.setBounds (getWidth() - 2, getHeight() - 2, 1, 1);
+        return;
+    }
 
     // 8 columns evenly distributed across the mixer.
     auto layoutEightCols = [] (juce::Rectangle<int> r,
@@ -725,7 +830,7 @@ void NorcoastAmbienceEditor::resized()
     // of the bars row instead of consuming pole position. Bars itself
     // is now a button row (was a tiny knob, hard to grab on stage).
     {
-        auto inner = layoutStrip (evolveStripBounds, 36);
+        auto inner = layoutStrip (evolveStripBounds, 48);
         labelInside (inner);
         customChordToggleButton.setBounds (inner.removeFromRight (140).reduced (2, 4));
         inner.removeFromRight (8);
@@ -761,7 +866,7 @@ void NorcoastAmbienceEditor::resized()
     // 4/4 vs 6/8 toggle moved up into the title bar so it lives next
     // to BPM where time-related controls naturally cluster.
     {
-        auto inner = layoutStrip (drumsStripBounds, 36);
+        auto inner = layoutStrip (drumsStripBounds, 48);
         labelInside (inner);
         sequencerToggleButton.setBounds (inner.removeFromRight (110).reduced (2, 4));
         inner.removeFromRight (8);
@@ -787,7 +892,7 @@ void NorcoastAmbienceEditor::resized()
     // [ ARP ] [ Voice 3-pill ............ ] [ Rate 5-pill ............ ]
     // Octaves moved over the Arp fader column in the mixer below.
     {
-        auto inner = layoutStrip (arpStripBounds, 36);
+        auto inner = layoutStrip (arpStripBounds, 48);
         labelInside (inner);
         const int half = inner.getWidth() / 2;
         if (arpVoiceRow != nullptr)

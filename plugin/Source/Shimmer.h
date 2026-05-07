@@ -1,59 +1,71 @@
 #pragma once
 
-#include <array>
-#include <cmath>
 #include <vector>
 #include <juce_dsp/juce_dsp.h>
 #include "DattorroReverb.h"
+#include "GranularPitchShift.h"
 
-// Shimmer v3 — proper octave-up sparkle.
+// Shimmer v4 — proper feedback-loop shimmer reverb.
 //
-// Signal path:
-//   input → HPF (700 Hz) → +12 st granular pitch shifter
-//         → bright Dattorro reverb (long decay, very low damping)
-//         → wet out (mixed against dry by `wetMix`)
+// Topology (per block):
+//   dry input + previous-block feedback   →  Dattorro plate reverb
+//   reverb out                            →  HPF · LPF · +12 st pitch
+//                                           shift · tanh sat · gain
+//                                         →  becomes next block's feedback
+//   reverb out (pre-feedback-tap)         →  user wet
 //
-// The pitch shifter sits BEFORE the reverb (not in a feedback loop),
-// so artefacts don't compound — the reverb smears them into a
-// perpetual sparkly tail without drifting out of tune. Two Hann-
-// windowed grains at 50% overlap give clean +12 st at low CPU.
+// Sparkle is the reverb tail itself recursively pitched up an octave —
+// the same trick Eventide / Valhalla / Strymon use. Per-block feedback
+// adds ~1 block of latency in the loop (≈3-12 ms at typical sizes),
+// which is musically inaudible but lets the granular shifter run
+// block-rate where it sounds best.
+//
+// Pitch shifter is from Danial Kooshki's MIT-licensed GranularPitchShift
+// (see GranularPitchShift.h for full attribution).
 class Shimmer
 {
 public:
     void prepare (double sr, int blockSize)
     {
         sampleRate = sr;
+        maxBlock   = juce::jmax (16, blockSize);
 
         inner.prepare (sr, blockSize);
         inner.setBandwidth        (0.9999f);
-        inner.setDamping          (0.03f);   // very bright tail
-        inner.setDecay            (0.88f);   // long, washy
+        inner.setDamping          (0.04f);
+        inner.setDecay            (0.85f);
         inner.setExcursionRate    (0.35f);
         inner.setExcursionDepthMs (0.6f);
         inner.setPreDelaySamples  ((int) (0.005 * sr));
         inner.reset();
 
-        const auto hpf = juce::dsp::IIR::Coefficients<float>::makeHighPass (sr, 700.0f, 0.5f);
-        *highpass.coefficients = *hpf;
-        highpass.reset();
+        const auto hpf = juce::dsp::IIR::Coefficients<float>::makeHighPass (sr,  180.0f, 0.5f);
+        const auto lpf = juce::dsp::IIR::Coefficients<float>::makeLowPass  (sr, 6500.0f, 0.5f);
+        *fbHpfL.coefficients = *hpf; *fbHpfR.coefficients = *hpf;
+        *fbLpfL.coefficients = *lpf; *fbLpfR.coefficients = *lpf;
+        fbHpfL.reset(); fbHpfR.reset();
+        fbLpfL.reset(); fbLpfR.reset();
 
-        pitchBuf.assign (kBufSize, 0.0f);
-        writePos = 0;
-        readPos[0] = 0.0;
-        readPos[1] = (double) (kGrainSize / 2);
+        shifter.prepare (sr, /*channels*/ 2, blockSize, /*grainMs*/ 100, /*voices*/ 8, /*jitterMs*/ 5.0f);
+        shifter.setSemitones (12.0f);    // octave up
+        shifter.reset();
+
+        wetBuf .setSize (2, maxBlock, false, false, true);
+        loopBuf.setSize (2, maxBlock, false, false, true);
+        fbBuf  .setSize (2, maxBlock, false, false, true);
+        wetBuf.clear(); loopBuf.clear(); fbBuf.clear();
     }
 
     void reset()
     {
         inner.reset();
-        highpass.reset();
-        std::fill (pitchBuf.begin(), pitchBuf.end(), 0.0f);
-        writePos = 0;
-        readPos[0] = 0.0;
-        readPos[1] = (double) (kGrainSize / 2);
+        fbHpfL.reset(); fbHpfR.reset();
+        fbLpfL.reset(); fbLpfR.reset();
+        shifter.reset();
+        wetBuf.clear(); loopBuf.clear(); fbBuf.clear();
     }
 
-    // Adds the shimmer wet output to mainBuffer. wetMix scales the
+    // Adds the shimmer wet output onto mainBuffer. wetMix scales the
     // octave-up reverb send into the main bus.
     void processAdd (juce::AudioBuffer<float>& mainBuffer, float wetMix)
     {
@@ -61,72 +73,83 @@ public:
 
         const int n   = mainBuffer.getNumSamples();
         const int nch = mainBuffer.getNumChannels();
+        if (n > wetBuf.getNumSamples())
+        {
+            wetBuf .setSize (2, n, false, false, true);
+            loopBuf.setSize (2, n, false, false, true);
+            fbBuf  .setSize (2, n, false, false, true);
+        }
+
         auto* L = mainBuffer.getWritePointer (0);
         auto* R = nch > 1 ? mainBuffer.getWritePointer (1) : L;
 
-        const float send = wetMix * 0.85f;
+        auto* wetL = wetBuf.getWritePointer (0);
+        auto* wetR = wetBuf.getWritePointer (1);
+
+        // 1. Reverb stage: input = dry + previous block's feedback tail.
+        const float* fbPrevL = fbBuf.getReadPointer (0);
+        const float* fbPrevR = fbBuf.getReadPointer (1);
 
         for (int i = 0; i < n; ++i)
         {
-            // Mono pre-shift signal — high-passed so the shimmer only
-            // works on harmonics above the fundamental.
-            const float monoIn = (L[i] + R[i]) * 0.5f;
-            const float bright = highpass.processSample (monoIn);
+            const float monoIn = (L[i] + R[i]) * 0.5f
+                               + (fbPrevL[i] + fbPrevR[i]) * 0.5f * kFeedbackGain;
+            inner.processSampleStereo (monoIn, wetL[i], wetR[i]);
+        }
 
-            // +12 st pitch shift via two Hann-windowed grains at 50%
-            // overlap, read at 2× write rate.
-            const float pitched = pitchShiftStep (bright);
+        // 2. Build next block's feedback tail from this block's wet:
+        //    wet → HPF → LPF → +12 st pitch shift → tanh saturation.
+        loopBuf.copyFrom (0, 0, wetBuf, 0, 0, n);
+        loopBuf.copyFrom (1, 0, wetBuf, 1, 0, n);
+        {
+            auto* lL = loopBuf.getWritePointer (0);
+            auto* lR = loopBuf.getWritePointer (1);
+            for (int i = 0; i < n; ++i)
+            {
+                lL[i] = fbHpfL.processSample (lL[i]);
+                lR[i] = fbHpfR.processSample (lR[i]);
+                lL[i] = fbLpfL.processSample (lL[i]);
+                lR[i] = fbLpfR.processSample (lR[i]);
+            }
+        }
 
-            // Pitched signal feeds the bright reverb.
-            float wetL, wetR;
-            inner.processSampleStereo (pitched, wetL, wetR);
+        // The granular shifter is block-based, so we hand it a sub-buffer
+        // of size n that aliases the loopBuf storage.
+        juce::AudioBuffer<float> loopIn  (loopBuf.getArrayOfWritePointers(), 2, n);
+        juce::AudioBuffer<float> loopOut (fbBuf  .getArrayOfWritePointers(), 2, n);
+        loopOut.clear();
+        shifter.processBlock (loopIn, loopOut);
 
-            L[i] += wetL * send;
-            R[i] += wetR * send;
+        {
+            auto* fL = fbBuf.getWritePointer (0);
+            auto* fR = fbBuf.getWritePointer (1);
+            for (int i = 0; i < n; ++i)
+            {
+                fL[i] = std::tanh (fL[i] * 1.5f) * 0.85f;
+                fR[i] = std::tanh (fR[i] * 1.5f) * 0.85f;
+            }
+        }
+
+        // 3. Sum wet into the main bus.
+        const float send = wetMix * 1.0f;
+        for (int i = 0; i < n; ++i)
+        {
+            L[i] += wetL[i] * send;
+            R[i] += wetR[i] * send;
         }
     }
 
 private:
-    static constexpr int kBufSize    = 4096;     // ~93 ms @ 44.1k
-    static constexpr int kGrainSize  = 1024;     // ~23 ms grain
-
-    inline float pitchShiftStep (float in) noexcept
-    {
-        pitchBuf[(size_t) writePos] = in;
-
-        constexpr float twoPi = juce::MathConstants<float>::twoPi;
-        const float invG  = 1.0f / (float) kGrainSize;
-
-        float out = 0.0f;
-        for (int g = 0; g < 2; ++g)
-        {
-            const float window = 0.5f * (1.0f - std::cos (twoPi * (float) readPos[g] * invG));
-
-            const double exact = (double) writePos - (double) kGrainSize + readPos[g];
-            const double wrapped = exact - std::floor (exact / (double) kBufSize)
-                                          * (double) kBufSize;
-            const int   idx0 = (int) wrapped;
-            const int   idx1 = (idx0 + 1) % kBufSize;
-            const float frac = (float) (wrapped - (double) idx0);
-            const float s    = pitchBuf[(size_t) idx0] * (1.0f - frac)
-                             + pitchBuf[(size_t) idx1] * frac;
-
-            out += s * window;
-
-            readPos[g] += 2.0;                    // 2× rate ⇒ +12 st
-            if (readPos[g] >= (double) kGrainSize)
-                readPos[g] -= (double) kGrainSize;
-        }
-
-        writePos = (writePos + 1) % kBufSize;
-        return out;                                // sum of two Hann grains ≈ unity
-    }
+    static constexpr float kFeedbackGain = 0.55f;   // pre-tanh feedback level
 
     double sampleRate = 44100.0;
-    DattorroReverb inner;
-    juce::dsp::IIR::Filter<float> highpass;
+    int    maxBlock   = 512;
 
-    std::vector<float> pitchBuf;
-    std::array<double, 2> readPos { 0.0, (double) (kGrainSize / 2) };
-    int writePos = 0;
+    DattorroReverb inner;
+    juce::dsp::IIR::Filter<float> fbHpfL, fbHpfR, fbLpfL, fbLpfR;
+    GranularPitchShift shifter;
+
+    juce::AudioBuffer<float> wetBuf;     // reverb output for this block
+    juce::AudioBuffer<float> loopBuf;    // wet → filters → pitch shift staging
+    juce::AudioBuffer<float> fbBuf;      // pitch-shifted feedback for next block
 };
