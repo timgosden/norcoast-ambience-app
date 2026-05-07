@@ -158,14 +158,18 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
         attach = std::make_unique<ButtonAttach> (
             owner.getAPVTS(), paramID, btn);
     };
+    // All oct toggles use the same accent so the row reads as a uniform
+    // strip — previously each layer had a different hue which made the
+    // row feel chaotic.
+    const juce::Colour kOctAccent (0xffc4915e);   // accent amber for all
     setupOctToggle (subOctButton,      ParamID::foundationSubOct,
-                    subOctAttach,      juce::Colour (0xff5eb88a));   // foundation green
+                    subOctAttach,      kOctAccent);
     setupOctToggle (padsSubOctButton,  ParamID::padsSubOct,
-                    padsSubOctAttach,  juce::Colour (0xffc4915e));   // pads amber
+                    padsSubOctAttach,  kOctAccent);
     setupOctToggle (pads2SubOctButton, ParamID::pads2SubOct,
-                    pads2SubOctAttach, juce::Colour (0xffe0d2a8));   // pads 2 cream
+                    pads2SubOctAttach, kOctAccent);
     setupOctToggle (textureOctButton,  ParamID::textureOctUp,
-                    textureOctAttach,  juce::Colour (0xffa08060));   // texture tan
+                    textureOctAttach,  kOctAccent);
 
     addAndMakeVisible (evolveButton);
     evolveButton.setClickingTogglesState (true);
@@ -997,15 +1001,34 @@ void NorcoastAmbienceEditor::paint (juce::Graphics& g)
     paintStrip (drumsStripBounds,  juce::Colour (0xff5eb88a), "MOVEMENT");   // green — web-app accent
     paintStrip (arpStripBounds,    juce::Colour (0xff9b7fd4), "ARP");
 
+    // ARP sub-labels — "VOICE" / "RATE" so the player can tell at a
+    // glance which pill row is which (otherwise they're identical-
+    // looking pill rows next to each other).
+    if (! advExpanded)
+    {
+        g.setColour (juce::Colour (0xff9b7fd4).withAlpha (0.85f));
+        g.setFont (juce::FontOptions (10.0f).withStyle ("Bold"));
+        if (! arpVoiceLabelBounds.isEmpty())
+            g.drawText ("VOICE", arpVoiceLabelBounds.toFloat(),
+                        juce::Justification::centredLeft);
+        if (! arpRateLabelBounds.isEmpty())
+            g.drawText ("RATE", arpRateLabelBounds.toFloat(),
+                        juce::Justification::centredLeft);
+    }
+
     // "Chord Evolve every:" label on the Advanced panel, painted right
     // next to the bars choice so the user can see what the bars choice
-    // actually controls.
+    // actually controls. Bigger / brighter than before — at 11pt amber on
+    // the slate Advanced panel it was unreadable.
     if (advExpanded && ! advBarsLabelBounds.isEmpty())
     {
-        g.setColour (juce::Colour (0xffc4915e));   // chord-evolve amber
-        g.setFont (juce::FontOptions (11.0f).withStyle ("Bold"));
-        g.drawText ("Chord Evolve every:", advBarsLabelBounds.toFloat(),
-                    juce::Justification::centredLeft);
+        const auto rf = advBarsLabelBounds.toFloat().reduced (2.0f, 1.0f);
+        g.setColour (juce::Colour (0xff1a1f2c));
+        g.fillRoundedRectangle (rf, 3.0f);
+        g.setColour (juce::Colour (0xffe8b478));   // brighter amber
+        g.setFont (juce::FontOptions (13.0f).withStyle ("Bold"));
+        g.drawText ("Chord Evolve every:", rf,
+                    juce::Justification::centred);
     }
 
     // ── Mixer surface backplane (the nanoKONTROL strip) ──────────────
@@ -1031,8 +1054,11 @@ void NorcoastAmbienceEditor::paint (juce::Graphics& g)
             // sitting above the layer faders. The accent border is
             // enough to demarcate FX vs faders — no extra horizontal
             // separator strip below.
+            // Height now matches the full knobs row (label + rotary +
+            // value text below) plus a few px of breathing room — at
+            // the previous height the bottom value caption was clipped.
             const float kKnobsHeight = 96.0f;
-            auto knobs = r.withHeight (kKnobsHeight + 8.0f).reduced (8.0f, 6.0f);
+            auto knobs = r.withHeight (kKnobsHeight + 16.0f).reduced (8.0f, 4.0f);
             g.setColour (juce::Colour (0xff0c1019).withAlpha (0.95f));
             g.fillRoundedRectangle (knobs, 6.0f);
             g.setColour (juce::Colour (NorcoastLookAndFeel::kAccent).withAlpha (0.35f));
@@ -1047,9 +1073,14 @@ void NorcoastAmbienceEditor::paint (juce::Graphics& g)
         }
     }
 
+}
+
+void NorcoastAmbienceEditor::paintOverChildren (juce::Graphics& g)
+{
     // ── Active-fader dB readout (drag tooltip) ──────────────────────
-    // Painted last so it overlays everything else. Same visual style as
-    // the EQ band-node drag readout for consistency.
+    // Painted in paintOverChildren so the readout sits above the fader
+    // thumb instead of being hidden behind it. Same visual style as the
+    // EQ band-node drag readout for consistency.
     // LPF has its own persistent Hz label above the column, so we skip
     // the floating drag tooltip for it — only the gain faders get one.
     if (activeFader != nullptr && activeFader != &lpfFreq.knob && ! advExpanded)
@@ -1058,7 +1089,6 @@ void NorcoastAmbienceEditor::paint (juce::Graphics& g)
         const float v = (float) activeFader->getValue();
 
         juce::String txt;
-        // Volume faders: convert linear 0..1 → dB.
         if (v <= 1e-4f)
             txt = "-inf dB";
         else
@@ -1067,15 +1097,13 @@ void NorcoastAmbienceEditor::paint (juce::Graphics& g)
             txt = (dB >= 0 ? "+" : "") + juce::String (dB, 1) + " dB";
         }
 
-        // Position the readout above the slider thumb. For LinearVertical
-        // sliders the thumb Y maps from value linearly bottom→top.
         const float thumbY = (float) fb.getBottom()
                            - v * (float) fb.getHeight();
         const float boxX = (float) fb.getCentreX() - 38.0f;
         const float boxY = juce::jmax (4.0f, thumbY - 22.0f);
 
         const juce::Rectangle<float> bg (boxX, boxY, 76.0f, 18.0f);
-        g.setColour (juce::Colour (0xff0d1220).withAlpha (0.92f));
+        g.setColour (juce::Colour (0xff0d1220).withAlpha (0.95f));
         g.fillRoundedRectangle (bg, 4.0f);
         g.setColour (juce::Colour (0xffe8a45e));
         g.drawRoundedRectangle (bg, 4.0f, 1.0f);
@@ -1148,9 +1176,16 @@ void NorcoastAmbienceEditor::resized()
 
     if (rootKeyRow != nullptr)
     {
-        // Reserve below = strips (3*42) + mixer + small fudge.
-        const int keyH = juce::jlimit (110, 160,
-                                       bounds.getHeight() - (kMixerHeight + 130));
+        // Reserve below = strips (3*42) + mixer + small fudge. When a
+        // collapsible panel (custom-chord pills / step sequencer) is
+        // open, give it room by shrinking the home-root grid; otherwise
+        // the panel computes 0 height and refuses to open. Sequencer
+        // wants ~108 px; the chord-degree row needs ~32 px.
+        int extra = 0;
+        if (sequencerExpanded)   extra += 108;
+        if (customChordExpanded) extra +=  32;
+        const int keyH = juce::jlimit (88, 160,
+                                       bounds.getHeight() - (kMixerHeight + 130 + extra));
         rootKeyRow->setBounds (bounds.removeFromTop (keyH));
         bounds.removeFromTop (8);
     }
@@ -1208,12 +1243,11 @@ void NorcoastAmbienceEditor::resized()
         {
             const int reserveBelow = 40 + 2 + kMixerHeight;  // ARP + gap + mixer
             const int avail = juce::jmax (0, bounds.getHeight() - reserveBelow);
-            const int seqH  = juce::jmin (132, avail);
-            if (seqH > 0)
-            {
-                stepSequencer->setBounds (bounds.removeFromTop (seqH).reduced (12, 0));
-                bounds.removeFromTop (juce::jmin (4, juce::jmax (0, bounds.getHeight() - reserveBelow)));
-            }
+            // Force at least 96 px so the 16 step pads have a clickable
+            // size — the rootKeyRow is shrunk above to make room.
+            const int seqH  = juce::jlimit (96, 132, avail);
+            stepSequencer->setBounds (bounds.removeFromTop (seqH).reduced (12, 0));
+            bounds.removeFromTop (4);
         }
     }
 
@@ -1221,9 +1255,15 @@ void NorcoastAmbienceEditor::resized()
         auto inner = layoutStrip (arpStripBounds, 40);
         labelInside (inner);
         const int half = inner.getWidth() / 2;
+        // Voice + Rate each get a small "VOICE" / "RATE" label in the
+        // strip so the player knows what the two pill rows are. Stored
+        // as Rectangles and painted in paint() below.
+        auto voiceCol = inner.removeFromLeft (half);
+        arpVoiceLabelBounds = voiceCol.removeFromLeft (44);
         if (arpVoiceRow != nullptr)
-            arpVoiceRow->setBounds (inner.removeFromLeft (half).reduced (0, 2));
+            arpVoiceRow->setBounds (voiceCol.reduced (0, 2));
         inner.removeFromLeft (6);
+        arpRateLabelBounds = inner.removeFromLeft (40);
         if (arpRateRow != nullptr)
             arpRateRow->setBounds (inner.reduced (0, 2));
     }
@@ -1261,11 +1301,17 @@ void NorcoastAmbienceEditor::resized()
         // N bars".
         auto barsArea = knobsArea.removeFromBottom (28);
         const int colW = knobsArea.getWidth() / n;
+        // Constrain the rotary to a fixed visual size so the label +
+        // rotary + value-text-below sit as a tight unit instead of the
+        // rotary stretching to fill a tall column (which left a big
+        // gap between the label and the knob).
+        constexpr int kAdvKnobH = 84;
         for (int i = 0; i < n; ++i)
         {
             auto c = knobsArea.removeFromLeft (colW);
             knobs[i]->label.setBounds (c.removeFromTop (kKnobLabelH));
-            knobs[i]->knob .setBounds (c.reduced (4, 4));
+            c.removeFromTop (2);
+            knobs[i]->knob .setBounds (c.removeFromTop (kAdvKnobH).reduced (4, 0));
         }
         // [Evolve] [Drone] [Chord Evolve every: ... bars row].
         // The label is painted in the Advanced paint pass so it stays
@@ -1273,12 +1319,13 @@ void NorcoastAmbienceEditor::resized()
         // length, default 4 bars.
         {
             auto evRow = barsArea;
-            auto evToggle = evRow.removeFromLeft (78);
+            auto evToggle = evRow.removeFromLeft (66);
             evRow.removeFromLeft (4);
-            auto drToggle = evRow.removeFromLeft (78);
+            auto drToggle = evRow.removeFromLeft (66);
             evRow.removeFromLeft (8);
-            // 102 px label slot for "Chord Evolve every:".
-            advBarsLabelBounds = evRow.removeFromLeft (102);
+            // 132 px label slot for "Chord Evolve every:" — wider so the
+            // 13pt bold text isn't crushed against the bars row.
+            advBarsLabelBounds = evRow.removeFromLeft (132);
             evRow.removeFromLeft (4);
             evolveButton.setBounds (evToggle.reduced (2, 2));
             droneButton .setBounds (drToggle.reduced (2, 2));

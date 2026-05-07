@@ -18,8 +18,9 @@ public:
     explicit NorcoastAmbienceEditor (NorcoastAmbienceProcessor&);
     ~NorcoastAmbienceEditor() override;
 
-    void paint    (juce::Graphics&) override;
-    void resized()                  override;
+    void paint             (juce::Graphics&) override;
+    void paintOverChildren (juce::Graphics&) override;
+    void resized()                           override;
 
 private:
     using SliderAttach = juce::AudioProcessorValueTreeState::SliderAttachment;
@@ -180,6 +181,11 @@ private:
     // Painted text for the chord-evolve bars label on Advanced. Stored
     // so paint() can stamp the heading right next to the bars row.
     juce::Rectangle<int> advBarsLabelBounds;
+
+    // Painted text slots for the ARP strip's "VOICE" / "RATE" sub-labels
+    // so the user can tell which pill row is which.
+    juce::Rectangle<int> arpVoiceLabelBounds;
+    juce::Rectangle<int> arpRateLabelBounds;
 
     // ─── Mixer surface: 8 vertical faders across the bottom half ─────
     // Foundation, Pads 1, Pads 2, Texture, Arp, Movement (drums),

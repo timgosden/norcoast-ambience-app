@@ -23,6 +23,17 @@ public:
 
     ~EqCurveDisplay() override { stopTimer(); }
 
+    // Reset all four EQ bands to 0 dB.
+    void resetAllBands()
+    {
+        for (auto* id : { ParamID::eqLow, ParamID::eqLoMid,
+                          ParamID::eqHiMid, ParamID::eqHigh })
+            if (auto* p = apvts.getParameter (id))
+                p->setValueNotifyingHost (
+                    p->getNormalisableRange().convertTo0to1 (0.0f));
+        repaint();
+    }
+
     void paint (juce::Graphics& g) override
     {
         const auto r = getLocalBounds().toFloat().reduced (1.0f);
@@ -39,6 +50,16 @@ public:
         g.drawText ("GLOBAL EQ",
                     r.reduced (10.0f, 6.0f).withHeight (14.0f),
                     juce::Justification::topLeft);
+
+        // "RESET" pill at top-right — click to zero all four bands.
+        const auto reset = resetButtonBounds (r);
+        g.setColour (resetHover ? juce::Colour (0xffb07acc).withAlpha (0.35f)
+                                : juce::Colour (0xff1a1f2c));
+        g.fillRoundedRectangle (reset, 3.0f);
+        g.setColour (juce::Colour (0xffb07acc).withAlpha (resetHover ? 1.0f : 0.7f));
+        g.drawRoundedRectangle (reset, 3.0f, 1.0f);
+        g.setFont (juce::FontOptions (10.0f).withStyle ("Bold"));
+        g.drawText ("RESET", reset, juce::Justification::centred);
 
         // Grid: vertical decade lines (100 Hz, 1 kHz, 10 kHz) and the
         // 0 dB centre line.
@@ -178,6 +199,13 @@ public:
 
     void mouseDown (const juce::MouseEvent& e) override
     {
+        // RESET pill takes priority — click anywhere inside the pill
+        // zeros all four bands and skips the band-drag logic.
+        if (resetButtonHit (e.position))
+        {
+            resetAllBands();
+            return;
+        }
         draggingBand = nearestBandIndex ((float) e.x);
         applyBandFromMouse (draggingBand, (float) e.y);
     }
@@ -195,9 +223,22 @@ public:
     }
 
     // Hover state — change the cursor over a band node and highlight it
-    // so the user can see they're draggable.
+    // so the user can see they're draggable. Reset pill also gets a
+    // hover highlight so its affordance is obvious.
     void mouseMove (const juce::MouseEvent& e) override
     {
+        const bool overReset = resetButtonHit (e.position);
+        if (overReset != resetHover)
+        {
+            resetHover = overReset;
+            repaint();
+        }
+        if (overReset)
+        {
+            setMouseCursor (juce::MouseCursor::PointingHandCursor);
+            if (hoverBand != -1) { hoverBand = -1; repaint(); }
+            return;
+        }
         const int idx = nearestBandIndex ((float) e.x);
         if (idx != hoverBand)
         {
@@ -215,6 +256,7 @@ public:
     void mouseExit (const juce::MouseEvent&) override
     {
         if (hoverBand != -1) { hoverBand = -1; repaint(); }
+        if (resetHover)      { resetHover = false; repaint(); }
         setMouseCursor (juce::MouseCursor::NormalCursor);
     }
 
@@ -230,6 +272,21 @@ public:
 
 private:
     void timerCallback() override { repaint(); }
+
+    juce::Rectangle<float> resetButtonBounds (juce::Rectangle<float> r) const noexcept
+    {
+        // 56×16 pill in the top-right corner, inset 10/6 from the edge
+        // so it lines up with the GLOBAL EQ heading on the left.
+        return juce::Rectangle<float> (r.getRight() - 10.0f - 56.0f,
+                                       r.getY()     +  6.0f,
+                                       56.0f, 16.0f);
+    }
+
+    bool resetButtonHit (juce::Point<float> p) const noexcept
+    {
+        return resetButtonBounds (getLocalBounds().toFloat().reduced (1.0f))
+                 .contains (p);
+    }
 
     static constexpr double kSr = 48000.0;       // analysis-only sample rate
 
@@ -287,6 +344,7 @@ private:
     }
 
     juce::AudioProcessorValueTreeState& apvts;
-    int draggingBand = -1;
-    int hoverBand    = -1;
+    int  draggingBand = -1;
+    int  hoverBand    = -1;
+    bool resetHover   = false;
 };
