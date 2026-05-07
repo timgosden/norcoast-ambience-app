@@ -360,6 +360,15 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     setupMute (arpMuteBtn,        arpMuteAttach,        ParamID::arpMute,        juce::Colour (0xffd46b8a));
     setupMute (drumMuteBtn,       drumMuteAttach,       ParamID::drumMute,       juce::Colour (0xffd46b8a));
 
+    // The Size and Feedback knobs were dropped from the FX row per
+    // request — keep the params alive (they still affect the audio at
+    // their saved values) but hide the controls.
+    for (auto* k : { &reverbSize, &delayFb, &delayTimeMs, &delayTone })
+    {
+        k->label.setVisible (false);
+        k->knob .setVisible (false);
+    }
+
     setSize (1080, 760);
 
     // Give the qwerty keyboard focus so computer-keyboard keys map to MIDI.
@@ -518,15 +527,19 @@ void NorcoastAmbienceEditor::resized()
             out[(size_t) i] = r.removeFromLeft (colW).reduced (3, 0);
     };
 
-    // Top of mixer: 8 FX mix knobs (labels + rotary sliders).
+    // Top of mixer: 8 FX mix knobs (labels + rotary sliders). Layout
+    // mirrors the fader column directly below where it makes sense:
+    //   pos 7 (HPF)   sits above LPF — paired filter sweep.
+    //   pos 8 (Mod)   sits above Master — verb-mod is the most-tweaked
+    //                                     "character" knob during gigs.
     {
         auto knobsArea = mixerInner.removeFromTop (kKnobsRowHeight);
         std::array<juce::Rectangle<int>, 8> cols;
         layoutEightCols (knobsArea, cols);
 
         ParamKnob* fxKnobs[8] = {
-            &reverbMix, &reverbSize, &shimmerVol, &chorusMix,
-            &delayMix,  &delayFb,    &widthMod,   &satAmt
+            &reverbMix, &shimmerVol, &chorusMix, &delayMix,
+            &widthMod,  &satAmt,     &hpfFreq,   &reverbMod
         };
         for (int i = 0; i < 8; ++i)
         {
@@ -633,18 +646,15 @@ void NorcoastAmbienceEditor::resized()
     }
     bounds.removeFromTop (4);
 
-    // Row: arp rate knob + HPF knob + (when expanded) EQ knobs.
+    // Row: arp rate knob + (when expanded) EQ knobs.
+    // HPF moved down into the mixer surface (above the LPF fader).
     {
         auto knobsRow = bounds.removeFromTop (76);
-        const int colW = eqExpanded ? knobsRow.getWidth() / 6 : knobsRow.getWidth() / 2;
+        const int colW = eqExpanded ? knobsRow.getWidth() / 5 : knobsRow.getWidth();
 
         auto arpCol = knobsRow.removeFromLeft (colW);
         arpRate.label.setBounds (arpCol.removeFromTop (kKnobLabelH));
         arpRate.knob .setBounds (arpCol.reduced (4, 2));
-
-        auto hpfCol = knobsRow.removeFromLeft (colW);
-        hpfFreq.label.setBounds (hpfCol.removeFromTop (kKnobLabelH));
-        hpfFreq.knob .setBounds (hpfCol.reduced (4, 2));
 
         if (eqExpanded)
         {
