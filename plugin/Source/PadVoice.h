@@ -48,6 +48,16 @@ public:
     void renderNextBlock (juce::AudioBuffer<float>& outputBuffer,
                           int startSample, int numSamples) override;
 
+    // Override the ADSR release (in seconds) — called from the
+    // processor every block so the user-controlled "Key Xfade" slider
+    // determines how long held notes take to fade after a noteOff.
+    void setReleaseSeconds (float secs)
+    {
+        auto p = adsr.getParameters();
+        p.release = juce::jlimit (0.05f, 8.0f, secs);
+        adsr.setParameters (p);
+    }
+
     struct LFO
     {
         double phase    = 0.0;

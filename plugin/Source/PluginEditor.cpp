@@ -805,13 +805,18 @@ void NorcoastAmbienceEditor::resized()
             &fadeTime,   &keyXfade
         };
         const int n    = (int) (sizeof (knobs) / sizeof (knobs[0]));
+        // Reserve a thin row at the bottom of the knob area for the
+        // evolveBars button row.
+        auto barsArea = knobsArea.removeFromBottom (28);
         const int colW = knobsArea.getWidth() / n;
         for (int i = 0; i < n; ++i)
         {
             auto c = knobsArea.removeFromLeft (colW);
             knobs[i]->label.setBounds (c.removeFromTop (kKnobLabelH));
-            knobs[i]->knob .setBounds (c.reduced (4, 6));
+            knobs[i]->knob .setBounds (c.reduced (4, 4));
         }
+        if (evolveBarsRow != nullptr)
+            evolveBarsRow->setBounds (barsArea.reduced (0, 2));
 
         if (eqCurve != nullptr)
             eqCurve->setBounds (adv.reduced (0, 4));
@@ -977,7 +982,7 @@ void NorcoastAmbienceEditor::resized()
     // panel, but the gigging surface doesn't need them.
     droneButton  .setVisible (false);
     evolveButton .setVisible (false);
-    if (evolveBarsRow != nullptr) evolveBarsRow->setVisible (false);
+    if (evolveBarsRow != nullptr) evolveBarsRow->setVisible (advExpanded);    // visible on Advanced
 
     // ── DRUMS strip ──────────────────────────────────────────────────
     // 4/4 vs 6/8 toggle moved up into the title bar so it lives next

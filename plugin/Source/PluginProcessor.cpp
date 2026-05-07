@@ -355,6 +355,26 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     if (layerScratch.getNumSamples() < n)
         layerScratch.setSize (2, n, false, false, true);
 
+    // ─── Apply the live "Key Xfade" release time to every PadVoice
+    // before any synth renders. When the drone changes key (or any
+    // held note is released), voices fade out over this duration —
+    // the new note's attack overlaps the tail and we get a graceful
+    // crossfade between chords.
+    {
+        const float xf = keyXfadeParam != nullptr
+                            ? juce::jlimit (0.05f, 8.0f, keyXfadeParam->load())
+                            : 0.5f;
+        auto applyToSynth = [xf] (juce::Synthesiser& s)
+        {
+            for (int i = 0; i < s.getNumVoices(); ++i)
+                if (auto* pv = dynamic_cast<PadVoice*> (s.getVoice (i)))
+                    pv->setReleaseSeconds (xf);
+        };
+        applyToSynth (foundationSynth);
+        applyToSynth (padsSynth);
+        applyToSynth (padsSynth2);
+    }
+
     // ─── Foundation renders BEFORE the chord evolver runs, so it
     // receives the raw root note(s) only — no chord intervals.
     layerScratch.clear();
