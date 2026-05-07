@@ -217,7 +217,7 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     loadButton.onClick = [this] { loadPresetFromFile(); };
 
     setupKnob (foundationVol, "Foundation",   ParamID::foundationVol);
-    setupKnob (padsVol,       "Pads",         ParamID::padsVol);
+    setupKnob (padsVol,       "Anchor",       ParamID::padsVol);
     setupKnob (textureVol,    "Texture",      ParamID::textureVol);
 
     // EVOLVE chord pool — pills toggle which chord types the auto-evolve
@@ -357,7 +357,7 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     bpmSlider.updateText();
 
     // ── Pads 2 fader (new alt-pad layer) ──────────────────────────────
-    setupKnob (padsVol2, "Pads 2", ParamID::padsVol2);
+    setupKnob (padsVol2,      "Aurora",       ParamID::padsVol2);
 
     // ── Convert layer / output knobs into vertical faders for the
     // bottom-half mixer surface. The knobs were already wired by

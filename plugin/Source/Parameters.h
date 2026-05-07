@@ -85,10 +85,10 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
                                         "Foundation",
                                         NormRange { 0.0f, 1.0f, 0.001f }, 0.55f));
     add (std::make_unique<FloatParam> (juce::ParameterID { ParamID::padsVol, 1 },
-                                        "Pads",
+                                        "Anchor",
                                         NormRange { 0.0f, 1.0f, 0.001f }, 0.50f));
     add (std::make_unique<FloatParam> (juce::ParameterID { ParamID::padsVol2, 1 },
-                                        "Pads 2",
+                                        "Aurora",
                                         NormRange { 0.0f, 1.0f, 0.001f }, 0.0f));
     add (std::make_unique<FloatParam> (juce::ParameterID { ParamID::textureVol, 1 },
                                         "Texture",
@@ -99,9 +99,9 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
     layout.add (std::make_unique<juce::AudioParameterBool> (
         juce::ParameterID { ParamID::foundationMute, 1 }, "Foundation Mute", false));
     layout.add (std::make_unique<juce::AudioParameterBool> (
-        juce::ParameterID { ParamID::padsMute,       1 }, "Pads Mute",       false));
+        juce::ParameterID { ParamID::padsMute,       1 }, "Anchor Mute",     false));
     layout.add (std::make_unique<juce::AudioParameterBool> (
-        juce::ParameterID { ParamID::pads2Mute,      1 }, "Pads 2 Mute",     false));
+        juce::ParameterID { ParamID::pads2Mute,      1 }, "Aurora Mute",     false));
     layout.add (std::make_unique<juce::AudioParameterBool> (
         juce::ParameterID { ParamID::textureMute,    1 }, "Texture Mute",    false));
     layout.add (std::make_unique<juce::AudioParameterBool> (
@@ -112,9 +112,9 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
     layout.add (std::make_unique<juce::AudioParameterBool> (
         juce::ParameterID { ParamID::foundationSubOct, 1 }, "Foundation Sub-Oct", true));
     layout.add (std::make_unique<juce::AudioParameterBool> (
-        juce::ParameterID { ParamID::padsSubOct, 1 }, "Pads Sub-Oct",   false));
+        juce::ParameterID { ParamID::padsSubOct, 1 }, "Anchor Sub-Oct", false));
     layout.add (std::make_unique<juce::AudioParameterBool> (
-        juce::ParameterID { ParamID::pads2SubOct, 1 }, "Pads 2 Sub-Oct", false));
+        juce::ParameterID { ParamID::pads2SubOct, 1 }, "Aurora Sub-Oct", false));
     layout.add (std::make_unique<juce::AudioParameterBool> (
         juce::ParameterID { ParamID::textureOctUp, 1 }, "Texture +Oct", true));
 

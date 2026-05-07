@@ -33,7 +33,7 @@ namespace
     LayerConfig makePadsConfig()
     {
         LayerConfig c;
-        c.name    = "Pads";
+        c.name    = "Anchor";
         c.timbres =
         {
             { WaveType::Lush,      6, 10.0f, 0.030f, 0.60f },
@@ -57,7 +57,7 @@ namespace
         // a player can blend it in for sparkle without crowding the main
         // pad's harmonic content.
         LayerConfig c;
-        c.name    = "Pads 2";
+        c.name    = "Aurora";
         c.timbres =
         {
             { WaveType::Glass,     4,  9.0f, 0.018f, 0.70f },
