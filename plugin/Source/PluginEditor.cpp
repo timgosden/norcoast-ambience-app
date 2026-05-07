@@ -513,7 +513,6 @@ void NorcoastAmbienceEditor::paint (juce::Graphics& g)
     paintStrip (evolveStripBounds, juce::Colour (0xffc4915e), "EVOLVE");
     paintStrip (drumsStripBounds,  juce::Colour (0xffe8a45e), "MOVEMENT");
     paintStrip (arpStripBounds,    juce::Colour (0xff9b7fd4), "ARP");
-    paintStrip (layersStripBounds, juce::Colour (0xff5eb88a), "LAYERS");
 
     // ── Mixer surface backplane (the nanoKONTROL strip) ──────────────
     if (! mixerPanelBounds.isEmpty())
@@ -797,10 +796,9 @@ void NorcoastAmbienceEditor::resized()
     }
     bounds.removeFromTop (2);
 
-    // LAYERS strip removed: the Sub Oct / Tex +Oct / EQ buttons moved
-    // to the mixer + title-bar (see below) so this row reclaims the
-    // dead space the user complained about.
-    layersStripBounds = {};
+    // (LAYERS strip removed entirely — Sub Oct / Tex +Oct moved into
+    // the mixer above their fader columns, EQ toggle moved up into
+    // the title bar.)
 
     // EQ knobs row — only visible when expanded.
     if (eqExpanded)
