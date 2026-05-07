@@ -1023,9 +1023,7 @@ void NorcoastAmbienceEditor::paint (juce::Graphics& g)
     if (advExpanded && ! advBarsLabelBounds.isEmpty())
     {
         const auto rf = advBarsLabelBounds.toFloat().reduced (2.0f, 1.0f);
-        g.setColour (juce::Colour (0xff1a1f2c));
-        g.fillRoundedRectangle (rf, 3.0f);
-        g.setColour (juce::Colour (0xffe8b478));   // brighter amber
+        g.setColour (juce::Colour (0xfff5e6d3));   // near-white cream — readable
         g.setFont (juce::FontOptions (13.0f).withStyle ("Bold"));
         g.drawText ("Chord Evolve every:", rf,
                     juce::Justification::centred);
