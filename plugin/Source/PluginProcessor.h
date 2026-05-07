@@ -179,6 +179,11 @@ private:
     // grid-locked modules derive their step boundaries from the same divisor
     // base and stay phase-aligned with each other.
     juce::int64 transportSamples = 0;
+    // Last BPM seen by processBlock. When BPM changes we rescale
+    // transportSamples so the current beat position is preserved —
+    // the arp/drum/evolve grids glide to the new tempo instead of
+    // jumping a step boundary.
+    double lastBpmForClock = 0.0;
     std::atomic<bool> latchOn { false };
     std::atomic<bool> stopped { false };
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> stopFade;
@@ -208,6 +213,19 @@ private:
     // smoothed so engaging Drive doesn't click — see processBlock.
     float satLpL = 0.0f, satLpR = 0.0f;
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> satAmtSmoothed { 0.0f };
+
+    // FX mix scalars — per-sample smoothed so preset switches and
+    // direct param edits glide instead of stepping. ~30 ms ramp is
+    // short enough to feel instant and long enough to eliminate the
+    // zipper noise / clicks the user heard when recalling presets.
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> reverbMixSmooth  { 0.0f };
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> delayMixSmooth   { 0.0f };
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> chorusMixSmooth  { 0.0f };
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> shimmerVolSmooth { 0.0f };
+    // Per-sample scratch for the smoothed reverb mix — two stereo
+    // channels read the same per-sample value without advancing the
+    // smoother twice.
+    std::vector<float> reverbMixRamp;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (NorcoastAmbienceProcessor)
 };

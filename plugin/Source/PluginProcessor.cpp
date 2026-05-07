@@ -257,6 +257,18 @@ void NorcoastAmbienceProcessor::prepareToPlay (double sampleRate, int samplesPer
     satAmtSmoothed.setCurrentAndTargetValue (satAmtParam != nullptr
                                               ? satAmtParam->load() : 0.0f);
 
+    // FX mix smoothers — 30 ms ramp lets preset recalls glide instead
+    // of clicking when the wet/dry balance jumps from one patch to
+    // another.
+    reverbMixSmooth .reset (sampleRate, 0.03);
+    delayMixSmooth  .reset (sampleRate, 0.03);
+    chorusMixSmooth .reset (sampleRate, 0.03);
+    shimmerVolSmooth.reset (sampleRate, 0.03);
+    reverbMixSmooth .setCurrentAndTargetValue (reverbMixParam  != nullptr ? reverbMixParam ->load() : 0.0f);
+    delayMixSmooth  .setCurrentAndTargetValue (delayMixParam   != nullptr ? delayMixParam  ->load() : 0.0f);
+    chorusMixSmooth .setCurrentAndTargetValue (chorusMixParam  != nullptr ? chorusMixParam ->load() : 0.0f);
+    shimmerVolSmooth.setCurrentAndTargetValue (shimmerVolParam != nullptr ? shimmerVolParam->load() : 0.0f);
+
     // Stop-fade ramp time: 1 second feels like the standalone's "Stop" pill.
     // 4-second stop fade — long enough for reverb / delay tails to
     // ring out gracefully past it.
@@ -400,6 +412,25 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
                 if (*hostBpm > 1.0)
                     bpm = *hostBpm;
 
+    // BPM clock continuity. transportSamples is the shared sample-grid
+    // that arp / drum / evolve all derive their step boundaries from.
+    // If we just kept incrementing it across a BPM change, every
+    // module's "step now" calculation would jump (since tickSamples
+    // depends on BPM). We rescale transportSamples so the *beat*
+    // position stays put — the grids glide to the new tempo instead
+    // of resetting their phase.
+    if (lastBpmForClock > 0.0 && std::abs (bpm - lastBpmForClock) > 1.0e-3)
+    {
+        const double oldSpb = (60.0 / lastBpmForClock) * sr;
+        const double newSpb = (60.0 / bpm)             * sr;
+        if (oldSpb > 0.0)
+        {
+            const double curBeats = (double) transportSamples / oldSpb;
+            transportSamples = (juce::int64) (curBeats * newSpb);
+        }
+    }
+    lastBpmForClock = bpm;
+
     {
         const int targetType   = juce::jlimit (0, (int) ChordEvolver::NumTypes - 1,
                                                (int) chordTypeParam->load());
@@ -531,6 +562,11 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     // Snapshot params once per block.
     const float chorusMix   = chorusMixParam ->load();
     const float delayMix    = delayMixParam  ->load();
+    // Push the latest mix values to the per-sample smoothers — the
+    // FX loops below read getNextValue() each sample so any preset
+    // recall ramps the wet/dry balance instead of clicking.
+    chorusMixSmooth .setTargetValue (chorusMix);
+    delayMixSmooth  .setTargetValue (delayMix);
     const float delayFb     = delayFbParam   ->load();
     const int   delayDivIdx = juce::jlimit (0, 6, (int) delayDivParam->load());
     const float delayTone   = delayToneParam ->load();
@@ -541,11 +577,13 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         { 0.125f, 0.25f, 0.375f, 0.5f, 0.75f, 1.0f, 1.5f };
     const float delayTimeSec = (60.0f / (float) bpm) * kDivBeats[(size_t) delayDivIdx];
     const float reverbMix   = reverbMixParam ->load();
+    reverbMixSmooth.setTargetValue (reverbMix);
     const float reverbSize  = reverbSizeParam->load();
     const float reverbMod   = reverbModParam ->load();
     const float lpfFader    = lpfFreqParam   ->load();
     const float hpfFader    = hpfFreqParam   ->load();
     const float shimmerVol  = shimmerVolParam->load();
+    shimmerVolSmooth.setTargetValue (shimmerVol);
     const float widthMod    = widthModParam  ->load();
     const float satAmt      = satAmtParam    ->load();
     const float masterVol   = masterVolParam ->load();
@@ -646,7 +684,9 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         const float chBaseR  = 0.011f  * (float) sr;
         const float chDepthL = 0.0050f * (float) sr;     // was 0.0025
         const float chDepthR = 0.0060f * (float) sr;     // was 0.0030
-        const float chMix = chorusMix * 0.5f;
+        // Mix is read per-sample from the smoother (see processBlock
+        // setTargetValue). This eliminates the click that used to
+        // accompany large wet/dry jumps on preset recall.
 
         constexpr float panAngL = (-0.65f + 1.0f) * 0.25f * juce::MathConstants<float>::pi;
         constexpr float panAngR = ( 0.65f + 1.0f) * 0.25f * juce::MathConstants<float>::pi;
@@ -672,6 +712,7 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
             const float chL = chorusDelayL.popSample (0);
             const float chR = chorusDelayR.popSample (0);
 
+            const float chMix = chorusMixSmooth.getNextValue() * 0.5f;
             L[s] = dryL + (chL * panL_L + chR * panR_L) * chMix;
             R[s] = dryR + (chL * panL_R + chR * panR_R) * chMix;
         }
@@ -679,7 +720,6 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
     // ─── Master delay (parallel send/return) ──────────────────────────
     {
-        const float wetSend = delayMix * 0.7f;
         for (int s = 0; s < n; ++s)
         {
             float delayedL = delayLine.popSample (0);
@@ -694,6 +734,7 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
             delayLine.pushSample (0, dryL + delayedL * delayFb);
             delayLine.pushSample (1, dryR + delayedR * delayFb);
 
+            const float wetSend = delayMixSmooth.getNextValue() * 0.7f;
             const float wetL = delayWetShelfL.processSample (delayedL * wetSend);
             const float wetR = delayWetShelfR.processSample (delayedR * wetSend);
 
@@ -724,12 +765,23 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
         reverb.processWet (reverbBuffer);
 
+        // Snapshot the smoothed reverb mix once per sample into a
+        // scratch ramp, so both stereo channels get the same per-sample
+        // value without advancing the smoother twice.
+        if ((int) reverbMixRamp.size() < n)
+            reverbMixRamp.resize ((size_t) n);
+        for (int i = 0; i < n; ++i)
+            reverbMixRamp[(size_t) i] = reverbMixSmooth.getNextValue();
+
         for (int ch = 0; ch < nch; ++ch)
         {
             auto* dst = buffer.getWritePointer (ch);
             auto* wet = reverbBuffer.getReadPointer (juce::jmin (ch, 1));
             for (int i = 0; i < n; ++i)
-                dst[i] = dst[i] * (1.0f - reverbMix) + wet[i] * reverbMix;
+            {
+                const float m = reverbMixRamp[(size_t) i];
+                dst[i] = dst[i] * (1.0f - m) + wet[i] * m;
+            }
         }
     }
 
@@ -739,7 +791,13 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     // it by 1-reverbMix). Slightly different topology to the
     // standalone (which sums shimmer + main-reverb in parallel) but
     // sonically equivalent for this preset's mix balance.
-    shimmer.processAdd (buffer, shimmerVol * 1.5f);
+    // Advance the shimmer-vol smoother by the block size and pass its
+    // current value — shimmer's internal mix is per-block, but with
+    // 30 ms ramp + ~5 ms block size the scalar moves in 5-step
+    // increments toward target, smooth enough to avoid clicks on
+    // preset recall.
+    shimmerVolSmooth.skip (n);
+    shimmer.processAdd (buffer, shimmerVolSmooth.getCurrentValue() * 1.5f);
 
     // ─── Width LFO (master pan modulation, 0.3 Hz) ────────────────────
     if (widthMod > 1e-4f)

@@ -129,5 +129,9 @@ private:
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> subOctGain   { 0.0f };
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> superOctGain { 0.0f };
 
+    // Smoothed layer-volume read so a preset switch ramps the per-voice
+    // gain in over ~30 ms instead of jumping (which used to click).
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> layerGainSmoothed { 1.0f };
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PadVoice)
 };

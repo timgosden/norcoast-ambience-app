@@ -411,7 +411,8 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     };
     fadeTime.knob.updateText();
 
-    setupKnob (keyXfade,  "Key Xfade", ParamID::keyXfade);
+    setupKnob (keyXfade,  "Chord Xfade", ParamID::keyXfade);
+    keyXfade.knob.setTooltip ("How long held notes take to fade out when the chord type evolves to a new shape — also covers manual key changes. Short = punchy edits, long = smooth bloom.");
     keyXfade.knob.textFromValueFunction = [] (double v) -> juce::String
     {
         return juce::String (v, 2) + " s";

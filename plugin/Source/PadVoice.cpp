@@ -89,6 +89,14 @@ void PadVoice::startNote (int midiNoteNumber, float velocity,
     subOctGain  .setCurrentAndTargetValue (subOnNow);
     superOctGain.setCurrentAndTargetValue (superOnNow);
 
+    // Layer-volume smoother — ramped over 30 ms so a preset recall
+    // glides the layer's amplitude into place. On note-start we
+    // initialise to whatever the param is right now so existing notes
+    // don't get an audible attack just from a preset edit.
+    const float gainNow = layerGainParam != nullptr ? layerGainParam->load() : 1.0f;
+    layerGainSmoothed.reset (sr, 0.03);
+    layerGainSmoothed.setCurrentAndTargetValue (gainNow);
+
     int idx = 0;
     for (int oi = 0; oi < numOcts; ++oi)
     {
@@ -199,8 +207,12 @@ void PadVoice::renderNextBlock (juce::AudioBuffer<float>& outputBuffer,
         o.phaseInc = detunedHz (o.baseHz, o.staticCents + lfoCents + bendCents) / sr;
     }
 
-    const float gainParam  = layerGainParam != nullptr ? layerGainParam->load() : 1.0f;
-    const float layerScale = gainParam * velocityScale * (1.0f + ampMod + breathMod);
+    // Push the latest layer volume to the smoother — it's read per
+    // sample below so any param jump (preset recall, automation) ramps
+    // into place over ~30 ms instead of clicking.
+    if (layerGainParam != nullptr)
+        layerGainSmoothed.setTargetValue (layerGainParam->load());
+    const float modScale = velocityScale * (1.0f + ampMod + breathMod);
 
     // Ramp the extra-octave gates toward the current toggle state so a
     // sub-oct / super-oct flip mid-note is heard immediately (50 ms ramp
@@ -217,8 +229,9 @@ void PadVoice::renderNextBlock (juce::AudioBuffer<float>& outputBuffer,
 
     for (int s = 0; s < numSamples; ++s)
     {
-        const float env = adsr.getNextSample();
-        const float g   = env * layerScale;
+        const float env       = adsr.getNextSample();
+        const float layerGain = layerGainSmoothed.getNextValue();
+        const float g         = env * layerGain * modScale;
 
         const float subG   = subOctGain  .getNextValue();
         const float superG = superOctGain.getNextValue();

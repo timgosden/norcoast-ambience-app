@@ -252,7 +252,7 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
     // values feel snappy; longer values overlap the old/new chord
     // through a graceful transition. Default 0.5 s.
     add (std::make_unique<FloatParam> (juce::ParameterID { ParamID::keyXfade, 1 },
-                                        "Key Xfade",
+                                        "Chord Xfade",
                                         NormRange { 0.05f, 5.0f, 0.05f }, 0.5f));
 
     // 16-step bitmasks for the Custom pattern, one per voice (lo / md / hh).
