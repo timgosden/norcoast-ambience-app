@@ -39,6 +39,10 @@ private:
 
     NorcoastAmbienceProcessor& owner;
 
+    // Hover-tooltip support — every knob / button / fader gets a
+    // setTooltip() call so the user can discover what each does.
+    juce::TooltipWindow tooltipWindow { this, 600 };
+
     // Invisible MidiKeyboardComponent — exists only to capture qwerty
     // keys via JUCE's tested key-press → MIDI mapping. The user never
     // sees it.
@@ -157,6 +161,7 @@ private:
     ParamKnob hpfFreq;
     ParamKnob reverbSize, reverbMod;
     ParamKnob delayFb, delayTimeMs, delayTone;
+    ParamKnob fadeTime, keyXfade;                  // Stop fade + key change crossfade
     ParamKnob eqLow, eqLoMid, eqHiMid, eqHigh;     // host-only; UI uses eqCurve
     std::unique_ptr<EqCurveDisplay> eqCurve;
 

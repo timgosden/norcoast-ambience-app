@@ -33,6 +33,13 @@ public:
         g.setColour (juce::Colour (0xff242a36));
         g.drawRoundedRectangle (r, 4.0f, 1.0f);
 
+        // "MASTER EQ" header at top-left.
+        g.setColour (juce::Colour (0xffb07acc));
+        g.setFont (juce::FontOptions (11.0f).withStyle ("Bold"));
+        g.drawText ("MASTER EQ",
+                    r.reduced (10.0f, 6.0f).withHeight (14.0f),
+                    juce::Justification::topLeft);
+
         // Grid: vertical decade lines (100 Hz, 1 kHz, 10 kHz) and the
         // 0 dB centre line.
         g.setColour (juce::Colour (0xff242a36).withAlpha (0.7f));

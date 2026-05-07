@@ -90,6 +90,12 @@ void NorcoastAmbienceEditor::setupKnob (ParamKnob& k, const juce::String& displa
         const float def = p->getNormalisableRange()
                             .convertFrom0to1 (p->getDefaultValue());
         k.knob.setDoubleClickReturnValue (true, def);
+
+        // Default tooltip = "Display Name (paramID) — drag, scroll,
+        // or double-click to reset". The constructor caller can
+        // overwrite later if it wants something more specific.
+        k.knob .setTooltip (displayName + " — drag / scroll to set; double-click to reset");
+        k.label.setTooltip (displayName);
     }
 }
 
@@ -123,6 +129,12 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     {
         owner.setStopped (stopButton.getToggleState());
     };
+    stopButton.setTooltip ("Fade the dry sources to silence over the Fade Time set on the Advanced page. Reverb / delay tails ring out past the fade. Click again to fade back in.");
+    saveButton.setTooltip ("Save the current state as a preset.");
+    loadButton.setTooltip ("Load a preset from disk.");
+    presetBox .setTooltip ("Browse the factory presets.");
+    bpmLabel  .setTooltip ("Tempo (BPM). When the host provides a playhead tempo, this value is overridden.");
+    bpmSlider .setTooltip ("Tempo (BPM). Drag, scroll, or click the +/- buttons. Default 70.");
 
     // Per-layer octave toggles. setupOctToggle wires up label + APVTS
     // attachment + accent colour in one call so all five rows are
@@ -319,6 +331,21 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     setupKnob (eqLoMid,     "Lo-Mid",      ParamID::eqLoMid,  " dB");
     setupKnob (eqHiMid,     "Hi-Mid",      ParamID::eqHiMid,  " dB");
     setupKnob (eqHigh,      "High",        ParamID::eqHigh,   " dB");
+
+    // Stop / key transition timing controls — surfaced on Advanced.
+    setupKnob (fadeTime,  "Stop Fade", ParamID::fadeTime);
+    fadeTime.knob.textFromValueFunction = [] (double v) -> juce::String
+    {
+        return juce::String (v, 1) + " s";
+    };
+    fadeTime.knob.updateText();
+
+    setupKnob (keyXfade,  "Key Xfade", ParamID::keyXfade);
+    keyXfade.knob.textFromValueFunction = [] (double v) -> juce::String
+    {
+        return juce::String (v, 2) + " s";
+    };
+    keyXfade.knob.updateText();
     // (Tried LinearBarVertical here — looked wrong for a bipolar param,
     // since the bar filled from the bottom regardless of cut vs boost.
     // Keeping rotaries; a dedicated EQ-curve visualiser is a bigger
@@ -347,7 +374,10 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     advButton.setColour (juce::TextButton::buttonColourId,
                          juce::Colour (NorcoastLookAndFeel::kPanelBg));
     advButton.setColour (juce::TextButton::buttonOnColourId,
-                         juce::Colour (NorcoastLookAndFeel::kAccent).withAlpha (0.4f));
+                         juce::Colour (0xffb07acc));   // EQ purple — "page" cue
+    advButton.setColour (juce::TextButton::textColourOnId,
+                         juce::Colour (NorcoastLookAndFeel::kBg));
+    advButton.setTooltip ("Advanced controls (Reverb Size / Mod, Delay Div / FB / Tone, Master EQ)");
     advButton.onClick = [this, setAdvancedKnobsVisible]
     {
         advExpanded = advButton.getToggleState();
@@ -453,7 +483,7 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
                      &arpVol, &drumVol, &lpfFreq, &masterVol })
     {
         k->knob.setSliderStyle (juce::Slider::LinearVertical);
-        k->knob.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 60, 14);
+        k->knob.setTextBoxStyle (juce::Slider::NoTextBox, true, 0, 0);   // no % under fader
     }
 
     // ── Mute buttons for the 6 audio layers ──────────────────────────
@@ -505,8 +535,13 @@ void NorcoastAmbienceEditor::timerCallback()
     for (size_t i = 0; i < meterLevels.size(); ++i)
     {
         const float raw = owner.layerLevels[i].load (std::memory_order_relaxed);
-        const float decayed = meterLevels[i] * 0.82f;          // ~24 Hz fall-off
-        const float next = juce::jmax (raw, decayed);
+        // dB-mapped meter: -60 dB → 0 visual, 0 dB → full bar. So a
+        // typical -20 dB peak now renders at ~67 % bar height instead
+        // of ~10 % under linear scaling — much more responsive.
+        const float dB = juce::Decibels::gainToDecibels (raw, -60.0f);
+        const float visual = juce::jlimit (0.0f, 1.0f, (dB + 60.0f) / 60.0f);
+        const float decayed = meterLevels[i] * 0.82f;
+        const float next    = juce::jmax (visual, decayed);
         if (std::abs (next - meterLevels[i]) > 1e-3f)
         {
             meterLevels[i] = next;

@@ -114,6 +114,8 @@ private:
     std::atomic<float>* drumCustomHhParam  = nullptr;
     std::atomic<float>* timeSigParam       = nullptr;
     std::atomic<float>* bpmParam           = nullptr;
+    std::atomic<float>* fadeTimeParam      = nullptr;
+    std::atomic<float>* keyXfadeParam      = nullptr;
     std::atomic<float>* chordTypeParam       = nullptr;
     std::atomic<float>* customChordMaskParam   = nullptr;
     std::atomic<float>* enabledChordsMaskParam = nullptr;
@@ -180,6 +182,7 @@ private:
     std::atomic<bool> latchOn { false };
     std::atomic<bool> stopped { false };
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> stopFade;
+    double stopFadeRampTimeSec = 0.0;     // last fadeTime we configured into stopFade
     std::vector<int> heldNotesScratch;   // reused across processBlock calls
     float lastReverbSize = -1.0f;
     float lastReverbMod  = -1.0f;
@@ -190,6 +193,7 @@ private:
     using StereoIIR = juce::dsp::ProcessorDuplicator<juce::dsp::IIR::Filter<float>,
                                                      juce::dsp::IIR::Coefficients<float>>;
     StereoIIR masterLpf, masterHpf;
+    StereoIIR reverbSendHpf;            // ~120 Hz on the wet send only
     float lastLpfHz = -1.0f, lastHpfHz = -1.0f;
 
     StereoIIR eqLow, eqLoMid, eqHiMid, eqHigh;

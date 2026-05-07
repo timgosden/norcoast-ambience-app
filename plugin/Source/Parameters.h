@@ -62,6 +62,10 @@ namespace ParamID
     inline constexpr const char* timeSig         = "timeSig";        // 0=4/4, 1=6/8
     inline constexpr const char* bpm             = "bpm";            // manual fallback BPM
 
+    // ─── Performance / advanced ───────────────────────────────────
+    inline constexpr const char* fadeTime        = "fadeTime";       // Stop button fade time, seconds
+    inline constexpr const char* keyXfade        = "keyXfade";       // Drone key change crossfade, seconds
+
     inline constexpr const char* chordType         = "chordType";
     inline constexpr const char* customChordMask   = "customChordMask";
     inline constexpr const char* enabledChordsMask = "enabledChordsMask";
@@ -236,6 +240,20 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
     add (std::make_unique<FloatParam> (juce::ParameterID { ParamID::bpm, 1 },
                                         "BPM",
                                         NormRange { 30.0f, 200.0f, 1.0f }, 70.0f));
+
+    // Stop button fade time, in seconds. The verb / delay tails ring on
+    // past this fade naturally. Default 4 s matches the previous hard-
+    // coded value.
+    add (std::make_unique<FloatParam> (juce::ParameterID { ParamID::fadeTime, 1 },
+                                        "Fade Time",
+                                        NormRange { 0.5f, 16.0f, 0.1f }, 4.0f));
+
+    // Crossfade time when the drone changes key, in seconds. Short
+    // values feel snappy; longer values overlap the old/new chord
+    // through a graceful transition. Default 0.5 s.
+    add (std::make_unique<FloatParam> (juce::ParameterID { ParamID::keyXfade, 1 },
+                                        "Key Xfade",
+                                        NormRange { 0.05f, 5.0f, 0.05f }, 0.5f));
 
     // 16-step bitmasks for the Custom pattern, one per voice (lo / md / hh).
     layout.add (std::make_unique<juce::AudioParameterInt> (

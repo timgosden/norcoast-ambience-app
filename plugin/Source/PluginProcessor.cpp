@@ -135,6 +135,8 @@ NorcoastAmbienceProcessor::NorcoastAmbienceProcessor()
     drumCustomHhParam  = apvts.getRawParameterValue (ParamID::drumCustomHh);
     timeSigParam       = apvts.getRawParameterValue (ParamID::timeSig);
     bpmParam           = apvts.getRawParameterValue (ParamID::bpm);
+    fadeTimeParam      = apvts.getRawParameterValue (ParamID::fadeTime);
+    keyXfadeParam      = apvts.getRawParameterValue (ParamID::keyXfade);
     chordTypeParam       = apvts.getRawParameterValue (ParamID::chordType);
     customChordMaskParam   = apvts.getRawParameterValue (ParamID::customChordMask);
     enabledChordsMaskParam = apvts.getRawParameterValue (ParamID::enabledChordsMask);
@@ -232,6 +234,13 @@ void NorcoastAmbienceProcessor::prepareToPlay (double sampleRate, int samplesPer
 
     masterLpf.prepare (spec); masterLpf.reset();
     masterHpf.prepare (spec); masterHpf.reset();
+
+    // Reverb send HPF — fixed at 120 Hz so kicks / sub-oct stay out of
+    // the verb tail. Coefficients set once; nothing user-tweakable.
+    reverbSendHpf.prepare (spec);
+    reverbSendHpf.reset();
+    *reverbSendHpf.state = *juce::dsp::IIR::Coefficients<float>::makeHighPass (
+                                sampleRate, 120.0f, 0.5f);
     lastLpfHz = lastHpfHz = -1.0f;
 
     eqLow.prepare (spec);   eqLow.reset();
@@ -244,7 +253,9 @@ void NorcoastAmbienceProcessor::prepareToPlay (double sampleRate, int samplesPer
     masterGain.setCurrentAndTargetValue (masterVolParam->load());
 
     // Stop-fade ramp time: 1 second feels like the standalone's "Stop" pill.
-    stopFade.reset (sampleRate, 1.0);
+    // 4-second stop fade — long enough for reverb / delay tails to
+    // ring out gracefully past it.
+    stopFade.reset (sampleRate, 4.0);
     stopFade.setCurrentAndTargetValue (1.0f);
 }
 
@@ -462,6 +473,36 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         sumLayerWithMute (muteTexture, textureMuteParam, 3);      // Texture
     }
 
+    // ─── Stop fade applied PRE-FX ─────────────────────────────────
+    // Multiplies the dry layer mix by a smoothed gain that ramps to 0
+    // over 4 seconds when Stop is engaged. The reverb / delay / shimmer
+    // chains downstream keep ringing because their internal feedback
+    // structures decay independently — the user hears a graceful "let
+    // the cathedral breathe out" rather than a hard cut.
+    {
+        const float target = stopped.load (std::memory_order_acquire) ? 0.0f : 1.0f;
+        // Re-arm the smoother's ramp time from the fadeTime param each
+        // block — cheap and lets the user tweak fade length live.
+        const double fadeSec = fadeTimeParam != nullptr
+                                 ? juce::jmax (0.05f, fadeTimeParam->load())
+                                 : 4.0f;
+        if (std::abs (fadeSec - stopFadeRampTimeSec) > 1e-3)
+        {
+            stopFade.reset (sr, fadeSec);
+            stopFadeRampTimeSec = fadeSec;
+        }
+        stopFade.setTargetValue (target);
+
+        auto* dL = buffer.getWritePointer (0);
+        auto* dR = buffer.getNumChannels() > 1 ? buffer.getWritePointer (1) : dL;
+        for (int s = 0; s < n; ++s)
+        {
+            const float g = stopFade.getNextValue();
+            dL[s] *= g;
+            dR[s] *= g;
+        }
+    }
+
     // Snapshot params once per block.
     const float chorusMix   = chorusMixParam ->load();
     const float delayMix    = delayMixParam  ->load();
@@ -647,6 +688,15 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         if (nch == 1)
             reverbBuffer.copyFrom (1, 0, buffer, 0, 0, n);
 
+        // ─── High-pass the reverb SEND so kicks / sub-oct don't muddy
+        // the tail. ~120 Hz, gentle Q, runs in place on the wet copy
+        // (does NOT affect the dry path).
+        {
+            juce::dsp::AudioBlock<float> block (reverbBuffer);
+            juce::dsp::ProcessContextReplacing<float> ctx (block);
+            reverbSendHpf.process (ctx);
+        }
+
         reverb.processWet (reverbBuffer);
 
         for (int ch = 0; ch < nch; ++ch)
@@ -733,12 +783,13 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         }
     }
 
-    // ─── Master volume + Stop fade ────────────────────────────────────
+    // ─── Master volume ─────────────────────────────────────────────
+    // Stop fade was already applied pre-FX so verb / delay tails get
+    // to ring out past it; here we just trim by the master gain.
     masterGain.setTargetValue (masterVol);
-    stopFade .setTargetValue (stopped.load (std::memory_order_acquire) ? 0.0f : 1.0f);
     for (int s = 0; s < n; ++s)
     {
-        const float g = masterGain.getNextValue() * stopFade.getNextValue();
+        const float g = masterGain.getNextValue();
         L[s] *= g;
         R[s] *= g;
     }
