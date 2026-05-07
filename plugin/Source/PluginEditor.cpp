@@ -489,11 +489,31 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
 
     setSize (1000, 720);
 
+    // Drive the per-fader level meters at ~24 Hz refresh.
+    startTimerHz (24);
+
     // Give the qwerty keyboard focus so computer-keyboard keys map to MIDI.
     juce::MessageManager::callAsync ([safeThis = juce::Component::SafePointer (&qwertyKeyboard)]
     {
         if (safeThis != nullptr) safeThis->grabKeyboardFocus();
     });
+}
+
+void NorcoastAmbienceEditor::timerCallback()
+{
+    bool changed = false;
+    for (size_t i = 0; i < meterLevels.size(); ++i)
+    {
+        const float raw = owner.layerLevels[i].load (std::memory_order_relaxed);
+        const float decayed = meterLevels[i] * 0.82f;          // ~24 Hz fall-off
+        const float next = juce::jmax (raw, decayed);
+        if (std::abs (next - meterLevels[i]) > 1e-3f)
+        {
+            meterLevels[i] = next;
+            changed = true;
+        }
+    }
+    if (changed) repaint();
 }
 
 NorcoastAmbienceEditor::~NorcoastAmbienceEditor()
@@ -612,25 +632,56 @@ void NorcoastAmbienceEditor::paint (juce::Graphics& g)
     if (! mixerPanelBounds.isEmpty())
     {
         const auto r = mixerPanelBounds.toFloat();
-        g.setColour (juce::Colour (NorcoastLookAndFeel::kPanelBg));
+        // Tint the panel a touch differently when Advanced is on so
+        // the user has a clear visual cue the bottom half just swapped.
+        g.setColour (advExpanded
+                     ? juce::Colour (0xff1a2030).withAlpha (0.9f)   // cool slate
+                     : juce::Colour (NorcoastLookAndFeel::kPanelBg));
         g.fillRoundedRectangle (r, 8.0f);
-        g.setColour (juce::Colour (NorcoastLookAndFeel::kPanelEdge));
-        g.drawRoundedRectangle (r, 8.0f, 1.0f);
+        g.setColour (advExpanded
+                     ? juce::Colour (0xffb07acc).withAlpha (0.5f)    // EQ purple border
+                     : juce::Colour (NorcoastLookAndFeel::kPanelEdge));
+        g.drawRoundedRectangle (r, 8.0f, advExpanded ? 1.5f : 1.0f);
 
-        // Sub-panel behind the 8 FX knobs — slightly tinted so the
-        // knobs feel like they live in their own little FX rack
-        // separate from the layer faders below.
-        const float kKnobsHeight = 96.0f;
-        auto knobs = r.withHeight (kKnobsHeight + 8.0f).reduced (8.0f, 6.0f);
-        g.setColour (juce::Colour (0xff111522).withAlpha (0.65f));
-        g.fillRoundedRectangle (knobs, 5.0f);
-        g.setColour (juce::Colour (NorcoastLookAndFeel::kPanelEdge).withAlpha (0.4f));
-        g.drawRoundedRectangle (knobs, 5.0f, 1.0f);
+        if (! advExpanded)
+        {
+            // Sub-panel behind the 8 FX knobs — slightly tinted so the
+            // knobs feel like they live in their own little FX rack
+            // separate from the layer faders below.
+            const float kKnobsHeight = 96.0f;
+            auto knobs = r.withHeight (kKnobsHeight + 8.0f).reduced (8.0f, 6.0f);
+            g.setColour (juce::Colour (0xff111522).withAlpha (0.65f));
+            g.fillRoundedRectangle (knobs, 5.0f);
+            g.setColour (juce::Colour (NorcoastLookAndFeel::kPanelEdge).withAlpha (0.4f));
+            g.drawRoundedRectangle (knobs, 5.0f, 1.0f);
 
-        // Thin separator between knobs panel and faders.
-        const float sepY = r.getY() + kKnobsHeight + 4.0f;
-        g.setColour (juce::Colour (NorcoastLookAndFeel::kPanelEdge).withAlpha (0.6f));
-        g.drawHorizontalLine ((int) sepY, r.getX() + 12.0f, r.getRight() - 12.0f);
+            // Thin separator between knobs panel and faders.
+            const float sepY = r.getY() + kKnobsHeight + 4.0f;
+            g.setColour (juce::Colour (NorcoastLookAndFeel::kPanelEdge).withAlpha (0.6f));
+            g.drawHorizontalLine ((int) sepY, r.getX() + 12.0f, r.getRight() - 12.0f);
+
+            // Per-fader level meters — a thin orange bar inside each
+            // layer column that bounces with the audio. Painted last so
+            // it overlays the slider track.
+            ParamKnob* faders[6] = {
+                &foundationVol, &padsVol, &padsVol2, &textureVol,
+                &arpVol,        &drumVol
+            };
+            for (int i = 0; i < 6; ++i)
+            {
+                const auto fb = faders[i]->knob.getBounds().toFloat();
+                if (fb.isEmpty()) continue;
+                const float lvl = juce::jlimit (0.0f, 1.0f, meterLevels[(size_t) i]);
+                if (lvl <= 0.001f) continue;
+                const float barH = fb.getHeight() * lvl;
+                const float barX = fb.getCentreX() - 1.5f;
+                const auto bar = juce::Rectangle<float> (barX,
+                                                          fb.getBottom() - barH,
+                                                          3.0f, barH);
+                g.setColour (juce::Colour (0xffe8a45e).withAlpha (0.55f));
+                g.fillRoundedRectangle (bar, 1.5f);
+            }
+        }
     }
 }
 
@@ -837,10 +888,10 @@ void NorcoastAmbienceEditor::resized()
         return outBounds.reduced (12, 4);     // inner padding
     };
 
-    auto labelInside = [] (juce::Rectangle<int>& strip, int width = 76)
+    auto labelInside = [] (juce::Rectangle<int>& strip, int width = 100)
     {
-        // Wider than before (was 64) so the "MOVEMENT" label has room
-        // to sit without truncating to "MOVEME...".
+        // Wide enough that the longest label ("MOVEMENT", 8 chars at
+        // 12 pt bold ≈ 90 px) sits comfortably without truncation.
         return strip.removeFromLeft (width);
     };
 

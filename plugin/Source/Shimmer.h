@@ -46,7 +46,10 @@ public:
         fbHpfL.reset(); fbHpfR.reset();
         fbLpfL.reset(); fbLpfR.reset();
 
-        shifter.prepare (sr, /*channels*/ 2, blockSize, /*grainMs*/ 100, /*voices*/ 8, /*jitterMs*/ 5.0f);
+        // Zero jitter on the grain trigger — random offsets caused
+        // audible pitch warble at +12 st. Eight voices in-phase keeps
+        // the octave-up clean and in tune.
+        shifter.prepare (sr, /*channels*/ 2, blockSize, /*grainMs*/ 100, /*voices*/ 8, /*jitterMs*/ 0.0f);
         shifter.setSemitones (12.0f);    // octave up
         shifter.reset();
 

@@ -9,7 +9,8 @@
 #include "StepSequencerGrid.h"
 #include "EqCurveDisplay.h"
 
-class NorcoastAmbienceEditor : public juce::AudioProcessorEditor
+class NorcoastAmbienceEditor : public juce::AudioProcessorEditor,
+                               private juce::Timer
 {
 public:
     explicit NorcoastAmbienceEditor (NorcoastAmbienceProcessor&);
@@ -107,6 +108,13 @@ private:
     // Bottom-strip backplane: a single rounded panel that frames the
     // 8-knob FX row + 8-fader mixer row.
     juce::Rectangle<int> mixerPanelBounds;
+
+    // Smoothed level-meter values for the 6 audio layer faders. Audio
+    // thread writes processor.layerLevels[i]; the editor's timer reads
+    // them, applies a 0.85-decay envelope, and the paint() routine
+    // draws a thin orange bar overlay inside each fader column.
+    std::array<float, 6> meterLevels { 0, 0, 0, 0, 0, 0 };
+    void timerCallback() override;
 
     // Top-half coloured-strip backgrounds — drawn in paint() to give
     // each control row its own section accent (matches the web app's

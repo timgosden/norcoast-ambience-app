@@ -318,19 +318,27 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     // main bus. Mute toggles ramp over 50 ms (configured in prepareToPlay)
     // so a click on the mute button doesn't actually click.
     auto sumLayerWithMute = [&] (juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear>& gain,
-                                 std::atomic<float>* muteParam)
+                                 std::atomic<float>* muteParam,
+                                 int meterIdx)
     {
         gain.setTargetValue (muteParam != nullptr && muteParam->load() > 0.5f ? 0.0f : 1.0f);
         auto* sL = layerScratch.getReadPointer (0);
         auto* sR = layerScratch.getReadPointer (1);
         auto* mL = buffer.getWritePointer (0);
         auto* mR = buffer.getNumChannels() > 1 ? buffer.getWritePointer (1) : mL;
+        float peak = 0.0f;
         for (int s = 0; s < n; ++s)
         {
             const float g = gain.getNextValue();
-            mL[s] += sL[s] * g;
-            mR[s] += sR[s] * g;
+            const float l = sL[s] * g;
+            const float r = sR[s] * g;
+            mL[s] += l;
+            mR[s] += r;
+            const float a = juce::jmax (std::abs (l), std::abs (r));
+            if (a > peak) peak = a;
         }
+        if (meterIdx >= 0 && meterIdx < (int) layerLevels.size())
+            layerLevels[(size_t) meterIdx].store (peak, std::memory_order_relaxed);
     };
 
     if (layerScratch.getNumSamples() < n)
@@ -340,7 +348,7 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     // receives the raw root note(s) only — no chord intervals.
     layerScratch.clear();
     foundationSynth.renderNextBlock (layerScratch, midi, 0, n);
-    sumLayerWithMute (muteFoundation, foundationMuteParam);
+    sumLayerWithMute (muteFoundation, foundationMuteParam, 0);    // Foundation
 
     // ─── Chord Evolve: augment user note-ons with chord intervals,
     // optionally cycle the chord type on a timer. Runs BEFORE
@@ -387,11 +395,11 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
     layerScratch.clear();
     padsSynth.renderNextBlock (layerScratch, midi, 0, n);
-    sumLayerWithMute (mutePads, padsMuteParam);
+    sumLayerWithMute (mutePads, padsMuteParam, 1);                // Anchor
 
     layerScratch.clear();
     padsSynth2.renderNextBlock (layerScratch, midi, 0, n);
-    sumLayerWithMute (mutePads2, pads2MuteParam);
+    sumLayerWithMute (mutePads2, pads2MuteParam, 2);              // Aurora
 
     // ─── Arpeggiator (additive — same FX chain as the pads) ───────────
     {
@@ -419,7 +427,7 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         arpeggiator.process (layerScratch, 0, n, heldNotesScratch,
                              arpVol, rate, bpm, octChoice, voice,
                              transportSamples, timeSig);
-        sumLayerWithMute (muteArp, arpMuteParam);
+        sumLayerWithMute (muteArp, arpMuteParam, 4);              // Arp
     }
 
     // ─── Drums (additive — same FX chain as the pads) ─────────────────
@@ -434,7 +442,7 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         drumMachine.process (layerScratch, 0, n, drumVol, patIdx, bpm,
                              loMask, mdMask, hhMask,
                              timeSig, transportSamples);
-        sumLayerWithMute (muteDrum, drumMuteParam);
+        sumLayerWithMute (muteDrum, drumMuteParam, 5);            // Movement
     }
 
     // ─── Texture (granular dulcimer — only fires while notes are held) ─
@@ -451,7 +459,7 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
             const bool octUp = textureOctUpParam->load() > 0.5f;
             texture.process (layerScratch, 0, n, heldNotesScratch, textureVol, octUp);
         }
-        sumLayerWithMute (muteTexture, textureMuteParam);
+        sumLayerWithMute (muteTexture, textureMuteParam, 3);      // Texture
     }
 
     // Snapshot params once per block.
@@ -565,11 +573,13 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     auto* R = buffer.getNumChannels() > 1 ? buffer.getWritePointer (1) : L;
 
     // ─── Juno chorus ──────────────────────────────────────────────────
+    // Depth bumped (was 2.5/3.0 ms) so the swirl is audible — the user
+    // reported the previous setting felt too subtle.
     {
-        const float chBaseL  = 0.007f  * (float) sr;
-        const float chBaseR  = 0.009f  * (float) sr;
-        const float chDepthL = 0.0025f * (float) sr;
-        const float chDepthR = 0.003f  * (float) sr;
+        const float chBaseL  = 0.008f  * (float) sr;
+        const float chBaseR  = 0.011f  * (float) sr;
+        const float chDepthL = 0.0050f * (float) sr;     // was 0.0025
+        const float chDepthR = 0.0060f * (float) sr;     // was 0.0030
         const float chMix = chorusMix * 0.5f;
 
         constexpr float panAngL = (-0.65f + 1.0f) * 0.25f * juce::MathConstants<float>::pi;
@@ -659,7 +669,9 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     // ─── Width LFO (master pan modulation, 0.3 Hz) ────────────────────
     if (widthMod > 1e-4f)
     {
-        const float depth = widthMod * 0.5f;   // ×0.5 internal scale (matches standalone)
+        // Internal scale 0.4 (was 0.5). User said 100% felt over-wide;
+        // 0.8× the previous depth makes the whole sweep more musical.
+        const float depth = widthMod * 0.4f;
         constexpr float halfPi = juce::MathConstants<float>::halfPi;
         for (int s = 0; s < n; ++s)
         {
@@ -695,17 +707,29 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         eqHigh.process  (ctx);
     }
 
-    // ─── Saturation (tanh soft-clip) ──────────────────────────────────
+    // ─── Saturation (tanh soft-clip + dark shelf) ────────────────────
+    // Drive scaled down (3.5 → 2.2) and a small high-shelf cut after
+    // the clip so the harmonics aren't ear-piercing at full crank.
     if (satAmt > 0.005f)
     {
-        const float k    = satAmt * 3.5f;
+        const float k    = satAmt * 2.2f;                 // was 3.5
         const float invN = 1.0f / std::tanh (k);
-        const float makeup = 1.0f - satAmt * 0.3f;
+        const float makeup = 1.0f - satAmt * 0.4f;        // pull back a bit more
         const float scale = invN * makeup;
+        // Simple one-pole low-pass to tame harmonics — coefficient
+        // chosen so cut depth scales with drive.
+        const float lpCoef = juce::jlimit (0.04f, 0.45f,
+                                            satAmt * 0.45f);
         for (int s = 0; s < n; ++s)
         {
-            L[s] = std::tanh (L[s] * k) * scale;
-            R[s] = std::tanh (R[s] * k) * scale;
+            const float satL = std::tanh (L[s] * k) * scale;
+            const float satR = std::tanh (R[s] * k) * scale;
+            // 1-pole LP smooth on the saturated signal — scales the
+            // dark-vs-bright character with drive amount.
+            satLpL += lpCoef * (satL - satLpL);
+            satLpR += lpCoef * (satR - satLpR);
+            L[s] = satLpL;
+            R[s] = satLpR;
         }
     }
 

@@ -138,6 +138,15 @@ private:
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> muteArp        { 1.0f };
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> muteDrum       { 1.0f };
 
+public:
+    // Per-layer peak amplitude for the GUI meters. Audio thread writes
+    // here at the end of each layer's render; the editor polls them at
+    // refresh rate and applies its own visual decay.
+    // Order: 0 = Foundation, 1 = Anchor, 2 = Aurora, 3 = Texture,
+    //        4 = Arp, 5 = Movement.
+    std::array<std::atomic<float>, 6> layerLevels {};
+private:
+
     // ─── Master FX chain ──────────────────────────────────────────────
     // Order: synth → chorus → delay → reverb → width LFO → saturation
     //              → EQ → master gain.
@@ -189,6 +198,10 @@ private:
 
     // Smoothed master gain so big fader moves don't pop.
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> masterGain;
+
+    // Saturation post-stage 1-pole low-pass state (tames bright tanh
+    // harmonics at high drive).
+    float satLpL = 0.0f, satLpR = 0.0f;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (NorcoastAmbienceProcessor)
 };
