@@ -360,10 +360,11 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     setupMute (arpMuteBtn,        arpMuteAttach,        ParamID::arpMute,        juce::Colour (0xffd46b8a));
     setupMute (drumMuteBtn,       drumMuteAttach,       ParamID::drumMute,       juce::Colour (0xffd46b8a));
 
-    // The Size and Feedback knobs were dropped from the FX row per
-    // request — keep the params alive (they still affect the audio at
-    // their saved values) but hide the controls.
-    for (auto* k : { &reverbSize, &delayFb, &delayTimeMs, &delayTone })
+    // The Size, Feedback, Mod, and delay character knobs were dropped
+    // from the FX row per request — keep the params alive (they still
+    // affect the audio at their saved values) but hide the controls.
+    for (auto* k : { &reverbSize, &reverbMod, &delayFb,
+                     &delayTimeMs, &delayTone })
     {
         k->label.setVisible (false);
         k->knob .setVisible (false);
@@ -527,11 +528,9 @@ void NorcoastAmbienceEditor::resized()
             out[(size_t) i] = r.removeFromLeft (colW).reduced (3, 0);
     };
 
-    // Top of mixer: 8 FX mix knobs (labels + rotary sliders). Layout
-    // mirrors the fader column directly below where it makes sense:
-    //   pos 7 (HPF)   sits above LPF — paired filter sweep.
-    //   pos 8 (Mod)   sits above Master — verb-mod is the most-tweaked
-    //                                     "character" knob during gigs.
+    // Top of mixer: 7 FX mix knobs (slot 8 above Master is intentionally
+    // empty per request). Slot 7 holds HPF so the paired filter sweep
+    // sits directly above the LPF fader.
     {
         auto knobsArea = mixerInner.removeFromTop (kKnobsRowHeight);
         std::array<juce::Rectangle<int>, 8> cols;
@@ -539,10 +538,11 @@ void NorcoastAmbienceEditor::resized()
 
         ParamKnob* fxKnobs[8] = {
             &reverbMix, &shimmerVol, &chorusMix, &delayMix,
-            &widthMod,  &satAmt,     &hpfFreq,   &reverbMod
+            &widthMod,  &satAmt,     &hpfFreq,   nullptr
         };
         for (int i = 0; i < 8; ++i)
         {
+            if (fxKnobs[i] == nullptr) continue;
             auto col = cols[(size_t) i];
             fxKnobs[i]->label.setBounds (col.removeFromTop (kKnobLabelH));
             fxKnobs[i]->knob .setBounds (col.reduced (2, 2));
