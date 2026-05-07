@@ -314,7 +314,9 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
         juce::Colour (0xff7eb6d4));    // arp blue
     drumPatternRow = std::make_unique<ChoiceButtonRow> (
         owner.getAPVTS(), ParamID::drumPattern,
-        juce::Colour (0xffd97171));    // drum red
+        juce::Colour (0xffe8a45e),     // movement orange
+        /*rowsHint*/ 1,
+        /*skipFirstN*/ 1);              // hide "Off" — fader mutes instead
     addAndMakeVisible (*arpVoiceRow);
     addAndMakeVisible (*drumPatternRow);
 
@@ -552,28 +554,37 @@ void NorcoastAmbienceEditor::resized()
 {
     auto bounds = getLocalBounds().reduced (16);
 
-    // ── Title strip: logo (drawn in paint), chord header, BPM, preset+stop ──
+    // ── Title strip: logo (drawn in paint), chord header, BPM, EQ,
+    // preset bar, Save / Load / Stop. Every button on this strip is
+    // the SAME height (kBtnH) and the same vertical inset, so the
+    // row reads as one tidy bar instead of three different sizes.
     {
-        auto title = bounds.removeFromTop (52);
-        title.removeFromLeft (60);
+        constexpr int kStripH    = 56;
+        constexpr int kBtnH      = 30;
+        constexpr int kBtnInsetV = (kStripH - kBtnH) / 2;   // centred vertically
+        constexpr int kBtnW      = 56;
+        constexpr int kGap       = 6;
 
-        auto right = title.removeFromRight (300).reduced (0, 10);
-        loadButton.setBounds (right.removeFromRight (44));
-        right.removeFromRight (4);
-        saveButton.setBounds (right.removeFromRight (44));
-        right.removeFromRight (6);
-        stopButton.setBounds (right.removeFromRight (52));
-        right.removeFromRight (8);
-        presetBox.setBounds (right);
+        auto title = bounds.removeFromTop (kStripH);
+        title.removeFromLeft (60);                           // logo space
 
-        // EQ toggle button — moved up here so its panel doesn't leave a
-        // dead row in the top half when collapsed.
-        eqToggleButton.setBounds (title.removeFromRight (60).reduced (0, 14));
-        title.removeFromRight (8);
+        auto right = title.removeFromRight (4 * kBtnW + 4 * kGap + 130 /*preset*/)
+                          .reduced (0, kBtnInsetV);
+        // Right-to-left: Stop · Save · Load · Preset.
+        stopButton.setBounds (right.removeFromRight (kBtnW));
+        right.removeFromRight (kGap);
+        saveButton.setBounds (right.removeFromRight (kBtnW));
+        right.removeFromRight (kGap);
+        loadButton.setBounds (right.removeFromRight (kBtnW));
+        right.removeFromRight (kGap);
+        presetBox.setBounds  (right);                        // remaining = preset
 
-        // BPM display: small label + inc/dec slider sandwiched between
-        // the chord header and the right-hand preset bar.
-        auto bpmArea = title.removeFromRight (140).reduced (0, 12);
+        title.removeFromRight (kGap);
+        eqToggleButton.setBounds (title.removeFromRight (kBtnW + 6).reduced (0, kBtnInsetV));
+        title.removeFromRight (kGap * 2);
+
+        // BPM display.
+        auto bpmArea = title.removeFromRight (140).reduced (0, kBtnInsetV);
         bpmLabel .setBounds (bpmArea.removeFromLeft (40));
         bpmSlider.setBounds (bpmArea);
 
@@ -688,6 +699,16 @@ void NorcoastAmbienceEditor::resized()
     // ── Top half (everything above the mixer slab) ──────────────────
     bounds.removeFromBottom (10);
 
+    // Pad keys (12-key root grid) — full width, sits at the top
+    // directly under the title strip so they're the first thing the
+    // player reaches for.
+    if (rootKeyRow != nullptr)
+    {
+        const int keyH = juce::jlimit (110, 160, bounds.getHeight() - 220);
+        rootKeyRow->setBounds (bounds.removeFromTop (keyH));
+        bounds.removeFromTop (8);
+    }
+
     // Helper: lay out a control strip and remember its bounds for paint().
     auto layoutStrip = [&] (juce::Rectangle<int>& outBounds, int height)
     {
@@ -800,10 +821,6 @@ void NorcoastAmbienceEditor::resized()
         eqRow = bounds.removeFromBottom (eqH);
         bounds.removeFromBottom (6);
     }
-
-    // Pad keys (12-key root grid) — full width, fills whatever vertical
-    // space is left between the ARP strip and the mixer / EQ row.
-    if (rootKeyRow != nullptr) rootKeyRow->setBounds (bounds);
 
     if (eqExpanded)
     {

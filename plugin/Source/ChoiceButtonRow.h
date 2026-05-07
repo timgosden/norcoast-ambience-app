@@ -9,16 +9,22 @@
 class ChoiceButtonRow : public juce::Component, private juce::Timer
 {
 public:
+    // skipFirstN — start the visible button list at index `skipFirstN`
+    // (used to hide a leading "Off" choice when the layer has its own
+    // mute / volume fader).
     ChoiceButtonRow (juce::AudioProcessorValueTreeState& s,
                      const juce::String& id,
                      juce::Colour accent = juce::Colour (NorcoastLookAndFeel::kAccent),
-                     int rowsHint = 1)
-        : apvts (s), paramID (id), accentColour (accent), numRows (juce::jmax (1, rowsHint))
+                     int rowsHint = 1,
+                     int skipFirstN = 0)
+        : apvts (s), paramID (id), accentColour (accent),
+          numRows (juce::jmax (1, rowsHint)),
+          firstVisible (juce::jmax (0, skipFirstN))
     {
         if (auto* choice = dynamic_cast<juce::AudioParameterChoice*> (s.getParameter (id)))
         {
             const auto& names = choice->choices;
-            for (int i = 0; i < names.size(); ++i)
+            for (int i = firstVisible; i < names.size(); ++i)
             {
                 auto* b = buttons.add (new juce::TextButton (names[i]));
                 b->setColour (juce::TextButton::buttonColourId,
@@ -57,7 +63,7 @@ private:
     {
         const int idx = (int) std::round (apvts.getRawParameterValue (paramID)->load());
         for (int i = 0; i < buttons.size(); ++i)
-            buttons[i]->setToggleState (i == idx, juce::dontSendNotification);
+            buttons[i]->setToggleState (i + firstVisible == idx, juce::dontSendNotification);
     }
 
     void selectIndex (int i)
@@ -72,6 +78,7 @@ private:
     juce::AudioProcessorValueTreeState& apvts;
     juce::String paramID;
     juce::Colour accentColour;
-    int          numRows = 1;
+    int          numRows      = 1;
+    int          firstVisible = 0;
     juce::OwnedArray<juce::TextButton> buttons;
 };

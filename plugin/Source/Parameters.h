@@ -210,9 +210,12 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
     add (std::make_unique<FloatParam> (juce::ParameterID { ParamID::drumVol, 1 },
                                         "Drums",
                                         NormRange { 0.0f, 1.0f, 0.001f }, 0.0f));
+    // "Off" stays in the param list for backwards compatibility with
+    // saved presets, but the editor hides it from the pill row — the
+    // Movement fader handles muting now. Default = Pulse (idx 1).
     layout.add (std::make_unique<juce::AudioParameterChoice> (
         juce::ParameterID { ParamID::drumPattern, 1 }, "Drum Pattern",
-        juce::StringArray { "Off", "Pulse", "Mist", "Stride", "Roam", "Custom" }, 0));
+        juce::StringArray { "Off", "Pulse", "Mist", "Stride", "Roam", "Custom" }, 1));
     layout.add (std::make_unique<juce::AudioParameterChoice> (
         juce::ParameterID { ParamID::timeSig, 1 }, "Time Sig",
         juce::StringArray { "4/4", "6/8" }, 0));
