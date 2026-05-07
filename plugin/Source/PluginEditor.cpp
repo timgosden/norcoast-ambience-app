@@ -5,7 +5,7 @@
 
 namespace
 {
-    constexpr int kKnobLabelH     = 18;
+    constexpr int kKnobLabelH     = 16;
     constexpr int kSectionPadX    = 12;
     constexpr int kSectionPadY    = 8;
     constexpr int kSectionHeaderH = 20;
@@ -48,7 +48,7 @@ void NorcoastAmbienceEditor::setupKnob (ParamKnob& k, const juce::String& displa
     k.knob.setRotaryParameters (juce::MathConstants<float>::pi * 1.25f,
                                 juce::MathConstants<float>::pi * 2.75f,
                                 true);
-    k.knob.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 64, 14);
+    k.knob.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 64, 18);
     k.knob.setLookAndFeel (&laf);
     addAndMakeVisible (k.knob);
 
@@ -433,7 +433,7 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
                      &arpVol, &drumVol, &lpfFreq, &masterVol })
     {
         k->knob.setSliderStyle (juce::Slider::LinearVertical);
-        k->knob.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 60, 14);
+        k->knob.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 60, 18);
     }
 
     // ── Mute buttons for the 6 audio layers ──────────────────────────

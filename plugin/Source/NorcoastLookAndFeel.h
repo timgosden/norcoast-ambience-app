@@ -85,14 +85,12 @@ public:
 
     juce::Font getLabelFont (juce::Label& label) override
     {
-        // ~+2px vs the JUCE default — the small knob/fader captions
-        // were uncomfortably tight to read on stage.
-        return juce::FontOptions ((float) label.getHeight() * 0.85f).withStyle ("Regular");
+        return juce::FontOptions ((float) label.getHeight() * 0.7f).withStyle ("Regular");
     }
 
     juce::Font getTextButtonFont (juce::TextButton&, int buttonHeight) override
     {
-        return juce::FontOptions ((float) buttonHeight * 0.55f).withStyle ("Regular");
+        return juce::FontOptions ((float) buttonHeight * 0.5f).withStyle ("Regular");
     }
 
     void drawButtonBackground (juce::Graphics& g, juce::Button& button,
