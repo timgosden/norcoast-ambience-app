@@ -76,6 +76,8 @@ private:
     std::atomic<float>* padsVol2Param         = nullptr;
     std::atomic<float>* textureVolParam       = nullptr;
     std::atomic<float>* foundationSubOctParam = nullptr;
+    std::atomic<float>* padsSubOctParam       = nullptr;
+    std::atomic<float>* pads2SubOctParam      = nullptr;
     std::atomic<float>* textureOctUpParam     = nullptr;
     std::atomic<float>* foundationMuteParam   = nullptr;
     std::atomic<float>* padsMuteParam         = nullptr;

@@ -97,6 +97,8 @@ NorcoastAmbienceProcessor::NorcoastAmbienceProcessor()
     padsVol2Param         = apvts.getRawParameterValue (ParamID::padsVol2);
     textureVolParam       = apvts.getRawParameterValue (ParamID::textureVol);
     foundationSubOctParam = apvts.getRawParameterValue (ParamID::foundationSubOct);
+    padsSubOctParam       = apvts.getRawParameterValue (ParamID::padsSubOct);
+    pads2SubOctParam      = apvts.getRawParameterValue (ParamID::pads2SubOct);
     textureOctUpParam     = apvts.getRawParameterValue (ParamID::textureOctUp);
     foundationMuteParam   = apvts.getRawParameterValue (ParamID::foundationMute);
     padsMuteParam         = apvts.getRawParameterValue (ParamID::padsMute);
@@ -152,11 +154,11 @@ NorcoastAmbienceProcessor::NorcoastAmbienceProcessor()
                                                 nullptr, nullptr,
                                                 nullptr));
         padsSynth      .addVoice (new PadVoice (padsConfig, padsVolParam,
-                                                nullptr,
+                                                padsSubOctParam,
                                                 nullptr, nullptr,
                                                 nullptr));
         padsSynth2     .addVoice (new PadVoice (padsConfig2, padsVol2Param,
-                                                nullptr,
+                                                pads2SubOctParam,
                                                 nullptr, nullptr,
                                                 nullptr));
     }

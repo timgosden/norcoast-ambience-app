@@ -61,21 +61,25 @@ private:
     std::unique_ptr<StepSequencerGrid> stepSequencer;  // 16-step drum grid
 
 
-    juce::TextButton  subOctButton     { "Sub Oct" };
-    juce::TextButton  textureOctButton { "Tex +Oct" };
-    juce::TextButton  evolveButton     { "Evolve" };
-    juce::TextButton  droneButton      { "Drone" };
+    // Per-layer octave toggles — one button each, sit above the
+    // matching fader column in the mixer for one-glance control.
+    juce::TextButton  subOctButton      { "-Oct" };     // Foundation sub
+    juce::TextButton  padsSubOctButton  { "-Oct" };     // Pads 1 sub
+    juce::TextButton  pads2SubOctButton { "-Oct" };     // Pads 2 sub
+    juce::TextButton  textureOctButton  { "+Oct" };     // Texture super
+    juce::TextButton  evolveButton      { "Evolve" };   // hidden; default on
+    juce::TextButton  droneButton       { "Drone" };    // hidden; default on
     std::unique_ptr<ButtonAttach> subOctAttach;
+    std::unique_ptr<ButtonAttach> padsSubOctAttach;
+    std::unique_ptr<ButtonAttach> pads2SubOctAttach;
     std::unique_ptr<ButtonAttach> textureOctAttach;
     std::unique_ptr<ButtonAttach> evolveAttach;
     std::unique_ptr<ButtonAttach> droneAttach;
 
-    // EQ / Custom Chord / Step Sequencer panels are collapsed by default.
+    // Custom Chord / Step Sequencer panels are collapsed by default.
     // Each toggle button flips the panel and triggers a re-layout.
-    juce::TextButton  eqToggleButton          { "EQ +" };
     juce::TextButton  customChordToggleButton { "Custom Chord +" };
     juce::TextButton  sequencerToggleButton   { "Sequencer +" };
-    bool              eqExpanded          = false;
     bool              customChordExpanded = false;
     bool              sequencerExpanded   = false;
 
@@ -136,13 +140,11 @@ private:
     ParamKnob reverbMix, shimmerVol, chorusMix;
     ParamKnob delayMix,  widthMod,   satAmt;
 
-    // ─── Other surfaced controls (top half) ──────────────────────────
-    // HPF knob now lives in the mixer above the LPF fader.
-    // Bars / Rate / Voice / Octave became button rows.
-    // Size / Mod / Tone / Feedback / Tempo Div are param-only (no UI
-    // surface; values still affect audio and persist in presets).
+    // ─── Other surfaced controls ─────────────────────────────────────
+    // HPF lives in the mixer above the LPF fader.
+    // EQ params still exist in APVTS (so saved presets keep loading)
+    // but they no longer have a UI surface — the user removed it.
     ParamKnob hpfFreq;
-    ParamKnob eqLow, eqLoMid, eqHiMid, eqHigh;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (NorcoastAmbienceEditor)
 };

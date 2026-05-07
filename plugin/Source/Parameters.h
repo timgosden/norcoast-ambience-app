@@ -12,6 +12,8 @@ namespace ParamID
     inline constexpr const char* padsVol2         = "padsVol2";       // alt pads layer
     inline constexpr const char* textureVol       = "textureVol";
     inline constexpr const char* foundationSubOct = "foundationSubOct";
+    inline constexpr const char* padsSubOct       = "padsSubOct";
+    inline constexpr const char* pads2SubOct      = "pads2SubOct";
     inline constexpr const char* textureOctUp     = "textureOctUp";
 
     // Per-layer mutes for the gigging mixer surface. A bool gate that
@@ -109,6 +111,10 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
 
     layout.add (std::make_unique<juce::AudioParameterBool> (
         juce::ParameterID { ParamID::foundationSubOct, 1 }, "Foundation Sub-Oct", true));
+    layout.add (std::make_unique<juce::AudioParameterBool> (
+        juce::ParameterID { ParamID::padsSubOct, 1 }, "Pads Sub-Oct",   false));
+    layout.add (std::make_unique<juce::AudioParameterBool> (
+        juce::ParameterID { ParamID::pads2SubOct, 1 }, "Pads 2 Sub-Oct", false));
     layout.add (std::make_unique<juce::AudioParameterBool> (
         juce::ParameterID { ParamID::textureOctUp, 1 }, "Texture +Oct", true));
 

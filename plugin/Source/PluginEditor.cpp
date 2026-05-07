@@ -119,15 +119,32 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
         owner.setStopped (stopButton.getToggleState());
     };
 
-    addAndMakeVisible (subOctButton);
-    subOctButton.setClickingTogglesState (true);
-    subOctAttach = std::make_unique<ButtonAttach> (
-        owner.getAPVTS(), ParamID::foundationSubOct, subOctButton);
-
-    addAndMakeVisible (textureOctButton);
-    textureOctButton.setClickingTogglesState (true);
-    textureOctAttach = std::make_unique<ButtonAttach> (
-        owner.getAPVTS(), ParamID::textureOctUp, textureOctButton);
+    // Per-layer octave toggles. setupOctToggle wires up label + APVTS
+    // attachment + accent colour in one call so all five rows are
+    // configured uniformly.
+    auto setupOctToggle = [this] (juce::TextButton& btn,
+                                  const juce::String& paramID,
+                                  std::unique_ptr<ButtonAttach>& attach,
+                                  juce::Colour accent)
+    {
+        addAndMakeVisible (btn);
+        btn.setClickingTogglesState (true);
+        btn.setColour (juce::TextButton::buttonColourId,
+                       juce::Colour (NorcoastLookAndFeel::kPanelBg));
+        btn.setColour (juce::TextButton::buttonOnColourId, accent);
+        btn.setColour (juce::TextButton::textColourOnId,
+                       juce::Colour (NorcoastLookAndFeel::kBg));
+        attach = std::make_unique<ButtonAttach> (
+            owner.getAPVTS(), paramID, btn);
+    };
+    setupOctToggle (subOctButton,      ParamID::foundationSubOct,
+                    subOctAttach,      juce::Colour (0xff5eb88a));   // foundation green
+    setupOctToggle (padsSubOctButton,  ParamID::padsSubOct,
+                    padsSubOctAttach,  juce::Colour (0xffc4915e));   // pads amber
+    setupOctToggle (pads2SubOctButton, ParamID::pads2SubOct,
+                    pads2SubOctAttach, juce::Colour (0xffe0d2a8));   // pads 2 cream
+    setupOctToggle (textureOctButton,  ParamID::textureOctUp,
+                    textureOctAttach,  juce::Colour (0xffa08060));   // texture tan
 
     addAndMakeVisible (evolveButton);
     evolveButton.setClickingTogglesState (true);
@@ -140,60 +157,40 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
         owner.getAPVTS(), ParamID::droneOn, droneButton);
 
     // ── Collapsible-panel toggle buttons ────────────────────────────────
-    // Each toggle button collapses or reveals its panel (EQ knobs,
-    // custom-chord degree pills, drum step sequencer). The
-    // visibility-list is captured by VALUE into the lambda (std::vector,
-    // not std::initializer_list — the latter doesn't own its storage and
-    // produced a dangling-pointer crash on click). Plain ASCII labels
-    // because some hosts rasterise the down-arrow glyph as mojibake.
+    // Custom-chord pills + drum step sequencer are collapsed by default;
+    // each toggle button flips a flag, sets the visible label, and
+    // triggers a re-layout. (EQ panel was removed; eq* params still
+    // exist for preset compat but have no UI surface.)
     auto setupToggle = [this] (juce::TextButton& btn,
                                const juce::String& labelOn,
                                const juce::String& labelOff,
                                juce::Colour onColour,
-                               bool* flagRefPtr,
-                               std::vector<ParamKnob*> knobsToHide)
+                               bool* flagRefPtr)
     {
         addAndMakeVisible (btn);
         btn.setClickingTogglesState (true);
         btn.setColour (juce::TextButton::buttonColourId,
                        juce::Colour (NorcoastLookAndFeel::kPanelBg));
         btn.setColour (juce::TextButton::buttonOnColourId, onColour.withAlpha (0.4f));
-        btn.onClick = [this, &btn, labelOn, labelOff, flagRefPtr, knobs = std::move (knobsToHide)]
+        btn.onClick = [this, &btn, labelOn, labelOff, flagRefPtr]
         {
             const bool open = btn.getToggleState();
             *flagRefPtr = open;
             btn.setButtonText (open ? labelOn : labelOff);
-            for (auto* k : knobs)
-            {
-                k->label.setVisible (open);
-                k->knob .setVisible (open);
-            }
             resized();
             repaint();
         };
     };
 
-    setupToggle (eqToggleButton, "EQ -", "EQ +",
-                 juce::Colour (0xffb07acc),
-                 &eqExpanded,
-                 { &eqLow, &eqLoMid, &eqHiMid, &eqHigh });
-    for (auto* k : { &eqLow, &eqLoMid, &eqHiMid, &eqHigh })
-    {
-        k->label.setVisible (false);
-        k->knob .setVisible (false);
-    }
-
     setupToggle (customChordToggleButton,
                  "Custom Chord -", "Custom Chord +",
                  juce::Colour (0xffc4915e),     // amber — chord-evolve accent
-                 &customChordExpanded,
-                 {});                           // customDegreesRow visibility set in resized()
+                 &customChordExpanded);
 
     setupToggle (sequencerToggleButton,
                  "Sequencer -", "Sequencer +",
                  juce::Colour (0xffe8a45e),     // orange — movement accent
-                 &sequencerExpanded,
-                 {});                           // stepSequencer visibility set in resized()
+                 &sequencerExpanded);
 
     // ── Preset bar ──────────────────────────────────────────────────────
     addAndMakeVisible (presetBox);
@@ -286,10 +283,9 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     lpfFreq.knob.updateText();
     hpfFreq.knob.updateText();
 
-    setupKnob (eqLow,         "Low",          ParamID::eqLow,    " dB");
-    setupKnob (eqLoMid,       "Lo-Mid",       ParamID::eqLoMid,  " dB");
-    setupKnob (eqHiMid,       "Hi-Mid",       ParamID::eqHiMid,  " dB");
-    setupKnob (eqHigh,        "High",         ParamID::eqHigh,   " dB");
+    // EQ knobs were dropped from the editor entirely (the user removed
+    // the panel). The eq* APVTS params still exist so saved presets
+    // load; the audio path keeps reading them.
 
     setupKnob (widthMod,      "Width",        ParamID::widthMod);
     setupKnob (satAmt,        "Saturation",   ParamID::satAmt);
@@ -406,7 +402,7 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     if (customDegreesRow != nullptr) customDegreesRow->setVisible (false);
     if (stepSequencer    != nullptr) stepSequencer   ->setVisible (false);
 
-    setSize (1100, 800);
+    setSize (1000, 720);
 
     // Give the qwerty keyboard focus so computer-keyboard keys map to MIDI.
     juce::MessageManager::callAsync ([safeThis = juce::Component::SafePointer (&qwertyKeyboard)]
@@ -425,7 +421,7 @@ NorcoastAmbienceEditor::~NorcoastAmbienceEditor()
                      &arpVol, &drumVol, &lpfFreq, &masterVol,
                      &reverbMix, &shimmerVol, &chorusMix,
                      &delayMix, &widthMod, &satAmt,
-                     &hpfFreq, &eqLow, &eqLoMid, &eqHiMid, &eqHigh })
+                     &hpfFreq })
         k->knob.setLookAndFeel (nullptr);
     bpmSlider.setLookAndFeel (nullptr);
 }
@@ -554,34 +550,35 @@ void NorcoastAmbienceEditor::resized()
 {
     auto bounds = getLocalBounds().reduced (16);
 
-    // ── Title strip: logo (drawn in paint), chord header, BPM, EQ,
+    // ── Title strip: logo (drawn in paint), chord header, BPM, time-sig,
     // preset bar, Save / Load / Stop. Every button on this strip is
-    // the SAME height (kBtnH) and the same vertical inset, so the
-    // row reads as one tidy bar instead of three different sizes.
+    // the SAME height (kBtnH) and the same vertical inset.
     {
         constexpr int kStripH    = 56;
         constexpr int kBtnH      = 30;
-        constexpr int kBtnInsetV = (kStripH - kBtnH) / 2;   // centred vertically
+        constexpr int kBtnInsetV = (kStripH - kBtnH) / 2;
         constexpr int kBtnW      = 56;
         constexpr int kGap       = 6;
 
         auto title = bounds.removeFromTop (kStripH);
         title.removeFromLeft (60);                           // logo space
 
-        auto right = title.removeFromRight (4 * kBtnW + 4 * kGap + 130 /*preset*/)
+        auto right = title.removeFromRight (3 * kBtnW + 3 * kGap + 110 /*preset*/)
                           .reduced (0, kBtnInsetV);
-        // Right-to-left: Stop · Save · Load · Preset.
         stopButton.setBounds (right.removeFromRight (kBtnW));
         right.removeFromRight (kGap);
         saveButton.setBounds (right.removeFromRight (kBtnW));
         right.removeFromRight (kGap);
         loadButton.setBounds (right.removeFromRight (kBtnW));
         right.removeFromRight (kGap);
-        presetBox.setBounds  (right);                        // remaining = preset
+        presetBox.setBounds  (right);
 
-        title.removeFromRight (kGap);
-        eqToggleButton.setBounds (title.removeFromRight (kBtnW + 6).reduced (0, kBtnInsetV));
         title.removeFromRight (kGap * 2);
+
+        // 4/4 vs 6/8 toggle next to BPM.
+        if (timeSigRow != nullptr)
+            timeSigRow->setBounds (title.removeFromRight (96).reduced (0, kBtnInsetV));
+        title.removeFromRight (kGap);
 
         // BPM display.
         auto bpmArea = title.removeFromRight (140).reduced (0, kBtnInsetV);
@@ -656,28 +653,28 @@ void NorcoastAmbienceEditor::resized()
             { &masterVol,     nullptr            }
         };
 
-        // Octave-toggle overlays: Sub Oct goes above the Foundation
-        // mute, Tex +Oct goes above the Texture mute. Reuses the
-        // column space that's otherwise empty above the mute pill so
-        // these toggles live near the layer they affect.
-        auto* octBtnPerCol = [&] () {
-            static juce::TextButton* arr[8] {
-                &subOctButton, nullptr, nullptr, &textureOctButton,
-                nullptr, nullptr, nullptr, nullptr
-            };
-            return arr;
-        }();
+        // Octave-toggle overlays — one button per layer column, sits
+        // above the mute pill so each layer's pitch shift lives right
+        // next to its volume control. Arp gets a tiny 3-pill row
+        // (-1/Mid/+1) instead of a single toggle since it's 3-state.
+        juce::TextButton* octBtnPerCol[8] {
+            &subOctButton, &padsSubOctButton, &pads2SubOctButton,
+            &textureOctButton, nullptr /*arp uses arpOctavesRow*/,
+            nullptr, nullptr, nullptr
+        };
 
         for (int i = 0; i < 8; ++i)
         {
             auto col = cols[(size_t) i];
             strips[i].fader->label.setBounds (col.removeFromTop (kKnobLabelH));
 
-            // Octave-toggle row (only Foundation + Texture columns)
+            // Octave-toggle row.
             const int octH = 18;
             auto octRow = col.removeFromTop (octH);
             if (octBtnPerCol[i] != nullptr)
                 octBtnPerCol[i]->setBounds (octRow.reduced (4, 1));
+            else if (i == 4 && arpOctavesRow != nullptr)
+                arpOctavesRow->setBounds (octRow.reduced (4, 1));
             col.removeFromTop (2);
 
             // Mute pill across the top of the fader column. Sits under
@@ -761,14 +758,13 @@ void NorcoastAmbienceEditor::resized()
     if (evolveBarsRow != nullptr) evolveBarsRow->setVisible (false);
 
     // ── DRUMS strip ──────────────────────────────────────────────────
+    // 4/4 vs 6/8 toggle moved up into the title bar so it lives next
+    // to BPM where time-related controls naturally cluster.
     {
         auto inner = layoutStrip (drumsStripBounds, 36);
-        labelInside (inner);                      // "DRUMS" painted in paint()
+        labelInside (inner);
         sequencerToggleButton.setBounds (inner.removeFromRight (110).reduced (2, 4));
         inner.removeFromRight (8);
-        if (timeSigRow != nullptr)
-            timeSigRow->setBounds (inner.removeFromRight (90).reduced (2, 2));
-        inner.removeFromRight (6);
         if (drumPatternRow != nullptr)
             drumPatternRow->setBounds (inner.reduced (0, 2));
     }
@@ -788,51 +784,21 @@ void NorcoastAmbienceEditor::resized()
     }
 
     // ── ARP strip ────────────────────────────────────────────────────
-    // [ ARP ] [ Voice 3-pill ] [ Oct -1/Mid/+1 ] [ Rate 5-pill ]
-    // All children are full-height button rows so they line up with
-    // the chord-pool / drum-pattern rows above.
+    // [ ARP ] [ Voice 3-pill ............ ] [ Rate 5-pill ............ ]
+    // Octaves moved over the Arp fader column in the mixer below.
     {
         auto inner = layoutStrip (arpStripBounds, 36);
         labelInside (inner);
-        const int third = inner.getWidth() / 3;
+        const int half = inner.getWidth() / 2;
         if (arpVoiceRow != nullptr)
-            arpVoiceRow->setBounds (inner.removeFromLeft (third).reduced (0, 2));
-        inner.removeFromLeft (4);
-        if (arpOctavesRow != nullptr)
-            arpOctavesRow->setBounds (inner.removeFromLeft (third).reduced (0, 2));
-        inner.removeFromLeft (4);
+            arpVoiceRow->setBounds (inner.removeFromLeft (half).reduced (0, 2));
+        inner.removeFromLeft (6);
         if (arpRateRow != nullptr)
             arpRateRow->setBounds (inner.reduced (0, 2));
     }
     bounds.removeFromTop (2);
-
-    // (LAYERS strip removed — Sub Oct / Tex +Oct moved into the mixer
-    // above their fader columns, EQ toggle moved up into the title bar.)
-
-    bounds.removeFromTop (6);
-
-    // EQ knobs row — when expanded, takes a band off the BOTTOM of the
-    // top half (just above the mixer) so it doesn't push the keys
-    // around.
-    juce::Rectangle<int> eqRow;
-    if (eqExpanded)
-    {
-        const int eqH = juce::jmin (76, juce::jmax (40, bounds.getHeight() - 80));
-        eqRow = bounds.removeFromBottom (eqH);
-        bounds.removeFromBottom (6);
-    }
-
-    if (eqExpanded)
-    {
-        const int colW = eqRow.getWidth() / 4;
-        ParamKnob* eqs[4] = { &eqLow, &eqLoMid, &eqHiMid, &eqHigh };
-        for (auto* eq : eqs)
-        {
-            auto col = eqRow.removeFromLeft (colW);
-            eq->label.setBounds (col.removeFromTop (kKnobLabelH));
-            eq->knob .setBounds (col.reduced (4, 2));
-        }
-    }
+    // (EQ panel removed; eq* params still drive audio at their stored
+    // values but no longer have a UI surface.)
 
     // Park the invisible qwerty-keyboard 1×1 in the bottom-right corner.
     qwertyKeyboard.setBounds (getWidth() - 2, getHeight() - 2, 1, 1);
