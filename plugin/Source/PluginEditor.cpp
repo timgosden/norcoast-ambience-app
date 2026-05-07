@@ -493,7 +493,7 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     // Arp octaves as a 3-pill button row (-1 / Mid / +1 shift).
     arpOctavesRow = std::make_unique<ChoiceButtonRow> (
         owner.getAPVTS(), ParamID::arpOctaves,
-        juce::Colour (0xff7eb6d4));
+        juce::Colour (0xff9b7fd4));   // ARP purple — matches the strip
     addAndMakeVisible (*arpOctavesRow);
 
     setupKnob (drumVol,       "Movement",     ParamID::drumVol);
@@ -504,7 +504,7 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     // for short discrete choices).
     arpVoiceRow    = std::make_unique<ChoiceButtonRow> (
         owner.getAPVTS(), ParamID::arpVoice,
-        juce::Colour (0xff7eb6d4));    // arp blue
+        juce::Colour (0xff9b7fd4));    // ARP purple — uniform with strip
     drumPatternRow = std::make_unique<ChoiceButtonRow> (
         owner.getAPVTS(), ParamID::drumPattern,
         juce::Colour (0xff5eb88a),     // movement green (matches strip)
@@ -1059,10 +1059,13 @@ void NorcoastAmbienceEditor::paint (juce::Graphics& g)
             auto knobs = r.withHeight (kKnobsHeight + 16.0f).reduced (8.0f, 4.0f);
             g.setColour (juce::Colour (0xff0c1019).withAlpha (0.92f));
             g.fillRoundedRectangle (knobs, 10.0f);
-            g.setColour (juce::Colour (0xff242a36));
-            g.drawRoundedRectangle (knobs, 10.0f, 1.0f);
+            // FX border in accent orange — the colour-scheme rule is
+            // FX = orange, so the rack identifies as orange-bordered
+            // even though the slate fill matches the surrounding mixer.
+            g.setColour (juce::Colour (NorcoastLookAndFeel::kAccent).withAlpha (0.45f));
+            g.drawRoundedRectangle (knobs, 10.0f, 1.2f);
 
-            g.setColour (juce::Colour (NorcoastLookAndFeel::kAccent).withAlpha (0.55f));
+            g.setColour (juce::Colour (NorcoastLookAndFeel::kAccent).withAlpha (0.7f));
             g.setFont (juce::FontOptions (10.0f).withStyle ("Bold"));
             g.drawText ("FX", knobs.toNearestInt().reduced (10, 6).withHeight (12),
                         juce::Justification::topLeft);
