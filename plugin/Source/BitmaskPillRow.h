@@ -37,6 +37,15 @@ public:
 
     ~BitmaskPillRow() override { stopTimer(); }
 
+    // Allow callers to relabel a pill at runtime (used for the Custom
+    // Chord row where each degree's note name follows the home root).
+    void setLabel (int i, const juce::String& text)
+    {
+        if (auto* b = buttons[i])
+            if (b->getButtonText() != text)
+                b->setButtonText (text);
+    }
+
     void resized() override
     {
         if (buttons.isEmpty()) return;

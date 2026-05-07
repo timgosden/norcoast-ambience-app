@@ -165,8 +165,17 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
 
     addAndMakeVisible (evolveButton);
     evolveButton.setClickingTogglesState (true);
+    evolveButton.setColour (juce::TextButton::buttonColourId,
+                            juce::Colour (NorcoastLookAndFeel::kPanelBg));
+    evolveButton.setColour (juce::TextButton::buttonOnColourId,
+                            juce::Colour (0xffc4915e));   // chord-evolve amber
+    evolveButton.setColour (juce::TextButton::textColourOnId,
+                            juce::Colour (NorcoastLookAndFeel::kBg));
+    evolveButton.setTooltip ("Evolve: auto-cycle through enabled chord types every N bars.");
     evolveAttach = std::make_unique<ButtonAttach> (
         owner.getAPVTS(), ParamID::evolveOn, evolveButton);
+    // Hidden by default; revealed when the user opens the Advanced panel.
+    evolveButton.setVisible (false);
 
     addAndMakeVisible (droneButton);
     droneButton.setClickingTogglesState (true);
@@ -399,6 +408,10 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
             b->setVisible (! advExpanded);
         if (arpOctavesRow != nullptr)
             arpOctavesRow->setVisible (! advExpanded);
+        lpfHzLabel.setVisible (! advExpanded);
+        // Evolve On/Off lives on the Advanced surface — hidden on the
+        // mixer view, visible when Advanced is open.
+        evolveButton.setVisible (advExpanded);
         resized();
         repaint();
     };
@@ -517,6 +530,16 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     setupMute (arpMuteBtn,        arpMuteAttach,        ParamID::arpMute,        juce::Colour (0xffd46b8a));
     setupMute (drumMuteBtn,       drumMuteAttach,       ParamID::drumMute,       juce::Colour (0xffd46b8a));
 
+    // ── LPF Hz indicator ─────────────────────────────────────────────
+    // Sits in the slot above the LPF fader where every other column has
+    // its octave-toggle button. Live-updated from the LPF slider value.
+    addAndMakeVisible (lpfHzLabel);
+    lpfHzLabel.setJustificationType (juce::Justification::centred);
+    lpfHzLabel.setColour (juce::Label::textColourId,
+                          juce::Colour (NorcoastLookAndFeel::kAccent));
+    lpfHzLabel.setInterceptsMouseClicks (false, false);
+    lpfHzLabel.setText ("--", juce::dontSendNotification);
+
     // (Param-only knobs from earlier UI revisions have been removed
     // from the editor entirely; their APVTS params still drive the
     // audio at their stored values.)
@@ -574,6 +597,42 @@ void NorcoastAmbienceEditor::timerCallback()
         }
     }
     if (changed) repaint();
+
+    // Live LPF Hz readout above the fader — same Hz/kHz mapping as the
+    // slider's textFromValueFunction.
+    {
+        const float v = (float) lpfFreq.knob.getValue();
+        const float hz = std::exp (4.6051702f + (v * v) * 5.298375f);
+        const juce::String txt = hz < 1000.0f
+            ? juce::String ((int) hz) + " Hz"
+            : juce::String (hz / 1000.0f, 1) + " kHz";
+        if (lpfHzLabel.getText() != txt)
+            lpfHzLabel.setText (txt, juce::dontSendNotification);
+    }
+
+    // Custom-chord pill labels follow the home root: 1·C, 2·D, 3·E, …
+    // Major-scale semitone offsets from root.
+    if (customDegreesRow != nullptr)
+    {
+        const int rootIdx = juce::jlimit (0, 11,
+            (int) owner.getAPVTS().getRawParameterValue (ParamID::homeRoot)->load());
+        if (rootIdx != lastHomeRootForLabels)
+        {
+            static const char* kNoteNames[12] = {
+                "C", "Db", "D", "Eb", "E", "F",
+                "Gb", "G", "Ab", "A", "Bb", "B"
+            };
+            static const int kMajorOffsets[7] = { 0, 2, 4, 5, 7, 9, 11 };
+            for (int i = 0; i < 7; ++i)
+            {
+                const int n = (rootIdx + kMajorOffsets[i]) % 12;
+                customDegreesRow->setLabel (i,
+                    juce::String (i + 1) + juce::String::fromUTF8 (" \xc2\xb7 ")
+                                         + kNoteNames[n]);
+            }
+            lastHomeRootForLabels = rootIdx;
+        }
+    }
 }
 
 NorcoastAmbienceEditor::~NorcoastAmbienceEditor()
@@ -878,8 +937,16 @@ void NorcoastAmbienceEditor::resized()
             knobs[i]->label.setBounds (c.removeFromTop (kKnobLabelH));
             knobs[i]->knob .setBounds (c.reduced (4, 4));
         }
-        if (evolveBarsRow != nullptr)
-            evolveBarsRow->setBounds (barsArea.reduced (0, 2));
+        // Evolve On/Off pill sits at the head of the bars row so the
+        // toggle is right next to the bars choice that depends on it.
+        {
+            auto evRow = barsArea;
+            auto evToggle = evRow.removeFromLeft (90);
+            evRow.removeFromLeft (8);
+            evolveButton.setBounds (evToggle.reduced (2, 2));
+            if (evolveBarsRow != nullptr)
+                evolveBarsRow->setBounds (evRow.reduced (0, 2));
+        }
 
         if (eqCurve != nullptr)
             eqCurve->setBounds (adv.reduced (0, 4));
@@ -963,6 +1030,8 @@ void NorcoastAmbienceEditor::resized()
                 octBtnPerCol[i]->setBounds (octRow.reduced (4, 2));
             else if (i == 4 && arpOctavesRow != nullptr)
                 arpOctavesRow->setBounds (octRow.reduced (4, 2));
+            else if (i == 6)
+                lpfHzLabel.setBounds (octRow.reduced (2, 2));
             col.removeFromTop (3);
 
             // Mute pill across the top of the fader column. Sits under
@@ -1044,7 +1113,8 @@ void NorcoastAmbienceEditor::resized()
     // params still exist and are reachable from the host's automation
     // panel, but the gigging surface doesn't need them.
     droneButton  .setVisible (false);
-    evolveButton .setVisible (false);
+    // evolveButton visibility is owned by the advButton click handler
+    // so opening Advanced surfaces it next to the bars row.
     if (evolveBarsRow != nullptr) evolveBarsRow->setVisible (advExpanded);    // visible on Advanced
 
     // ── DRUMS strip ──────────────────────────────────────────────────
@@ -1069,13 +1139,24 @@ void NorcoastAmbienceEditor::resized()
         stepSequencer->setVisible (sequencerExpanded);
         if (sequencerExpanded)
         {
-            // Reserve room for: ARP strip (40) + spacing (10) + key
-            // grid (~140) + EQ row when open (78) below the sequencer.
-            const int reserveBelow = 40 + 10 + 140 + (eqCurve != nullptr && eqCurve->isVisible() ? 0 : 0);
-            const int seqH = juce::jmax (60,
-                              juce::jmin (96, bounds.getHeight() - reserveBelow));
-            stepSequencer->setBounds (bounds.removeFromTop (seqH).reduced (12, 0));
-            bounds.removeFromTop (4);
+            // Earlier this reserve included the root-key grid (already
+            // taken from the top of `bounds` above), which left
+            // bounds.getHeight() - reserveBelow negative on smaller
+            // window sizes — the jmax(60, …) then forced 60 px of
+            // sequencer to push the ARP strip below the visible area.
+            //
+            // The actual layout below the sequencer is just the ARP
+            // strip (40) plus its 2 px gap. Reserve exactly that and
+            // let jmax(0, …) collapse the sequencer to nothing rather
+            // than overflow when space is tight.
+            const int reserveBelow = 40 + 2;
+            const int avail = juce::jmax (0, bounds.getHeight() - reserveBelow);
+            const int seqH  = juce::jmin (96, avail);
+            if (seqH > 0)
+            {
+                stepSequencer->setBounds (bounds.removeFromTop (seqH).reduced (12, 0));
+                bounds.removeFromTop (juce::jmin (4, juce::jmax (0, bounds.getHeight() - reserveBelow)));
+            }
         }
     }
 

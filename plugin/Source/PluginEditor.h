@@ -121,6 +121,15 @@ private:
     std::array<float, 6> meterLevels { 0, 0, 0, 0, 0, 0 };
     void timerCallback() override;
 
+    // Live Hz/kHz readout above the LPF fader column — fills the slot
+    // where the other layer columns show their octave toggle. Updated
+    // from the LPF slider value in timerCallback().
+    juce::Label lpfHzLabel;
+
+    // Cached last home-root index; used to relabel the Custom Chord
+    // pills (1·C, 2·D, …) only when the root actually changes.
+    int lastHomeRootForLabels = -1;
+
     // Slider drag tracking — when a fader is being dragged, paint a
     // floating "-X.X dB" readout above its thumb (same UX as the EQ
     // band-node drag readout).
