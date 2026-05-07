@@ -716,6 +716,19 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         R[s] *= g;
     }
 
+    // ─── Hard safety limiter ──────────────────────────────────────────
+    // Last-line defence against any future bug producing a runaway peak
+    // (e.g. a feedback loop, NaN cascade, or accidental gain explosion).
+    // Anything past ±2.0 (≈ +6 dB above unity) gets clamped — protects
+    // monitors and ears even if upstream DSP misbehaves.
+    for (int s = 0; s < n; ++s)
+    {
+        L[s] = juce::jlimit (-2.0f, 2.0f, L[s]);
+        R[s] = juce::jlimit (-2.0f, 2.0f, R[s]);
+        if (! std::isfinite (L[s])) L[s] = 0.0f;
+        if (! std::isfinite (R[s])) R[s] = 0.0f;
+    }
+
     // Advance the shared transport clock for the next block. All grid-locked
     // modules (arp, drums, evolve) read this at block-start and stay phase
     // aligned with each other regardless of when notes are pressed.

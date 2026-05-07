@@ -141,35 +141,33 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
 
     // ── Collapsible-panel toggle buttons ────────────────────────────────
     // Each toggle button collapses or reveals its panel (EQ knobs,
-    // custom-chord degree pills, drum step sequencer). Plain ASCII
-    // labels because some hosts rasterise the down-arrow glyph as
-    // mojibake.
+    // custom-chord degree pills, drum step sequencer). The
+    // visibility-list is captured by VALUE into the lambda (std::vector,
+    // not std::initializer_list — the latter doesn't own its storage and
+    // produced a dangling-pointer crash on click). Plain ASCII labels
+    // because some hosts rasterise the down-arrow glyph as mojibake.
     auto setupToggle = [this] (juce::TextButton& btn,
                                const juce::String& labelOn,
                                const juce::String& labelOff,
                                juce::Colour onColour,
-                               bool& flagRef,
-                               std::initializer_list<ParamKnob*> knobsToHide,
-                               std::initializer_list<juce::Component*> compsToHide,
-                               std::function<void()> extraReset = {})
+                               bool* flagRefPtr,
+                               std::vector<ParamKnob*> knobsToHide)
     {
         addAndMakeVisible (btn);
         btn.setClickingTogglesState (true);
         btn.setColour (juce::TextButton::buttonColourId,
                        juce::Colour (NorcoastLookAndFeel::kPanelBg));
         btn.setColour (juce::TextButton::buttonOnColourId, onColour.withAlpha (0.4f));
-        btn.onClick = [this, &btn, labelOn, labelOff, &flagRef, knobsToHide, compsToHide, extraReset]
+        btn.onClick = [this, &btn, labelOn, labelOff, flagRefPtr, knobs = std::move (knobsToHide)]
         {
-            flagRef = btn.getToggleState();
-            btn.setButtonText (flagRef ? labelOn : labelOff);
-            for (auto* k : knobsToHide)
+            const bool open = btn.getToggleState();
+            *flagRefPtr = open;
+            btn.setButtonText (open ? labelOn : labelOff);
+            for (auto* k : knobs)
             {
-                k->label.setVisible (flagRef);
-                k->knob .setVisible (flagRef);
+                k->label.setVisible (open);
+                k->knob .setVisible (open);
             }
-            for (auto* c : compsToHide)
-                if (c != nullptr) c->setVisible (flagRef);
-            if (extraReset) extraReset();
             resized();
             repaint();
         };
@@ -177,9 +175,8 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
 
     setupToggle (eqToggleButton, "EQ -", "EQ +",
                  juce::Colour (0xffb07acc),
-                 eqExpanded,
-                 { &eqLow, &eqLoMid, &eqHiMid, &eqHigh },
-                 {});
+                 &eqExpanded,
+                 { &eqLow, &eqLoMid, &eqHiMid, &eqHigh });
     for (auto* k : { &eqLow, &eqLoMid, &eqHiMid, &eqHigh })
     {
         k->label.setVisible (false);
@@ -189,16 +186,14 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     setupToggle (customChordToggleButton,
                  "Custom Chord -", "Custom Chord +",
                  juce::Colour (0xffc4915e),     // amber — chord-evolve accent
-                 customChordExpanded,
-                 {},
-                 {});                           // customDegreesRow toggled in resized()
+                 &customChordExpanded,
+                 {});                           // customDegreesRow visibility set in resized()
 
     setupToggle (sequencerToggleButton,
                  "Sequencer -", "Sequencer +",
-                 juce::Colour (0xffe8a45e),     // orange — drums accent
-                 sequencerExpanded,
-                 {},
-                 {});                           // stepSequencer toggled in resized()
+                 juce::Colour (0xffe8a45e),     // orange — movement accent
+                 &sequencerExpanded,
+                 {});                           // stepSequencer visibility set in resized()
 
     // ── Preset bar ──────────────────────────────────────────────────────
     addAndMakeVisible (presetBox);
@@ -256,10 +251,11 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
         /* alwaysOnBit = */ 0);
     addAndMakeVisible (*customDegreesRow);
 
-    // 12-key root grid (full-width row at the bottom of the editor).
+    // 12-key root grid — 3 rows of 4 (C/Db/D/Eb · E/F/Gb/G · Ab/A/Bb/B).
     rootKeyRow = std::make_unique<ChoiceButtonRow> (
         owner.getAPVTS(), ParamID::homeRoot,
-        juce::Colour (NorcoastLookAndFeel::kAccent));
+        juce::Colour (NorcoastLookAndFeel::kAccent),
+        /*rowsHint*/ 3);
     addAndMakeVisible (*rootKeyRow);
 
     // 16-step drum sequencer.
@@ -342,6 +338,8 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     addAndMakeVisible (*arpOctavesRow);
 
     setupKnob (drumVol,       "Movement",     ParamID::drumVol);
+    // Mute button label below the fader already says "M"; the fader
+    // label says "Movement" so the strip self-identifies on stage.
 
     // Voice / Pattern pickers as pill button rows (knobs are awkward
     // for short discrete choices).
@@ -550,7 +548,7 @@ void NorcoastAmbienceEditor::paint (juce::Graphics& g)
                     juce::Justification::centredLeft);
     };
     paintStrip (evolveStripBounds, juce::Colour (0xffc4915e), "EVOLVE");
-    paintStrip (drumsStripBounds,  juce::Colour (0xffe8a45e), "DRUMS");
+    paintStrip (drumsStripBounds,  juce::Colour (0xffe8a45e), "MOVEMENT");
     paintStrip (arpStripBounds,    juce::Colour (0xff9b7fd4), "ARP");
     paintStrip (layersStripBounds, juce::Colour (0xff5eb88a), "LAYERS");
 
@@ -685,9 +683,9 @@ void NorcoastAmbienceEditor::resized()
     // ── Top half (everything above the mixer slab) ──────────────────
     bounds.removeFromBottom (10);
 
-    // 12-key root grid (full width).
+    // 12-key root grid — 3 rows × 4 columns of chunky chord pads.
     {
-        auto keyRow = bounds.removeFromTop (44);
+        auto keyRow = bounds.removeFromTop (132);    // 3 rows × 44 px
         if (rootKeyRow != nullptr) rootKeyRow->setBounds (keyRow);
     }
     bounds.removeFromTop (8);

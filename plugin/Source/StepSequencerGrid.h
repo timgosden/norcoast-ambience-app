@@ -46,9 +46,16 @@ public:
 
         const bool isCustom = (int) apvts.getRawParameterValue (ParamID::drumPattern)->load() == 5;
 
+        // Time signature: 4/4 → 16 steps grouped by 4; 6/8 → 12 steps
+        // grouped by 3. Read once per repaint so the grid swaps live
+        // when the user flips the toggle on the DRUMS strip.
+        const bool is68    = (int) apvts.getRawParameterValue (ParamID::timeSig)->load() == 1;
+        const int  nSteps  = is68 ? 12 : 16;
+        const int  group   = is68 ? 3  : 4;
+
         const auto cells = getCellArea();
         const float labelW = (float) kLabelWidth;
-        const float cellW  = (cells.getWidth() - labelW) / 16.0f;
+        const float cellW  = (cells.getWidth() - labelW) / (float) nSteps;
         const float cellH  = cells.getHeight() / 3.0f;
 
         // Row labels
@@ -65,7 +72,7 @@ public:
         // Cells
         for (int row = 0; row < 3; ++row)
         {
-            for (int step = 0; step < 16; ++step)
+            for (int step = 0; step < nSteps; ++step)
             {
                 const float x = cells.getX() + labelW + step * cellW;
                 const float y = cells.getY() + row * cellH;
@@ -88,8 +95,8 @@ public:
                     g.drawRoundedRectangle (cellBox, 2.0f, 0.5f);
                 }
 
-                // Beat divider — every 4 steps a slightly stronger gap.
-                if (step > 0 && step % 4 == 0 && row == 0)
+                // Beat divider — separates groups of 3 (6/8) or 4 (4/4).
+                if (step > 0 && step % group == 0 && row == 0)
                 {
                     g.setColour (juce::Colour (0x55ffffff));
                     g.drawVerticalLine ((int) x,
@@ -133,13 +140,15 @@ private:
     {
         const auto cells = getCellArea();
         if (! cells.contains (p)) return { -1, -1 };
+        const bool is68    = (int) apvts.getRawParameterValue (ParamID::timeSig)->load() == 1;
+        const int  nSteps  = is68 ? 12 : 16;
         const float labelW = (float) kLabelWidth;
-        const float cellW  = (cells.getWidth() - labelW) / 16.0f;
+        const float cellW  = (cells.getWidth() - labelW) / (float) nSteps;
         const float cellH  = cells.getHeight() / 3.0f;
         const float x = p.x - cells.getX() - labelW;
         const float y = p.y - cells.getY();
         if (x < 0) return { -1, -1 };
-        const int step = juce::jlimit (0, 15, (int) (x / cellW));
+        const int step = juce::jlimit (0, nSteps - 1, (int) (x / cellW));
         const int row  = juce::jlimit (0, 2,  (int) (y / cellH));
         return { step, row };
     }

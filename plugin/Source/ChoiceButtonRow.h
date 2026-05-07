@@ -11,8 +11,9 @@ class ChoiceButtonRow : public juce::Component, private juce::Timer
 public:
     ChoiceButtonRow (juce::AudioProcessorValueTreeState& s,
                      const juce::String& id,
-                     juce::Colour accent = juce::Colour (NorcoastLookAndFeel::kAccent))
-        : apvts (s), paramID (id), accentColour (accent)
+                     juce::Colour accent = juce::Colour (NorcoastLookAndFeel::kAccent),
+                     int rowsHint = 1)
+        : apvts (s), paramID (id), accentColour (accent), numRows (juce::jmax (1, rowsHint))
     {
         if (auto* choice = dynamic_cast<juce::AudioParameterChoice*> (s.getParameter (id)))
         {
@@ -38,10 +39,17 @@ public:
     void resized() override
     {
         if (buttons.isEmpty()) return;
-        const int n = buttons.size();
-        const int w = getWidth() / n;
+        const int n  = buttons.size();
+        const int rows = juce::jmin (numRows, n);
+        const int cols = (n + rows - 1) / rows;
+        const int w = getWidth()  / juce::jmax (1, cols);
+        const int h = getHeight() / juce::jmax (1, rows);
         for (int i = 0; i < n; ++i)
-            buttons[i]->setBounds (i * w, 0, w - 2, getHeight());
+        {
+            const int r = i / cols;
+            const int c = i % cols;
+            buttons[i]->setBounds (c * w, r * h, w - 2, h - 2);
+        }
     }
 
 private:
@@ -64,5 +72,6 @@ private:
     juce::AudioProcessorValueTreeState& apvts;
     juce::String paramID;
     juce::Colour accentColour;
+    int          numRows = 1;
     juce::OwnedArray<juce::TextButton> buttons;
 };
