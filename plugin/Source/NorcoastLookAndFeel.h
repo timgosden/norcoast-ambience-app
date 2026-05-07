@@ -32,7 +32,12 @@ public:
         setColour (juce::TextButton::buttonColourId,          juce::Colour (kPanelBg));
         setColour (juce::TextButton::buttonOnColourId,        juce::Colour (kAccent));
         setColour (juce::TextButton::textColourOnId,          juce::Colour (kBg));
-        setColour (juce::TextButton::textColourOffId,         juce::Colour (kAccent));
+        // Default off-state button text is dim white — was kAccent
+        // (orange) which made toggle states ambiguous because most
+        // on-state buttons also use accent for their on colour. Now
+        // toggling clearly switches dim-white → accent.
+        setColour (juce::TextButton::textColourOffId,
+                   juce::Colour (0xffd6dae6).withAlpha (0.55f));
 
         setColour (juce::ComboBox::outlineColourId,           juce::Colour (kPanelEdge));
     }
