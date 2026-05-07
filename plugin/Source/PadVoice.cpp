@@ -89,12 +89,12 @@ void PadVoice::startNote (int midiNoteNumber, float velocity,
     subOctGain  .setCurrentAndTargetValue (subOnNow);
     superOctGain.setCurrentAndTargetValue (superOnNow);
 
-    // Layer-volume smoother — ramped over 30 ms so a preset recall
-    // glides the layer's amplitude into place. On note-start we
-    // initialise to whatever the param is right now so existing notes
-    // don't get an audible attack just from a preset edit.
+    // Layer-volume smoother — ramped over 250 ms so preset switches
+    // crossfade the layer amplitudes into place over a quarter-second.
+    // On note-start we initialise to whatever the param is right now
+    // so existing notes don't get an audible attack from a preset edit.
     const float gainNow = layerGainParam != nullptr ? layerGainParam->load() : 1.0f;
-    layerGainSmoothed.reset (sr, 0.03);
+    layerGainSmoothed.reset (sr, 0.25);
     layerGainSmoothed.setCurrentAndTargetValue (gainNow);
 
     int idx = 0;

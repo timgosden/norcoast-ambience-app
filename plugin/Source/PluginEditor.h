@@ -63,7 +63,6 @@ private:
     std::unique_ptr<ChoiceButtonRow> arpVoiceRow;
     std::unique_ptr<ChoiceButtonRow> arpOctavesRow;
     std::unique_ptr<ChoiceButtonRow> arpRateRow;        // ⏯ rate as buttons not knob
-    std::unique_ptr<ChoiceButtonRow> arpPatternRow;     // Up / Down / UpDown / Random — Adv only
     std::unique_ptr<ChoiceButtonRow> evolveBarsRow;     // bars as buttons not knob
     std::unique_ptr<ChoiceButtonRow> drumPatternRow;
     std::unique_ptr<BitmaskPillRow>  chordPoolRow;     // EVOLVE chord-pool toggles
@@ -177,6 +176,10 @@ private:
     juce::Rectangle<int> evolveStripBounds;
     juce::Rectangle<int> drumsStripBounds;
     juce::Rectangle<int> arpStripBounds;
+
+    // Painted text for the chord-evolve bars label on Advanced. Stored
+    // so paint() can stamp the heading right next to the bars row.
+    juce::Rectangle<int> advBarsLabelBounds;
 
     // ─── Mixer surface: 8 vertical faders across the bottom half ─────
     // Foundation, Pads 1, Pads 2, Texture, Arp, Movement (drums),

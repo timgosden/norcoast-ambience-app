@@ -472,12 +472,10 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
         if (arpOctavesRow != nullptr)
             arpOctavesRow->setVisible (! advExpanded);
         lpfHzLabel.setVisible (! advExpanded);
-        // Evolve / Drone on/off pills + Arp pattern row live on the
-        // Advanced surface — hidden on the mixer view, visible when
-        // Advanced is open.
+        // Evolve / Drone on/off pills live on the Advanced surface —
+        // hidden on the mixer view, visible when Advanced is open.
         evolveButton.setVisible (advExpanded);
         droneButton .setVisible (advExpanded);
-        if (arpPatternRow != nullptr) arpPatternRow->setVisible (advExpanded);
         resized();
         repaint();
     };
@@ -517,14 +515,6 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
         owner.getAPVTS(), ParamID::arpRate,
         juce::Colour (0xff9b7fd4));
     addAndMakeVisible (*arpRateRow);
-
-    // Arp pattern — Up / Down / UpDown / Random. Lives on the
-    // Advanced panel; default Up matches the original behaviour.
-    arpPatternRow = std::make_unique<ChoiceButtonRow> (
-        owner.getAPVTS(), ParamID::arpPattern,
-        juce::Colour (0xff9b7fd4));
-    addAndMakeVisible (*arpPatternRow);
-    arpPatternRow->setVisible (false);
 
     // Evolve bars as buttons too — replaces the squished "Bars" knob.
     evolveBarsRow = std::make_unique<ChoiceButtonRow> (
@@ -1007,6 +997,17 @@ void NorcoastAmbienceEditor::paint (juce::Graphics& g)
     paintStrip (drumsStripBounds,  juce::Colour (0xff5eb88a), "MOVEMENT");   // green — web-app accent
     paintStrip (arpStripBounds,    juce::Colour (0xff9b7fd4), "ARP");
 
+    // "Chord Evolve every:" label on the Advanced panel, painted right
+    // next to the bars choice so the user can see what the bars choice
+    // actually controls.
+    if (advExpanded && ! advBarsLabelBounds.isEmpty())
+    {
+        g.setColour (juce::Colour (0xffc4915e));   // chord-evolve amber
+        g.setFont (juce::FontOptions (11.0f).withStyle ("Bold"));
+        g.drawText ("Chord Evolve every:", advBarsLabelBounds.toFloat(),
+                    juce::Justification::centredLeft);
+    }
+
     // ── Mixer surface backplane (the nanoKONTROL strip) ──────────────
     if (! mixerPanelBounds.isEmpty())
     {
@@ -1027,21 +1028,15 @@ void NorcoastAmbienceEditor::paint (juce::Graphics& g)
             // FX rack sub-panel — distinctly tinted (cooler / darker
             // than the surrounding mixer plate) and edged in accent
             // orange so it visibly reads as a separate "FX section"
-            // sitting above the layer faders.
+            // sitting above the layer faders. The accent border is
+            // enough to demarcate FX vs faders — no extra horizontal
+            // separator strip below.
             const float kKnobsHeight = 96.0f;
             auto knobs = r.withHeight (kKnobsHeight + 8.0f).reduced (8.0f, 6.0f);
             g.setColour (juce::Colour (0xff0c1019).withAlpha (0.95f));
             g.fillRoundedRectangle (knobs, 6.0f);
             g.setColour (juce::Colour (NorcoastLookAndFeel::kAccent).withAlpha (0.35f));
             g.drawRoundedRectangle (knobs, 6.0f, 1.5f);
-
-            // Bigger, more obvious separator below the FX panel — a
-            // 2-pixel band in the accent colour so the divide between
-            // FX and faders is unmissable.
-            const float sepY = r.getY() + kKnobsHeight + 6.0f;
-            g.setColour (juce::Colour (NorcoastLookAndFeel::kAccent).withAlpha (0.45f));
-            g.fillRect (juce::Rectangle<float> (r.getX() + 14.0f, sepY,
-                                                 r.getWidth() - 28.0f, 2.0f));
 
             // "FX" sticker on the left of the rack so the user reads
             // the section identity at a glance.
@@ -1144,7 +1139,99 @@ void NorcoastAmbienceEditor::resized()
     constexpr int kKnobsRowHeight =  96;
     constexpr int kMixerHeight    = kKnobsRowHeight + kFaderRowHeight + 16;
 
-    auto mixerArea = bounds.removeFromBottom (kMixerHeight);
+    // ── Top half (key grid + EVOLVE / DRUMS / ARP strips + their
+    // optional Custom Chord / Sequencer panels) ──────────────────────
+    // Laid out FIRST so the Custom Chord / Sequencer toggles work
+    // identically whether or not Advanced mode is open, and so the
+    // mixer anchors directly underneath ARP with no dead space.
+    bounds.removeFromBottom (10);
+
+    if (rootKeyRow != nullptr)
+    {
+        // Reserve below = strips (3*42) + mixer + small fudge.
+        const int keyH = juce::jlimit (110, 160,
+                                       bounds.getHeight() - (kMixerHeight + 130));
+        rootKeyRow->setBounds (bounds.removeFromTop (keyH));
+        bounds.removeFromTop (8);
+    }
+
+    auto layoutStrip = [&] (juce::Rectangle<int>& outBounds, int height)
+    {
+        outBounds = bounds.removeFromTop (height);
+        return outBounds.reduced (12, 4);     // inner padding
+    };
+
+    auto labelInside = [] (juce::Rectangle<int>& strip, int width = 100)
+    {
+        return strip.removeFromLeft (width);
+    };
+
+    {
+        auto inner = layoutStrip (evolveStripBounds, 40);
+        labelInside (inner);
+        customChordToggleButton.setBounds (inner.removeFromRight (140).reduced (2, 4));
+        inner.removeFromRight (8);
+        if (chordPoolRow != nullptr) chordPoolRow->setBounds (inner.reduced (0, 2));
+    }
+    bounds.removeFromTop (2);
+
+    if (customDegreesRow != nullptr)
+    {
+        customDegreesRow->setVisible (customChordExpanded);
+        if (customChordExpanded)
+        {
+            auto cc = bounds.removeFromTop (28);
+            cc.removeFromLeft (12 + 64);
+            cc.removeFromRight (12 + 140 + 8);
+            customDegreesRow->setBounds (cc);
+            bounds.removeFromTop (4);
+        }
+    }
+
+    droneButton .setVisible (advExpanded);
+    if (evolveBarsRow != nullptr) evolveBarsRow->setVisible (advExpanded);
+
+    {
+        auto inner = layoutStrip (drumsStripBounds, 40);
+        labelInside (inner);
+        sequencerToggleButton.setBounds (inner.removeFromRight (110).reduced (2, 4));
+        inner.removeFromRight (8);
+        if (drumPatternRow != nullptr)
+            drumPatternRow->setBounds (inner.reduced (0, 2));
+    }
+    bounds.removeFromTop (2);
+
+    if (stepSequencer != nullptr)
+    {
+        stepSequencer->setVisible (sequencerExpanded);
+        if (sequencerExpanded)
+        {
+            const int reserveBelow = 40 + 2 + kMixerHeight;  // ARP + gap + mixer
+            const int avail = juce::jmax (0, bounds.getHeight() - reserveBelow);
+            const int seqH  = juce::jmin (132, avail);
+            if (seqH > 0)
+            {
+                stepSequencer->setBounds (bounds.removeFromTop (seqH).reduced (12, 0));
+                bounds.removeFromTop (juce::jmin (4, juce::jmax (0, bounds.getHeight() - reserveBelow)));
+            }
+        }
+    }
+
+    {
+        auto inner = layoutStrip (arpStripBounds, 40);
+        labelInside (inner);
+        const int half = inner.getWidth() / 2;
+        if (arpVoiceRow != nullptr)
+            arpVoiceRow->setBounds (inner.removeFromLeft (half).reduced (0, 2));
+        inner.removeFromLeft (6);
+        if (arpRateRow != nullptr)
+            arpRateRow->setBounds (inner.reduced (0, 2));
+    }
+    bounds.removeFromTop (2);
+
+    // ── Mixer slab — anchored immediately under the ARP strip so
+    // there's no dead band between the two halves of the editor. ───
+    auto mixerArea = bounds.removeFromTop (kMixerHeight);
     mixerPanelBounds = mixerArea;
     auto mixerInner  = mixerArea.reduced (12, 8);
 
@@ -1168,13 +1255,11 @@ void NorcoastAmbienceEditor::resized()
             &fadeTime,   &keyXfade
         };
         const int n    = (int) (sizeof (knobs) / sizeof (knobs[0]));
-        // Reserve a row at the bottom for the arp-pattern pills, then
-        // another for the bars row above it. Two stacked 26-px rows
-        // are more compact than separate strips and stay in the same
-        // visual column as the Advanced knobs.
-        auto patternArea = knobsArea.removeFromBottom (26);
-        knobsArea.removeFromBottom (4);
-        auto barsArea    = knobsArea.removeFromBottom (28);
+        // Reserve a row at the bottom for the [Evolve] [Drone] pills +
+        // the chord-evolve bars choice. Bars label is painted to the
+        // right of the toggles so the user reads it as "evolve every
+        // N bars".
+        auto barsArea = knobsArea.removeFromBottom (28);
         const int colW = knobsArea.getWidth() / n;
         for (int i = 0; i < n; ++i)
         {
@@ -1182,31 +1267,23 @@ void NorcoastAmbienceEditor::resized()
             knobs[i]->label.setBounds (c.removeFromTop (kKnobLabelH));
             knobs[i]->knob .setBounds (c.reduced (4, 4));
         }
-        // Evolve / Drone on/off pills sit at the head of the bars row.
-        // [Evolve] [Drone] | [bars choice ...] — toggles cluster on the
-        // left so the bars choice that depends on Evolve sits next to
-        // its master switch.
+        // [Evolve] [Drone] [Chord Evolve every: ... bars row].
+        // The label is painted in the Advanced paint pass so it stays
+        // discoverable; the bars row itself is the chord-evolve cycle
+        // length, default 4 bars.
         {
             auto evRow = barsArea;
             auto evToggle = evRow.removeFromLeft (78);
             evRow.removeFromLeft (4);
             auto drToggle = evRow.removeFromLeft (78);
-            evRow.removeFromLeft (10);
+            evRow.removeFromLeft (8);
+            // 102 px label slot for "Chord Evolve every:".
+            advBarsLabelBounds = evRow.removeFromLeft (102);
+            evRow.removeFromLeft (4);
             evolveButton.setBounds (evToggle.reduced (2, 2));
             droneButton .setBounds (drToggle.reduced (2, 2));
             if (evolveBarsRow != nullptr)
                 evolveBarsRow->setBounds (evRow.reduced (0, 2));
-        }
-
-        // Arp pattern row — Up / Down / UpDown / Random.
-        if (arpPatternRow != nullptr)
-        {
-            auto pRow = patternArea;
-            // Reserve the same 78+4+78+10 = 170 px of leading space as
-            // the bars row above, then drop a tiny "Arp" label, so the
-            // pattern pills line up exactly under the bars choices.
-            pRow.removeFromLeft (170);
-            arpPatternRow->setBounds (pRow.reduced (0, 2));
         }
 
         if (eqCurve != nullptr)
@@ -1311,135 +1388,7 @@ void NorcoastAmbienceEditor::resized()
         }
     }
 
-    // ── Top half (everything above the mixer slab) ──────────────────
-    bounds.removeFromBottom (10);
-
-    // Pad keys (12-key root grid) — full width, sits at the top
-    // directly under the title strip so they're the first thing the
-    // player reaches for.
-    if (rootKeyRow != nullptr)
-    {
-        const int keyH = juce::jlimit (110, 160, bounds.getHeight() - 220);
-        rootKeyRow->setBounds (bounds.removeFromTop (keyH));
-        bounds.removeFromTop (8);
-    }
-
-    // Helper: lay out a control strip and remember its bounds for paint().
-    auto layoutStrip = [&] (juce::Rectangle<int>& outBounds, int height)
-    {
-        outBounds = bounds.removeFromTop (height);
-        return outBounds.reduced (12, 4);     // inner padding
-    };
-
-    auto labelInside = [] (juce::Rectangle<int>& strip, int width = 100)
-    {
-        // Wide enough that the longest label ("MOVEMENT", 8 chars at
-        // 12 pt bold ≈ 90 px) sits comfortably without truncation.
-        return strip.removeFromLeft (width);
-    };
-
-    // ── EVOLVE strip ─────────────────────────────────────────────────
-    // [ EVOLVE ] [ chord-pool pills ......... ] [ Custom Chord + ]
-    // The drone + evolve toggles dropped here — they default ON and
-    // hardly ever change, so they live as compact pills on the right
-    // of the bars row instead of consuming pole position. Bars itself
-    // is now a button row (was a tiny knob, hard to grab on stage).
-    {
-        auto inner = layoutStrip (evolveStripBounds, 40);
-        labelInside (inner);
-        customChordToggleButton.setBounds (inner.removeFromRight (140).reduced (2, 4));
-        inner.removeFromRight (8);
-        if (chordPoolRow != nullptr) chordPoolRow->setBounds (inner.reduced (0, 2));
-    }
-    bounds.removeFromTop (2);
-
-    // Custom-chord degrees row — same X bounds as the chord-pool pills
-    // above, so the two rows align visually when the panel opens.
-    if (customDegreesRow != nullptr)
-    {
-        customDegreesRow->setVisible (customChordExpanded);
-        if (customChordExpanded)
-        {
-            auto cc = bounds.removeFromTop (28);
-            // Match horizontal bounds of the chord-pool pills row above.
-            cc.removeFromLeft (12 + 64);                 // strip pad + label
-            cc.removeFromRight (12 + 140 + 8);           // strip pad + toggle + gap
-            customDegreesRow->setBounds (cc);
-            bounds.removeFromTop (4);
-        }
-    }
-
-    // Drone / Evolve / Bars row removed from the surface — those are
-    // now hard defaults (drone = on, evolve = on, bars = 4). The
-    // params still exist and are reachable from the host's automation
-    // panel, but the gigging surface doesn't need them.
-    droneButton  .setVisible (false);
-    // evolveButton visibility is owned by the advButton click handler
-    // so opening Advanced surfaces it next to the bars row.
-    if (evolveBarsRow != nullptr) evolveBarsRow->setVisible (advExpanded);    // visible on Advanced
-
-    // ── DRUMS strip ──────────────────────────────────────────────────
-    // 4/4 vs 6/8 toggle moved up into the title bar so it lives next
-    // to BPM where time-related controls naturally cluster.
-    {
-        auto inner = layoutStrip (drumsStripBounds, 40);
-        labelInside (inner);
-        sequencerToggleButton.setBounds (inner.removeFromRight (110).reduced (2, 4));
-        inner.removeFromRight (8);
-        if (drumPatternRow != nullptr)
-            drumPatternRow->setBounds (inner.reduced (0, 2));
-    }
-    bounds.removeFromTop (2);
-
-    // Step sequencer — only visible when expanded. Bigger than before
-    // so the cells are easy to click on stage. Clamp aggressively so
-    // the ARP strip directly below isn't pushed off-screen — the user
-    // hit that bug after opening Sequencer.
-    if (stepSequencer != nullptr)
-    {
-        stepSequencer->setVisible (sequencerExpanded);
-        if (sequencerExpanded)
-        {
-            // Earlier this reserve included the root-key grid (already
-            // taken from the top of `bounds` above), which left
-            // bounds.getHeight() - reserveBelow negative on smaller
-            // window sizes — the jmax(60, …) then forced 60 px of
-            // sequencer to push the ARP strip below the visible area.
-            //
-            // The actual layout below the sequencer is just the ARP
-            // strip (40) plus its 2 px gap. Reserve exactly that and
-            // let jmax(0, …) collapse the sequencer to nothing rather
-            // than overflow when space is tight.
-            const int reserveBelow = 40 + 2;
-            const int avail = juce::jmax (0, bounds.getHeight() - reserveBelow);
-            // Each voice row is component height / 3, so bumping the
-            // cap to 132 gives ~+8 px per row over the original 96 cap
-            // — chunky enough to hit reliably on stage.
-            const int seqH  = juce::jmin (132, avail);
-            if (seqH > 0)
-            {
-                stepSequencer->setBounds (bounds.removeFromTop (seqH).reduced (12, 0));
-                bounds.removeFromTop (juce::jmin (4, juce::jmax (0, bounds.getHeight() - reserveBelow)));
-            }
-        }
-    }
-
-    // ── ARP strip ────────────────────────────────────────────────────
-    // [ ARP ] [ Voice 3-pill ............ ] [ Rate 5-pill ............ ]
-    // Octaves moved over the Arp fader column in the mixer below.
-    {
-        auto inner = layoutStrip (arpStripBounds, 40);
-        labelInside (inner);
-        const int half = inner.getWidth() / 2;
-        if (arpVoiceRow != nullptr)
-            arpVoiceRow->setBounds (inner.removeFromLeft (half).reduced (0, 2));
-        inner.removeFromLeft (6);
-        if (arpRateRow != nullptr)
-            arpRateRow->setBounds (inner.reduced (0, 2));
-    }
-    bounds.removeFromTop (2);
-    // (EQ panel removed; eq* params still drive audio at their stored
-    // values but no longer have a UI surface.)
+    // (Strips already laid out above the mixer.)
 
     // Park the invisible qwerty-keyboard 1×1 in the bottom-right corner.
     qwertyKeyboard.setBounds (getWidth() - 2, getHeight() - 2, 1, 1);

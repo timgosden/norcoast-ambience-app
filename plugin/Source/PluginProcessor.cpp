@@ -128,7 +128,6 @@ NorcoastAmbienceProcessor::NorcoastAmbienceProcessor()
     arpRateParam       = apvts.getRawParameterValue (ParamID::arpRate);
     arpOctavesParam    = apvts.getRawParameterValue (ParamID::arpOctaves);
     arpVoiceParam      = apvts.getRawParameterValue (ParamID::arpVoice);
-    arpPatternParam    = apvts.getRawParameterValue (ParamID::arpPattern);
     drumVolParam       = apvts.getRawParameterValue (ParamID::drumVol);
     drumPatternParam   = apvts.getRawParameterValue (ParamID::drumPattern);
     drumCustomLoParam  = apvts.getRawParameterValue (ParamID::drumCustomLo);
@@ -261,10 +260,13 @@ void NorcoastAmbienceProcessor::prepareToPlay (double sampleRate, int samplesPer
     // FX mix smoothers — 30 ms ramp lets preset recalls glide instead
     // of clicking when the wet/dry balance jumps from one patch to
     // another.
-    reverbMixSmooth .reset (sampleRate, 0.03);
-    delayMixSmooth  .reset (sampleRate, 0.03);
-    chorusMixSmooth .reset (sampleRate, 0.03);
-    shimmerVolSmooth.reset (sampleRate, 0.03);
+    // 250 ms ramp on the FX mix smoothers so preset switches glide for
+    // a quarter-second instead of a snap (user wanted a longer
+    // crossfade between presets, not a click-suppression smoother).
+    reverbMixSmooth .reset (sampleRate, 0.25);
+    delayMixSmooth  .reset (sampleRate, 0.25);
+    chorusMixSmooth .reset (sampleRate, 0.25);
+    shimmerVolSmooth.reset (sampleRate, 0.25);
     reverbMixSmooth .setCurrentAndTargetValue (reverbMixParam  != nullptr ? reverbMixParam ->load() : 0.0f);
     delayMixSmooth  .setCurrentAndTargetValue (delayMixParam   != nullptr ? delayMixParam  ->load() : 0.0f);
     chorusMixSmooth .setCurrentAndTargetValue (chorusMixParam  != nullptr ? chorusMixParam ->load() : 0.0f);
@@ -487,10 +489,6 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         const int   octChoice = juce::jlimit (0, 2, (int) arpOctavesParam->load());
         const auto  voice   = static_cast<Arpeggiator::VoiceKind> (
                                   juce::jlimit (0, 2, (int) arpVoiceParam->load()));
-        const auto  pattern = static_cast<Arpeggiator::Pattern> (
-                                  juce::jlimit (0, 3,
-                                                arpPatternParam != nullptr
-                                                    ? (int) arpPatternParam->load() : 0));
 
         // Render to scratch + sum-with-mute so the mute button cuts the arp
         // cleanly; the shared transport keeps the step grid locked.
@@ -498,7 +496,7 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         layerScratch.clear();
         arpeggiator.process (layerScratch, 0, n, heldNotesScratch,
                              arpVol, rate, bpm, octChoice, voice,
-                             transportSamples, timeSig, pattern);
+                             transportSamples, timeSig);
         sumLayerWithMute (muteArp, arpMuteParam, 4);              // Arp
     }
 
