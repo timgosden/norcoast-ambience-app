@@ -26,6 +26,10 @@ class Arpeggiator
 {
 public:
     enum class VoiceKind { Soft = 0, Sine, Juno };
+    // Pattern selects how stepIdx maps to a held-note index. Web app's
+    // current behaviour is Up. Down/UpDown/Random are added so the
+    // user can shape the arpeggio motion from the Advanced page.
+    enum class Pattern   { Up = 0, Down, UpDown, Random };
 
     void prepare (double sr, int /*blockSize*/)
     {
@@ -53,7 +57,8 @@ public:
                   float vol, float rateBeats, double bpm,
                   int octaveChoice, VoiceKind voiceKind,
                   juce::int64 transportSamples,
-                  int timeSig = 0)
+                  int timeSig = 0,
+                  Pattern pattern = Pattern::Up)
     {
         const bool noteSourceLive = vol >= 1e-4f && ! heldNotes.empty();
         const int  octShift = juce::jlimit (0, 2, octaveChoice);
@@ -79,7 +84,8 @@ public:
 
             if (noteSourceLive && stepNow != lastFiredStep)
             {
-                triggerArpNote (heldNotes, octShift, voiceKind, vol, noteDurSamps, effHeld);
+                triggerArpNote (heldNotes, octShift, voiceKind, vol,
+                                noteDurSamps, effHeld, pattern);
                 stepIdx = (stepIdx + 1) % juce::jmax (1, patternSize);
                 lastFiredStep = stepNow;
             }
@@ -188,14 +194,33 @@ private:
 
     // octShift: -1, 0 or +1 — applied uniformly to all held notes.
     // effHeld: pattern wrap (capped to 3 in 6/8 by process()).
+    // pattern: how stepIdx maps to a note within heldNotes.
     void triggerArpNote (const std::vector<int>& heldNotes, int octShift,
                          VoiceKind kind, float vol, int noteDurSamps,
-                         int effHeld)
+                         int effHeld, Pattern pattern)
     {
         const int held = (int) heldNotes.size();
         if (held <= 0) return;
         const int wrap = juce::jmax (1, juce::jmin (effHeld, held));
-        const int idx  = stepIdx % wrap;
+        int idx = 0;
+        switch (pattern)
+        {
+            case Pattern::Up:     idx = stepIdx % wrap; break;
+            case Pattern::Down:   idx = (wrap - 1) - (stepIdx % wrap); break;
+            case Pattern::UpDown:
+            {
+                // Ping-pong: 0..wrap-1, wrap-2..1, repeat. Period =
+                // 2*(wrap-1) for wrap > 1, else just 0.
+                const int period = juce::jmax (1, 2 * (wrap - 1));
+                const int p      = stepIdx % period;
+                idx = (p < wrap) ? p : (period - p);
+                break;
+            }
+            case Pattern::Random:
+                idx = juce::Random::getSystemRandom().nextInt (wrap);
+                break;
+        }
+        idx = juce::jlimit (0, wrap - 1, idx);
         const int midi = juce::jlimit (0, 127,
                                        heldNotes[(size_t) idx] + octShift * 12);
         const float freq = (float) juce::MidiMessage::getMidiNoteInHertz (midi);

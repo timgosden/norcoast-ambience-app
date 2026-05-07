@@ -107,6 +107,7 @@ private:
     std::atomic<float>* arpRateParam       = nullptr;
     std::atomic<float>* arpOctavesParam    = nullptr;
     std::atomic<float>* arpVoiceParam      = nullptr;
+    std::atomic<float>* arpPatternParam    = nullptr;
     std::atomic<float>* drumVolParam       = nullptr;
     std::atomic<float>* drumPatternParam   = nullptr;
     std::atomic<float>* drumCustomLoParam  = nullptr;

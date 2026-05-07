@@ -128,6 +128,7 @@ NorcoastAmbienceProcessor::NorcoastAmbienceProcessor()
     arpRateParam       = apvts.getRawParameterValue (ParamID::arpRate);
     arpOctavesParam    = apvts.getRawParameterValue (ParamID::arpOctaves);
     arpVoiceParam      = apvts.getRawParameterValue (ParamID::arpVoice);
+    arpPatternParam    = apvts.getRawParameterValue (ParamID::arpPattern);
     drumVolParam       = apvts.getRawParameterValue (ParamID::drumVol);
     drumPatternParam   = apvts.getRawParameterValue (ParamID::drumPattern);
     drumCustomLoParam  = apvts.getRawParameterValue (ParamID::drumCustomLo);
@@ -486,6 +487,10 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         const int   octChoice = juce::jlimit (0, 2, (int) arpOctavesParam->load());
         const auto  voice   = static_cast<Arpeggiator::VoiceKind> (
                                   juce::jlimit (0, 2, (int) arpVoiceParam->load()));
+        const auto  pattern = static_cast<Arpeggiator::Pattern> (
+                                  juce::jlimit (0, 3,
+                                                arpPatternParam != nullptr
+                                                    ? (int) arpPatternParam->load() : 0));
 
         // Render to scratch + sum-with-mute so the mute button cuts the arp
         // cleanly; the shared transport keeps the step grid locked.
@@ -493,7 +498,7 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         layerScratch.clear();
         arpeggiator.process (layerScratch, 0, n, heldNotesScratch,
                              arpVol, rate, bpm, octChoice, voice,
-                             transportSamples, timeSig);
+                             transportSamples, timeSig, pattern);
         sumLayerWithMute (muteArp, arpMuteParam, 4);              // Arp
     }
 

@@ -472,10 +472,12 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
         if (arpOctavesRow != nullptr)
             arpOctavesRow->setVisible (! advExpanded);
         lpfHzLabel.setVisible (! advExpanded);
-        // Evolve / Drone on/off pills live on the Advanced surface —
-        // hidden on the mixer view, visible when Advanced is open.
+        // Evolve / Drone on/off pills + Arp pattern row live on the
+        // Advanced surface — hidden on the mixer view, visible when
+        // Advanced is open.
         evolveButton.setVisible (advExpanded);
         droneButton .setVisible (advExpanded);
+        if (arpPatternRow != nullptr) arpPatternRow->setVisible (advExpanded);
         resized();
         repaint();
     };
@@ -515,6 +517,14 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
         owner.getAPVTS(), ParamID::arpRate,
         juce::Colour (0xff9b7fd4));
     addAndMakeVisible (*arpRateRow);
+
+    // Arp pattern — Up / Down / UpDown / Random. Lives on the
+    // Advanced panel; default Up matches the original behaviour.
+    arpPatternRow = std::make_unique<ChoiceButtonRow> (
+        owner.getAPVTS(), ParamID::arpPattern,
+        juce::Colour (0xff9b7fd4));
+    addAndMakeVisible (*arpPatternRow);
+    arpPatternRow->setVisible (false);
 
     // Evolve bars as buttons too — replaces the squished "Bars" knob.
     evolveBarsRow = std::make_unique<ChoiceButtonRow> (
@@ -1014,23 +1024,31 @@ void NorcoastAmbienceEditor::paint (juce::Graphics& g)
 
         if (! advExpanded)
         {
-            // Sub-panel behind the 8 FX knobs — slightly tinted so the
-            // knobs feel like they live in their own little FX rack
-            // separate from the layer faders below.
+            // FX rack sub-panel — distinctly tinted (cooler / darker
+            // than the surrounding mixer plate) and edged in accent
+            // orange so it visibly reads as a separate "FX section"
+            // sitting above the layer faders.
             const float kKnobsHeight = 96.0f;
             auto knobs = r.withHeight (kKnobsHeight + 8.0f).reduced (8.0f, 6.0f);
-            g.setColour (juce::Colour (0xff111522).withAlpha (0.65f));
-            g.fillRoundedRectangle (knobs, 5.0f);
-            g.setColour (juce::Colour (NorcoastLookAndFeel::kPanelEdge).withAlpha (0.4f));
-            g.drawRoundedRectangle (knobs, 5.0f, 1.0f);
+            g.setColour (juce::Colour (0xff0c1019).withAlpha (0.95f));
+            g.fillRoundedRectangle (knobs, 6.0f);
+            g.setColour (juce::Colour (NorcoastLookAndFeel::kAccent).withAlpha (0.35f));
+            g.drawRoundedRectangle (knobs, 6.0f, 1.5f);
 
-            // Thin separator between knobs panel and faders.
-            const float sepY = r.getY() + kKnobsHeight + 4.0f;
-            g.setColour (juce::Colour (NorcoastLookAndFeel::kPanelEdge).withAlpha (0.6f));
-            g.drawHorizontalLine ((int) sepY, r.getX() + 12.0f, r.getRight() - 12.0f);
+            // Bigger, more obvious separator below the FX panel — a
+            // 2-pixel band in the accent colour so the divide between
+            // FX and faders is unmissable.
+            const float sepY = r.getY() + kKnobsHeight + 6.0f;
+            g.setColour (juce::Colour (NorcoastLookAndFeel::kAccent).withAlpha (0.45f));
+            g.fillRect (juce::Rectangle<float> (r.getX() + 14.0f, sepY,
+                                                 r.getWidth() - 28.0f, 2.0f));
 
-            // Level meters were removed per user feedback — too tiny to
-            // be useful, and visually crowded the fader thumbs.
+            // "FX" sticker on the left of the rack so the user reads
+            // the section identity at a glance.
+            g.setColour (juce::Colour (NorcoastLookAndFeel::kAccent).withAlpha (0.55f));
+            g.setFont (juce::FontOptions (10.0f).withStyle ("Bold"));
+            g.drawText ("FX", knobs.toNearestInt().reduced (10, 6).withHeight (12),
+                        juce::Justification::topLeft);
         }
     }
 
@@ -1150,9 +1168,13 @@ void NorcoastAmbienceEditor::resized()
             &fadeTime,   &keyXfade
         };
         const int n    = (int) (sizeof (knobs) / sizeof (knobs[0]));
-        // Reserve a thin row at the bottom of the knob area for the
-        // evolveBars button row.
-        auto barsArea = knobsArea.removeFromBottom (28);
+        // Reserve a row at the bottom for the arp-pattern pills, then
+        // another for the bars row above it. Two stacked 26-px rows
+        // are more compact than separate strips and stay in the same
+        // visual column as the Advanced knobs.
+        auto patternArea = knobsArea.removeFromBottom (26);
+        knobsArea.removeFromBottom (4);
+        auto barsArea    = knobsArea.removeFromBottom (28);
         const int colW = knobsArea.getWidth() / n;
         for (int i = 0; i < n; ++i)
         {
@@ -1174,6 +1196,17 @@ void NorcoastAmbienceEditor::resized()
             droneButton .setBounds (drToggle.reduced (2, 2));
             if (evolveBarsRow != nullptr)
                 evolveBarsRow->setBounds (evRow.reduced (0, 2));
+        }
+
+        // Arp pattern row — Up / Down / UpDown / Random.
+        if (arpPatternRow != nullptr)
+        {
+            auto pRow = patternArea;
+            // Reserve the same 78+4+78+10 = 170 px of leading space as
+            // the bars row above, then drop a tiny "Arp" label, so the
+            // pattern pills line up exactly under the bars choices.
+            pRow.removeFromLeft (170);
+            arpPatternRow->setBounds (pRow.reduced (0, 2));
         }
 
         if (eqCurve != nullptr)

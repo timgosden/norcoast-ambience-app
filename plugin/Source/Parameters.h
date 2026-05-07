@@ -53,6 +53,7 @@ namespace ParamID
     inline constexpr const char* arpRate       = "arpRate";
     inline constexpr const char* arpOctaves    = "arpOctaves";
     inline constexpr const char* arpVoice      = "arpVoice";
+    inline constexpr const char* arpPattern    = "arpPattern";
 
     inline constexpr const char* drumVol         = "drumVol";
     inline constexpr const char* drumPattern     = "drumPattern";
@@ -219,6 +220,12 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
     layout.add (std::make_unique<juce::AudioParameterChoice> (
         juce::ParameterID { ParamID::arpVoice, 1 }, "Arp Voice",
         juce::StringArray { "Bloom", "Hush", "Glow" }, 2));   // default Glow
+    // Arp pattern — how stepIdx maps to held-note index. Default "Up"
+    // matches the web app behaviour (linear ascending, with octave
+    // shifts injected once per held-notes cycle).
+    layout.add (std::make_unique<juce::AudioParameterChoice> (
+        juce::ParameterID { ParamID::arpPattern, 1 }, "Arp Pattern",
+        juce::StringArray { "Up", "Down", "UpDown", "Random" }, 0));
 
     // ─── Drum machine ─────────────────────────────────────────────────
     add (std::make_unique<FloatParam> (juce::ParameterID { ParamID::drumVol, 1 },
