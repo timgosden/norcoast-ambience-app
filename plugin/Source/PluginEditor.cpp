@@ -490,6 +490,8 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     {
         k->knob.setSliderStyle (juce::Slider::LinearVertical);
         k->knob.setTextBoxStyle (juce::Slider::NoTextBox, true, 0, 0);   // no % under fader
+        // Listen for drag so we can float a dB readout above the thumb.
+        k->knob.addListener (this);
     }
 
     // ── Mute buttons for the 6 audio layers ──────────────────────────
@@ -533,6 +535,23 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     {
         if (safeThis != nullptr) safeThis->grabKeyboardFocus();
     });
+}
+
+void NorcoastAmbienceEditor::sliderDragStarted (juce::Slider* s)
+{
+    activeFader = s;
+    repaint();
+}
+
+void NorcoastAmbienceEditor::sliderDragEnded (juce::Slider* s)
+{
+    if (activeFader == s) activeFader = nullptr;
+    repaint();
+}
+
+void NorcoastAmbienceEditor::sliderValueChanged (juce::Slider* s)
+{
+    if (s == activeFader) repaint();
 }
 
 void NorcoastAmbienceEditor::timerCallback()
@@ -726,6 +745,50 @@ void NorcoastAmbienceEditor::paint (juce::Graphics& g)
                 g.fillRoundedRectangle (bar, 1.5f);
             }
         }
+    }
+
+    // ── Active-fader dB readout (drag tooltip) ──────────────────────
+    // Painted last so it overlays everything else. Same visual style as
+    // the EQ band-node drag readout for consistency.
+    if (activeFader != nullptr && ! advExpanded)
+    {
+        const auto fb = activeFader->getBounds();
+        const float v = (float) activeFader->getValue();
+
+        juce::String txt;
+        if (activeFader == &lpfFreq.knob)
+        {
+            // LPF is a curve fader, not a gain — show its Hz mapping.
+            const float hz = std::exp (4.6051702f + (v * v) * 5.298375f);
+            txt = hz < 1000.0f ? juce::String ((int) hz) + " Hz"
+                               : juce::String (hz / 1000.0f, 1) + " kHz";
+        }
+        else
+        {
+            // Volume faders: convert linear 0..1 → dB.
+            if (v <= 1e-4f)
+                txt = "-inf dB";
+            else
+            {
+                const float dB = juce::Decibels::gainToDecibels (v, -60.0f);
+                txt = (dB >= 0 ? "+" : "") + juce::String (dB, 1) + " dB";
+            }
+        }
+
+        // Position the readout above the slider thumb. For LinearVertical
+        // sliders the thumb Y maps from value linearly bottom→top.
+        const float thumbY = (float) fb.getBottom()
+                           - v * (float) fb.getHeight();
+        const float boxX = (float) fb.getCentreX() - 38.0f;
+        const float boxY = juce::jmax (4.0f, thumbY - 22.0f);
+
+        const juce::Rectangle<float> bg (boxX, boxY, 76.0f, 18.0f);
+        g.setColour (juce::Colour (0xff0d1220).withAlpha (0.92f));
+        g.fillRoundedRectangle (bg, 4.0f);
+        g.setColour (juce::Colour (0xffe8a45e));
+        g.drawRoundedRectangle (bg, 4.0f, 1.0f);
+        g.setFont (juce::FontOptions (11.0f).withStyle ("Bold"));
+        g.drawText (txt, bg, juce::Justification::centred);
     }
 }
 

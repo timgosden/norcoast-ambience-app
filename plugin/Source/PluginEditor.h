@@ -10,7 +10,8 @@
 #include "EqCurveDisplay.h"
 
 class NorcoastAmbienceEditor : public juce::AudioProcessorEditor,
-                               private juce::Timer
+                               private juce::Timer,
+                               private juce::Slider::Listener
 {
 public:
     explicit NorcoastAmbienceEditor (NorcoastAmbienceProcessor&);
@@ -119,6 +120,14 @@ private:
     // draws a thin orange bar overlay inside each fader column.
     std::array<float, 6> meterLevels { 0, 0, 0, 0, 0, 0 };
     void timerCallback() override;
+
+    // Slider drag tracking — when a fader is being dragged, paint a
+    // floating "-X.X dB" readout above its thumb (same UX as the EQ
+    // band-node drag readout).
+    juce::Slider* activeFader = nullptr;
+    void sliderDragStarted (juce::Slider* s) override;
+    void sliderDragEnded   (juce::Slider* s) override;
+    void sliderValueChanged (juce::Slider* s) override;
 
     // Top-half coloured-strip backgrounds — drawn in paint() to give
     // each control row its own section accent (matches the web app's

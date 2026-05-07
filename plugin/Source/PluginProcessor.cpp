@@ -252,6 +252,11 @@ void NorcoastAmbienceProcessor::prepareToPlay (double sampleRate, int samplesPer
     masterGain.reset (sampleRate, 0.05); // 50 ms ramp
     masterGain.setCurrentAndTargetValue (masterVolParam->load());
 
+    // Drive amount — 30 ms ramp, click-free engagement.
+    satAmtSmoothed.reset (sampleRate, 0.03);
+    satAmtSmoothed.setCurrentAndTargetValue (satAmtParam != nullptr
+                                              ? satAmtParam->load() : 0.0f);
+
     // Stop-fade ramp time: 1 second feels like the standalone's "Stop" pill.
     // 4-second stop fade — long enough for reverb / delay tails to
     // ring out gracefully past it.
@@ -777,29 +782,23 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         eqHigh.process  (ctx);
     }
 
-    // ─── Saturation (tanh soft-clip + dark shelf) ────────────────────
-    // Drive scaled down (3.5 → 2.2) and a small high-shelf cut after
-    // the clip so the harmonics aren't ear-piercing at full crank.
-    if (satAmt > 0.005f)
+    // ─── Saturation (tanh soft-clip) ────────────────────────────────
+    // Drive amount is per-sample smoothed so engaging it doesn't click
+    // (the previous "if (satAmt > 0.005)" hard-branch produced an
+    // audible step on threshold crossing). The post-tanh LP filter
+    // turned out to make the sound dark/weird so it's gone — back to
+    // the neutral-character original.
     {
-        const float k    = satAmt * 2.2f;                 // was 3.5
-        const float invN = 1.0f / std::tanh (k);
-        const float makeup = 1.0f - satAmt * 0.4f;        // pull back a bit more
-        const float scale = invN * makeup;
-        // Simple one-pole low-pass to tame harmonics — coefficient
-        // chosen so cut depth scales with drive.
-        const float lpCoef = juce::jlimit (0.04f, 0.45f,
-                                            satAmt * 0.45f);
+        satAmtSmoothed.setTargetValue (satAmt);
         for (int s = 0; s < n; ++s)
         {
-            const float satL = std::tanh (L[s] * k) * scale;
-            const float satR = std::tanh (R[s] * k) * scale;
-            // 1-pole LP smooth on the saturated signal — scales the
-            // dark-vs-bright character with drive amount.
-            satLpL += lpCoef * (satL - satLpL);
-            satLpR += lpCoef * (satR - satLpR);
-            L[s] = satLpL;
-            R[s] = satLpR;
+            const float a    = satAmtSmoothed.getNextValue();
+            const float k    = juce::jmax (1.0e-4f, a * 3.0f);   // between original 3.5 and tame 2.2
+            const float invN = 1.0f / std::tanh (k);
+            const float makeup = 1.0f - a * 0.3f;
+            const float scale  = invN * makeup;
+            L[s] = std::tanh (L[s] * k) * scale;
+            R[s] = std::tanh (R[s] * k) * scale;
         }
     }
 
@@ -855,8 +854,31 @@ void NorcoastAmbienceProcessor::setCurrentProgram (int idx)
 {
     const auto& list = Presets::factory();
     if (idx < 0 || idx >= (int) list.size()) return;
+
+    // Snapshot the GLOBAL EQ before applying the preset so it persists
+    // across preset switches — the user wants the EQ to feel like a
+    // master output stage that doesn't get disturbed by patch recall.
+    const float eqLo = apvts.getRawParameterValue (ParamID::eqLow)  ->load();
+    const float eqLm = apvts.getRawParameterValue (ParamID::eqLoMid)->load();
+    const float eqHm = apvts.getRawParameterValue (ParamID::eqHiMid)->load();
+    const float eqHi = apvts.getRawParameterValue (ParamID::eqHigh) ->load();
+
     Presets::apply (apvts, list[(size_t) idx]);
     currentProgram = idx;
+
+    // Restore EQ values.
+    auto restore = [this] (const char* paramID, float value)
+    {
+        if (auto* p = apvts.getParameter (paramID))
+        {
+            const auto range = p->getNormalisableRange();
+            p->setValueNotifyingHost (range.convertTo0to1 (value));
+        }
+    };
+    restore (ParamID::eqLow,   eqLo);
+    restore (ParamID::eqLoMid, eqLm);
+    restore (ParamID::eqHiMid, eqHm);
+    restore (ParamID::eqHigh,  eqHi);
 
     // Notify any AudioProcessorListeners — host preset menus rely on this
     // to refresh their displayed program-name when state changes.

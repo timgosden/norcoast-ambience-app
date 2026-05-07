@@ -36,7 +36,7 @@ public:
         // "MASTER EQ" header at top-left.
         g.setColour (juce::Colour (0xffb07acc));
         g.setFont (juce::FontOptions (11.0f).withStyle ("Bold"));
-        g.drawText ("MASTER EQ",
+        g.drawText ("GLOBAL EQ",
                     r.reduced (10.0f, 6.0f).withHeight (14.0f),
                     juce::Justification::topLeft);
 

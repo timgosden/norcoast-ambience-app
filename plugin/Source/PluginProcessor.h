@@ -204,8 +204,10 @@ private:
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> masterGain;
 
     // Saturation post-stage 1-pole low-pass state (tames bright tanh
-    // harmonics at high drive).
+    // harmonics at high drive). The amount itself is per-sample
+    // smoothed so engaging Drive doesn't click — see processBlock.
     float satLpL = 0.0f, satLpR = 0.0f;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> satAmtSmoothed { 0.0f };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (NorcoastAmbienceProcessor)
 };
