@@ -51,6 +51,8 @@ private:
     // Choice button rows — replace knobs for discrete pickers.
     std::unique_ptr<ChoiceButtonRow> arpVoiceRow;
     std::unique_ptr<ChoiceButtonRow> arpOctavesRow;
+    std::unique_ptr<ChoiceButtonRow> arpRateRow;        // ⏯ rate as buttons not knob
+    std::unique_ptr<ChoiceButtonRow> evolveBarsRow;     // bars as buttons not knob
     std::unique_ptr<ChoiceButtonRow> drumPatternRow;
     std::unique_ptr<BitmaskPillRow>  chordPoolRow;     // EVOLVE chord-pool toggles
     std::unique_ptr<ChoiceButtonRow> rootKeyRow;       // bottom 12-key grid
@@ -107,7 +109,6 @@ private:
     juce::Rectangle<int> evolveStripBounds;
     juce::Rectangle<int> drumsStripBounds;
     juce::Rectangle<int> arpStripBounds;
-    juce::Rectangle<int> layersStripBounds;
 
     // ─── Mixer surface: 8 vertical faders across the bottom half ─────
     // Foundation, Pads 1, Pads 2, Texture, Arp, Movement (drums),
@@ -129,18 +130,19 @@ private:
     std::unique_ptr<ButtonAttach> arpMuteAttach;
     std::unique_ptr<ButtonAttach> drumMuteAttach;
 
-    // ─── 8 FX mix knobs row above the faders ─────────────────────────
-    // Reverb, Reverb Size, Shimmer, Chorus, Delay, Delay Feedback,
-    // Width, Drive — all "amount" controls.
-    ParamKnob reverbMix, reverbSize, shimmerVol, chorusMix;
-    ParamKnob delayMix, delayFb, widthMod, satAmt;
+    // ─── FX mix knobs row above the faders ───────────────────────────
+    // Reverb · Shimmer · Chorus · Delay · Width · Drive · HPF.
+    // Slot 8 (above Master) is intentionally empty.
+    ParamKnob reverbMix, shimmerVol, chorusMix;
+    ParamKnob delayMix,  widthMod,   satAmt;
 
-    // ─── Other controls (top half) ───────────────────────────────────
-    ParamKnob evolveRate;
-    ParamKnob delayTimeMs, delayTone, reverbMod;
+    // ─── Other surfaced controls (top half) ──────────────────────────
+    // HPF knob now lives in the mixer above the LPF fader.
+    // Bars / Rate / Voice / Octave became button rows.
+    // Size / Mod / Tone / Feedback / Tempo Div are param-only (no UI
+    // surface; values still affect audio and persist in presets).
     ParamKnob hpfFreq;
     ParamKnob eqLow, eqLoMid, eqHiMid, eqHigh;
-    ParamKnob arpRate;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (NorcoastAmbienceEditor)
 };

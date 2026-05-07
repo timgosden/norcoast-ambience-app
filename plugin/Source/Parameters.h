@@ -200,8 +200,8 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
         juce::ParameterID { ParamID::arpRate, 1 }, "Arp Rate",
         juce::StringArray { "1/16", "1/8", "1/4", "1/2", "1 bar" }, 1));
     layout.add (std::make_unique<juce::AudioParameterChoice> (
-        juce::ParameterID { ParamID::arpOctaves, 1 }, "Arp Octaves",
-        juce::StringArray { "1", "2", "3" }, 1));
+        juce::ParameterID { ParamID::arpOctaves, 1 }, "Arp Octave",
+        juce::StringArray { "-1 oct", "Mid", "+1 oct" }, 1));   // default Mid
     // Voice names match the latest standalone web-app labels.
     layout.add (std::make_unique<juce::AudioParameterChoice> (
         juce::ParameterID { ParamID::arpVoice, 1 }, "Arp Voice",

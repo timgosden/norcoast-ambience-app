@@ -223,17 +223,6 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     setupKnob (padsVol,       "Pads",         ParamID::padsVol);
     setupKnob (textureVol,    "Texture",      ParamID::textureVol);
 
-    setupKnob (evolveRate,    "Bars",         ParamID::evolveBars);
-    {
-        static const juce::StringArray barChoices { "1", "2", "4", "8", "16", "32" };
-        evolveRate.knob.textFromValueFunction = [] (double v) -> juce::String
-        {
-            const int idx = juce::jlimit (0, barChoices.size() - 1, (int) std::round (v));
-            return barChoices[idx];
-        };
-        evolveRate.knob.updateText();
-    }
-
     // EVOLVE chord pool — pills toggle which chord types the auto-evolve
     // cycle picks from. Default = all six on.
     chordPoolRow = std::make_unique<BitmaskPillRow> (
@@ -262,33 +251,11 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     stepSequencer = std::make_unique<StepSequencerGrid> (owner.getAPVTS());
     addAndMakeVisible (*stepSequencer);
 
+    // FX knobs that survive on the mixer surface.
     setupKnob (chorusMix,     "Chorus",       ParamID::chorusMix);
     setupKnob (delayMix,      "Delay",        ParamID::delayMix);
-    setupKnob (delayFb,       "Feedback",     ParamID::delayFb);
-    setupKnob (delayTimeMs,   "Div",          ParamID::delayDiv);
-    {
-        static const juce::StringArray divs { "1/32", "1/16", "1/16.", "1/8", "1/8.", "1/4", "1/4." };
-        delayTimeMs.knob.textFromValueFunction = [] (double v) -> juce::String
-        {
-            static const juce::StringArray names { "1/32", "1/16", "1/16.", "1/8", "1/8.", "1/4", "1/4." };
-            return names[juce::jlimit (0, names.size() - 1, (int) std::round (v))];
-        };
-        delayTimeMs.knob.updateText();
-    }
-    setupKnob (delayTone,     "Tone",         ParamID::delayTone);
-
     setupKnob (reverbMix,     "Reverb",       ParamID::reverbMix);
-    setupKnob (reverbSize,    "Size",         ParamID::reverbSize);
-    setupKnob (reverbMod,     "Mod",          ParamID::reverbMod);
     setupKnob (shimmerVol,    "Shimmer",      ParamID::shimmerVol);
-
-    // Reverb size readout: 1 → 10 s (matches the standalone's display).
-    reverbSize.knob.textFromValueFunction = [] (double v) -> juce::String
-    {
-        return juce::String ((int) std::round (1.0 + v * 9.0)) + "s";
-    };
-    reverbSize.knob.updateText();
-
     setupKnob (hpfFreq,       "High Pass",    ParamID::hpfFreq);
     setupKnob (lpfFreq,       "LPF",          ParamID::lpfFreq);
 
@@ -321,17 +288,8 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     setupKnob (masterVol,     "Master",       ParamID::masterVol);
 
     setupKnob (arpVol,        "Arp",          ParamID::arpVol);
-    setupKnob (arpRate,       "Rate",         ParamID::arpRate);
-    {
-        static const juce::StringArray rateChoices { "1/16", "1/8", "1/4", "1/2", "1 bar" };
-        arpRate.knob.textFromValueFunction = [] (double v) -> juce::String
-        {
-            const int idx = juce::jlimit (0, rateChoices.size() - 1, (int) std::round (v));
-            return rateChoices[idx];
-        };
-        arpRate.knob.updateText();
-    }
-    // Arp octaves as a 3-pill button row instead of a knob (it's a 3-way choice).
+
+    // Arp octaves as a 3-pill button row (-1 / Mid / +1 shift).
     arpOctavesRow = std::make_unique<ChoiceButtonRow> (
         owner.getAPVTS(), ParamID::arpOctaves,
         juce::Colour (0xff7eb6d4));
@@ -351,6 +309,19 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
         juce::Colour (0xffd97171));    // drum red
     addAndMakeVisible (*arpVoiceRow);
     addAndMakeVisible (*drumPatternRow);
+
+    // Arp rate as a button row (was a knob — too small to grab on
+    // stage). Same purple as the rest of the ARP strip.
+    arpRateRow = std::make_unique<ChoiceButtonRow> (
+        owner.getAPVTS(), ParamID::arpRate,
+        juce::Colour (0xff9b7fd4));
+    addAndMakeVisible (*arpRateRow);
+
+    // Evolve bars as buttons too — replaces the squished "Bars" knob.
+    evolveBarsRow = std::make_unique<ChoiceButtonRow> (
+        owner.getAPVTS(), ParamID::evolveBars,
+        juce::Colour (0xffc4915e));
+    addAndMakeVisible (*evolveBarsRow);
 
     // 4/4 vs 6/8 toggle — sits beside the drum pattern pills so the
     // time signature is always visible and easily switchable on stage.
@@ -417,15 +388,9 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     setupMute (arpMuteBtn,        arpMuteAttach,        ParamID::arpMute,        juce::Colour (0xffd46b8a));
     setupMute (drumMuteBtn,       drumMuteAttach,       ParamID::drumMute,       juce::Colour (0xffd46b8a));
 
-    // The Size, Feedback, Mod, and delay character knobs were dropped
-    // from the FX row per request — keep the params alive (they still
-    // affect the audio at their saved values) but hide the controls.
-    for (auto* k : { &reverbSize, &reverbMod, &delayFb,
-                     &delayTimeMs, &delayTone })
-    {
-        k->label.setVisible (false);
-        k->knob .setVisible (false);
-    }
+    // (Param-only knobs from earlier UI revisions have been removed
+    // from the editor entirely; their APVTS params still drive the
+    // audio at their stored values.)
 
     // Default custom-chord and sequencer panels to hidden.
     if (customDegreesRow != nullptr) customDegreesRow->setVisible (false);
@@ -448,11 +413,9 @@ NorcoastAmbienceEditor::~NorcoastAmbienceEditor()
     // destructors don't dereference a dangling LAF pointer.
     for (auto* k : { &foundationVol, &padsVol, &padsVol2, &textureVol,
                      &arpVol, &drumVol, &lpfFreq, &masterVol,
-                     &reverbMix, &reverbSize, &shimmerVol, &chorusMix,
-                     &delayMix, &delayFb, &widthMod, &satAmt,
-                     &evolveRate, &delayTimeMs, &delayTone, &reverbMod,
-                     &hpfFreq, &eqLow, &eqLoMid, &eqHiMid, &eqHigh,
-                     &arpRate })
+                     &reverbMix, &shimmerVol, &chorusMix,
+                     &delayMix, &widthMod, &satAmt,
+                     &hpfFreq, &eqLow, &eqLoMid, &eqHiMid, &eqHigh })
         k->knob.setLookAndFeel (nullptr);
     bpmSlider.setLookAndFeel (nullptr);
 }
@@ -561,8 +524,17 @@ void NorcoastAmbienceEditor::paint (juce::Graphics& g)
         g.setColour (juce::Colour (NorcoastLookAndFeel::kPanelEdge));
         g.drawRoundedRectangle (r, 8.0f, 1.0f);
 
-        // Thin separator between knobs row and faders row.
+        // Sub-panel behind the 8 FX knobs — slightly tinted so the
+        // knobs feel like they live in their own little FX rack
+        // separate from the layer faders below.
         const float kKnobsHeight = 96.0f;
+        auto knobs = r.withHeight (kKnobsHeight + 8.0f).reduced (8.0f, 6.0f);
+        g.setColour (juce::Colour (0xff111522).withAlpha (0.65f));
+        g.fillRoundedRectangle (knobs, 5.0f);
+        g.setColour (juce::Colour (NorcoastLookAndFeel::kPanelEdge).withAlpha (0.4f));
+        g.drawRoundedRectangle (knobs, 5.0f, 1.0f);
+
+        // Thin separator between knobs panel and faders.
         const float sepY = r.getY() + kKnobsHeight + 4.0f;
         g.setColour (juce::Colour (NorcoastLookAndFeel::kPanelEdge).withAlpha (0.6f));
         g.drawHorizontalLine ((int) sepY, r.getX() + 12.0f, r.getRight() - 12.0f);
@@ -586,6 +558,11 @@ void NorcoastAmbienceEditor::resized()
         stopButton.setBounds (right.removeFromRight (52));
         right.removeFromRight (8);
         presetBox.setBounds (right);
+
+        // EQ toggle button — moved up here so its panel doesn't leave a
+        // dead row in the top half when collapsed.
+        eqToggleButton.setBounds (title.removeFromRight (60).reduced (0, 14));
+        title.removeFromRight (8);
 
         // BPM display: small label + inc/dec slider sandwiched between
         // the chord header and the right-hand preset bar.
@@ -661,10 +638,29 @@ void NorcoastAmbienceEditor::resized()
             { &masterVol,     nullptr            }
         };
 
+        // Octave-toggle overlays: Sub Oct goes above the Foundation
+        // mute, Tex +Oct goes above the Texture mute. Reuses the
+        // column space that's otherwise empty above the mute pill so
+        // these toggles live near the layer they affect.
+        auto* octBtnPerCol = [&] () {
+            static juce::TextButton* arr[8] {
+                &subOctButton, nullptr, nullptr, &textureOctButton,
+                nullptr, nullptr, nullptr, nullptr
+            };
+            return arr;
+        }();
+
         for (int i = 0; i < 8; ++i)
         {
             auto col = cols[(size_t) i];
             strips[i].fader->label.setBounds (col.removeFromTop (kKnobLabelH));
+
+            // Octave-toggle row (only Foundation + Texture columns)
+            const int octH = 18;
+            auto octRow = col.removeFromTop (octH);
+            if (octBtnPerCol[i] != nullptr)
+                octBtnPerCol[i]->setBounds (octRow.reduced (4, 1));
+            col.removeFromTop (2);
 
             // Mute pill across the top of the fader column. Sits under
             // the label, just like the web app's mute dot above the
@@ -675,8 +671,10 @@ void NorcoastAmbienceEditor::resized()
                 strips[i].mute->setBounds (muteRow.reduced (10, 1));
             col.removeFromTop (4);
 
-            // The fader fills the rest of the column.
-            strips[i].fader->knob.setBounds (col.reduced (8, 2));
+            // The fader fills the rest of the column. Reduce a touch
+            // more horizontally so the slider doesn't dominate the
+            // whole column width.
+            strips[i].fader->knob.setBounds (col.reduced (10, 2));
         }
     }
 
@@ -684,9 +682,15 @@ void NorcoastAmbienceEditor::resized()
     bounds.removeFromBottom (10);
 
     // 12-key root grid — 3 rows × 4 columns of chunky chord pads.
+    // Constrain width so cells aren't ridiculously wide / thin.
     {
-        auto keyRow = bounds.removeFromTop (132);    // 3 rows × 44 px
-        if (rootKeyRow != nullptr) rootKeyRow->setBounds (keyRow);
+        constexpr int kKeyRowH    = 132;     // 3 rows × 44 px
+        constexpr int kKeyRowMaxW = 720;     // ~180 px / cell
+        auto fullRow = bounds.removeFromTop (kKeyRowH);
+        const int margin = juce::jmax (0, (fullRow.getWidth() - kKeyRowMaxW) / 2);
+        fullRow.removeFromLeft (margin);
+        fullRow.removeFromRight (margin);
+        if (rootKeyRow != nullptr) rootKeyRow->setBounds (fullRow);
     }
     bounds.removeFromTop (8);
 
@@ -703,36 +707,50 @@ void NorcoastAmbienceEditor::resized()
     };
 
     // ── EVOLVE strip ─────────────────────────────────────────────────
+    // [ EVOLVE ] [ chord-pool pills ......... ] [ Custom Chord + ]
+    // The drone + evolve toggles dropped here — they default ON and
+    // hardly ever change, so they live as compact pills on the right
+    // of the bars row instead of consuming pole position. Bars itself
+    // is now a button row (was a tiny knob, hard to grab on stage).
     {
         auto inner = layoutStrip (evolveStripBounds, 36);
-        labelInside (inner);                      // "EVOLVE" painted in paint()
-        // Drone + Evolve toggles + Bars knob on the right; chord-pool
-        // pills + custom-chord toggle on the left.
-        droneButton .setBounds (inner.removeFromRight (60).reduced (2, 4));
-        inner.removeFromRight (3);
-        evolveButton.setBounds (inner.removeFromRight (60).reduced (2, 4));
+        labelInside (inner);
+        customChordToggleButton.setBounds (inner.removeFromRight (140).reduced (2, 4));
         inner.removeFromRight (8);
-        // Bars: small label + knob.
-        evolveRate.knob .setBounds (inner.removeFromRight (52).reduced (2, 2));
-        evolveRate.label.setBounds (inner.removeFromRight (32));
-        inner.removeFromRight (8);
-        customChordToggleButton.setBounds (inner.removeFromRight (110).reduced (2, 4));
-        inner.removeFromRight (6);
         if (chordPoolRow != nullptr) chordPoolRow->setBounds (inner.reduced (0, 2));
     }
     bounds.removeFromTop (2);
 
-    // Custom-chord degree pills row — only visible when expanded.
+    // Custom-chord degrees row — same X bounds as the chord-pool pills
+    // above, so the two rows align visually when the panel opens.
     if (customDegreesRow != nullptr)
     {
         customDegreesRow->setVisible (customChordExpanded);
         if (customChordExpanded)
         {
-            auto cc = bounds.removeFromTop (28).reduced (24, 0);
+            auto cc = bounds.removeFromTop (28);
+            // Match horizontal bounds of the chord-pool pills row above.
+            cc.removeFromLeft (12 + 64);                 // strip pad + label
+            cc.removeFromRight (12 + 140 + 8);           // strip pad + toggle + gap
             customDegreesRow->setBounds (cc);
             bounds.removeFromTop (4);
         }
     }
+
+    // Bars + drone + evolve thin sub-row (these were squeezed into the
+    // EVOLVE strip; now they get their own line so the buttons can
+    // actually be the same size as the rest of the row above).
+    {
+        auto sub = bounds.removeFromTop (32).reduced (12, 2);
+        sub.removeFromLeft (64);                          // align under "EVOLVE" label
+        droneButton .setBounds (sub.removeFromRight (90).reduced (2, 2));
+        sub.removeFromRight (4);
+        evolveButton.setBounds (sub.removeFromRight (90).reduced (2, 2));
+        sub.removeFromRight (8);
+        if (evolveBarsRow != nullptr)
+            evolveBarsRow->setBounds (sub.reduced (0, 2));
+    }
+    bounds.removeFromTop (4);
 
     // ── DRUMS strip ──────────────────────────────────────────────────
     {
@@ -761,31 +779,28 @@ void NorcoastAmbienceEditor::resized()
     }
 
     // ── ARP strip ────────────────────────────────────────────────────
+    // [ ARP ] [ Voice 3-pill ] [ Oct -1/Mid/+1 ] [ Rate 5-pill ]
+    // All children are full-height button rows so they line up with
+    // the chord-pool / drum-pattern rows above.
     {
         auto inner = layoutStrip (arpStripBounds, 36);
-        labelInside (inner);                      // "ARP" painted in paint()
-        // Rate knob right, Octaves middle, Voice left.
-        arpRate.knob .setBounds (inner.removeFromRight (52).reduced (2, 2));
-        arpRate.label.setBounds (inner.removeFromRight (32));
-        inner.removeFromRight (10);
-        if (arpOctavesRow != nullptr)
-            arpOctavesRow->setBounds (inner.removeFromRight (110).reduced (2, 2));
-        inner.removeFromRight (10);
+        labelInside (inner);
+        const int third = inner.getWidth() / 3;
         if (arpVoiceRow != nullptr)
-            arpVoiceRow->setBounds (inner.reduced (0, 2));
+            arpVoiceRow->setBounds (inner.removeFromLeft (third).reduced (0, 2));
+        inner.removeFromLeft (4);
+        if (arpOctavesRow != nullptr)
+            arpOctavesRow->setBounds (inner.removeFromLeft (third).reduced (0, 2));
+        inner.removeFromLeft (4);
+        if (arpRateRow != nullptr)
+            arpRateRow->setBounds (inner.reduced (0, 2));
     }
     bounds.removeFromTop (2);
 
-    // ── LAYERS strip (sub-oct / tex-oct / EQ toggle) ─────────────────
-    {
-        auto inner = layoutStrip (layersStripBounds, 36);
-        labelInside (inner);                      // "LAYERS" painted in paint()
-        eqToggleButton.setBounds (inner.removeFromRight (110).reduced (2, 4));
-        inner.removeFromRight (10);
-        textureOctButton.setBounds (inner.removeFromRight (90).reduced (2, 4));
-        inner.removeFromRight (6);
-        subOctButton    .setBounds (inner.removeFromRight (90).reduced (2, 4));
-    }
+    // LAYERS strip removed: the Sub Oct / Tex +Oct / EQ buttons moved
+    // to the mixer + title-bar (see below) so this row reclaims the
+    // dead space the user complained about.
+    layersStripBounds = {};
 
     // EQ knobs row — only visible when expanded.
     if (eqExpanded)

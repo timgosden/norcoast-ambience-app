@@ -40,19 +40,20 @@ public:
         stepIdx = 0;
     }
 
-    // transportSamples: shared monotonic sample clock used by arp + drums +
-    // evolve so all three lock to the same beat grid. Wraps every step.
-    // timeSig: 0 = 4/4 (pattern wraps over all held notes), 1 = 6/8
-    // (pattern wraps every 3 held notes per octave so the arp groups
-    // naturally with the dotted-quarter pulse).
+    // octaveChoice : 0 = -1 oct, 1 = 0 (Mid), 2 = +1 oct.
+    // timeSig      : 0 = 4/4, 1 = 6/8 (groups in threes).
+    // Pattern walks through held notes once and shifts ALL of them by
+    // octaveShift * 12 semitones — matches the web app's "-Oct/Mid/+Oct"
+    // semantics, replacing the previous "octave-span" behaviour.
     void process (juce::AudioBuffer<float>& buffer, int startSample, int numSamples,
                   const std::vector<int>& heldNotes,
                   float vol, float rateBeats, double bpm,
-                  int octSpan, VoiceKind voiceKind,
+                  int octaveChoice, VoiceKind voiceKind,
                   juce::int64 transportSamples,
                   int timeSig = 0)
     {
         const bool noteSourceLive = vol >= 1e-4f && ! heldNotes.empty();
+        const int  octShift = juce::jlimit (-1, 1, octaveChoice - 1);
 
         // 6/8 pattern groups in threes — cap effective held-note count
         // at 3 so the arp loops every dotted-quarter pulse instead of
@@ -62,8 +63,7 @@ public:
             ? juce::jmin (3, juce::jmax (1, held))
             : juce::jmax (1, held);
 
-        const int patternSize  = noteSourceLive
-            ? effHeld * (octSpan + 1) : 1;
+        const int patternSize  = noteSourceLive ? effHeld : 1;
         const int tickSamples  = juce::jmax (1, (int) ((60.0 / bpm) * rateBeats * sampleRate));
         const int noteDurSamps = (int) (tickSamples * 0.88f);
 
@@ -72,13 +72,11 @@ public:
 
         for (int s = 0; s < numSamples; ++s)
         {
-            // Step boundary derived from the shared transport clock — all
-            // grid-based modules use the same divisor base so they line up.
             const juce::int64 stepNow = (transportSamples + s) / tickSamples;
 
             if (noteSourceLive && stepNow != lastFiredStep)
             {
-                triggerArpNote (heldNotes, octSpan, voiceKind, vol, noteDurSamps, effHeld);
+                triggerArpNote (heldNotes, octShift, voiceKind, vol, noteDurSamps, effHeld);
                 stepIdx = (stepIdx + 1) % juce::jmax (1, patternSize);
                 lastFiredStep = stepNow;
             }
@@ -185,19 +183,18 @@ private:
         v.filterZ = 0.0f;
     }
 
-    // ─── Triggers ─────────────────────────────────────────────────────
-    // effHeld is the effective number of held notes the arp wraps over
-    // — capped to 3 in 6/8 (process() decides), so arp groups in 3s.
-    void triggerArpNote (const std::vector<int>& heldNotes, int octSpan,
+    // octShift: -1, 0 or +1 — applied uniformly to all held notes.
+    // effHeld: pattern wrap (capped to 3 in 6/8 by process()).
+    void triggerArpNote (const std::vector<int>& heldNotes, int octShift,
                          VoiceKind kind, float vol, int noteDurSamps,
                          int effHeld)
     {
         const int held = (int) heldNotes.size();
         if (held <= 0) return;
         const int wrap = juce::jmax (1, juce::jmin (effHeld, held));
-        const int idx = stepIdx % wrap;
-        const int oct = (stepIdx / wrap) % (octSpan + 1);
-        const int midi = heldNotes[(size_t) idx] + oct * 12;
+        const int idx  = stepIdx % wrap;
+        const int midi = juce::jlimit (0, 127,
+                                       heldNotes[(size_t) idx] + octShift * 12);
         const float freq = (float) juce::MidiMessage::getMidiNoteInHertz (midi);
 
         switch (kind)

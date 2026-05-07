@@ -406,7 +406,7 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         static constexpr std::array<float, 5> kArpBeats { 0.25f, 0.5f, 1.0f, 2.0f, 4.0f };
         const int rateIdx = juce::jlimit (0, 4, (int) arpRateParam->load());
         const float rate  = kArpBeats[(size_t) rateIdx];
-        const int   octSpan = juce::jlimit (0, 2, (int) arpOctavesParam->load());
+        const int   octChoice = juce::jlimit (0, 2, (int) arpOctavesParam->load());
         const auto  voice   = static_cast<Arpeggiator::VoiceKind> (
                                   juce::jlimit (0, 2, (int) arpVoiceParam->load()));
 
@@ -415,7 +415,7 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         const int timeSig = juce::jlimit (0, 1, (int) timeSigParam->load());
         layerScratch.clear();
         arpeggiator.process (layerScratch, 0, n, heldNotesScratch,
-                             arpVol, rate, bpm, octSpan, voice,
+                             arpVol, rate, bpm, octChoice, voice,
                              transportSamples, timeSig);
         sumLayerWithMute (muteArp, arpMuteParam);
     }
