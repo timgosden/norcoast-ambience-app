@@ -799,9 +799,13 @@ void NorcoastAmbienceProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     // 30 ms ramp + ~5 ms block size the scalar moves in 5-step
     // increments toward target, smooth enough to avoid clicks on
     // preset recall.
-    // Shimmer max effect = 1.0x — was 1.5x (smeared the pads with
-    // detune artefacts), trialled 0.5x (too tame). 1.0x lets the
-    // sparkle ride at unity with the dry signal at slider 100%.
+    // Shimmer wet send: at slider 100% the param value is 0.5 (range
+    // locked at 0..0.5 for preset compat). Multiplier of 1.0 yields a
+    // 0.5x parallel send at full — quieter than the old 1.5x but the
+    // pitched feedback loop sounds clean at this level instead of
+    // saturating into the "broken / too detune-y" territory the user
+    // hit at 1.0x send. Display still maps 0..0.5 → 0..100% so the
+    // knob reads sensibly.
     shimmerVolSmooth.skip (n);
     shimmer.processAdd (buffer, shimmerVolSmooth.getCurrentValue() * 1.0f);
 

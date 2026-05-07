@@ -45,20 +45,23 @@ public:
         inner.reset();
 
         const auto hpf = juce::dsp::IIR::Coefficients<float>::makeHighPass (sr,  180.0f, 0.5f);
-        // 4 kHz LPF in the feedback loop. The 6.5 kHz it used to be at
-        // let too much pitch-shifted high-mid through, and after a few
-        // feedback iterations the tail piled up bright energy. 4 kHz
-        // produces the warm bell tail you actually want from a shimmer.
-        const auto lpf = juce::dsp::IIR::Coefficients<float>::makeLowPass  (sr, 4000.0f, 0.5f);
+        // 2.6 kHz LPF in the feedback loop — darker still than the
+        // 4 kHz it was at. The pitched feedback piles up high content
+        // every iteration and the user heard the result as too bright;
+        // pulling the corner down warms the tail without killing the
+        // sparkle.
+        const auto lpf = juce::dsp::IIR::Coefficients<float>::makeLowPass  (sr, 2600.0f, 0.5f);
         *fbHpfL.coefficients = *hpf; *fbHpfR.coefficients = *hpf;
         *fbLpfL.coefficients = *lpf; *fbLpfR.coefficients = *lpf;
         fbHpfL.reset(); fbHpfR.reset();
         fbLpfL.reset(); fbLpfR.reset();
 
-        // Zero jitter on the grain trigger — random offsets caused
-        // audible pitch warble at +12 st. Eight voices in-phase keeps
-        // the octave-up clean and in tune.
-        shifter.prepare (sr, /*channels*/ 2, blockSize, /*grainMs*/ 100, /*voices*/ 8, /*jitterMs*/ 0.0f);
+        // Granular shifter: 4 voices × 60 ms grains, zero jitter. Was
+        // 8 × 100 ms which sounded thick on paper but the stacked
+        // voices produced tiny phase mismatches that the user heard
+        // as "weird detune" on the shimmer tail. Fewer, shorter grains
+        // sound cleaner at +12 st.
+        shifter.prepare (sr, /*channels*/ 2, blockSize, /*grainMs*/ 60, /*voices*/ 4, /*jitterMs*/ 0.0f);
         shifter.setSemitones (12.0f);    // octave up
         shifter.reset();
 
@@ -169,7 +172,7 @@ public:
     }
 
 private:
-    static constexpr float kFeedbackGain = 0.55f;   // pre-tanh feedback level
+    static constexpr float kFeedbackGain = 0.40f;   // pre-tanh feedback level (was 0.55 — quieter, darker tail)
 
     double sampleRate = 44100.0;
     int    maxBlock   = 512;

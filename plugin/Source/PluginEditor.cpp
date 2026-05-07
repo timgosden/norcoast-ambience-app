@@ -350,12 +350,13 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     setupKnob (delayMix,      "Delay",        ParamID::delayMix);
     setupKnob (reverbMix,     "Reverb",       ParamID::reverbMix);
     setupKnob (shimmerVol,    "Shimmer",      ParamID::shimmerVol);
-    // Shimmer audio is capped at 0.5x internally — display the slider
-    // as 0..100% so the player sees a normal-looking knob and the
-    // engine never goes past the (now tame) max.
+    // Param range is 0..0.5 internally (locked for preset compat) but
+    // the player sees a normal 0..100% knob — scale display by 200 so
+    // full slider reads 100%. Matching audio scale of 2.0x is applied
+    // in the processor.
     shimmerVol.knob.textFromValueFunction = [] (double v) -> juce::String
     {
-        return juce::String ((int) std::round (v * 100.0)) + "%";
+        return juce::String ((int) std::round (v * 200.0)) + "%";
     };
     shimmerVol.knob.updateText();
 
