@@ -59,7 +59,7 @@ public:
         const float cellH  = cells.getHeight() / 3.0f;
 
         // Row labels
-        g.setFont (juce::FontOptions (10.0f).withStyle ("Bold"));
+        g.setFont (juce::FontOptions (12.0f).withStyle ("Bold"));
         for (int row = 0; row < 3; ++row)
         {
             g.setColour (rowColours[(size_t) row].withAlpha (0.55f));

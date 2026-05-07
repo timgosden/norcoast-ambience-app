@@ -5,7 +5,7 @@
 
 namespace
 {
-    constexpr int kKnobLabelH     = 16;
+    constexpr int kKnobLabelH     = 18;
     constexpr int kSectionPadX    = 12;
     constexpr int kSectionPadY    = 8;
     constexpr int kSectionHeaderH = 20;
@@ -580,7 +580,7 @@ void NorcoastAmbienceEditor::paint (juce::Graphics& g)
         g.setColour (accent.withAlpha (0.55f));
         g.fillRect (rf.withWidth (3.0f));         // colour bar on the left
         g.setColour (accent);
-        g.setFont (juce::FontOptions (10.0f).withStyle ("Bold"));
+        g.setFont (juce::FontOptions (12.0f).withStyle ("Bold"));
         g.drawText (title, r.reduced (12, 0).withWidth (60),
                     juce::Justification::centredLeft);
     };
