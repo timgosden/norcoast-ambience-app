@@ -7,6 +7,7 @@
 #include "ChoiceButtonRow.h"
 #include "BitmaskPillRow.h"
 #include "StepSequencerGrid.h"
+#include "EqCurveDisplay.h"
 
 class NorcoastAmbienceEditor : public juce::AudioProcessorEditor
 {
@@ -148,7 +149,8 @@ private:
     ParamKnob hpfFreq;
     ParamKnob reverbSize, reverbMod;
     ParamKnob delayFb, delayTimeMs, delayTone;
-    ParamKnob eqLow, eqLoMid, eqHiMid, eqHigh;
+    ParamKnob eqLow, eqLoMid, eqHiMid, eqHigh;     // host-only; UI uses eqCurve
+    std::unique_ptr<EqCurveDisplay> eqCurve;
 
     // ─── Advanced panel toggle ───────────────────────────────────────
     juce::TextButton advButton { "Adv" };

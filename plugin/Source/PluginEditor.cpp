@@ -253,6 +253,11 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     stepSequencer = std::make_unique<StepSequencerGrid> (owner.getAPVTS());
     addAndMakeVisible (*stepSequencer);
 
+    // Pro-Q-style EQ curve display — shown on the Advanced panel.
+    eqCurve = std::make_unique<EqCurveDisplay> (owner.getAPVTS());
+    addAndMakeVisible (*eqCurve);
+    eqCurve->setVisible (false);   // only visible when Advanced is open
+
     // FX knobs that survive on the mixer surface.
     setupKnob (chorusMix,     "Chorus",       ParamID::chorusMix);
     setupKnob (delayMix,      "Delay",        ParamID::delayMix);
@@ -314,29 +319,26 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     setupKnob (eqLoMid,     "Lo-Mid",      ParamID::eqLoMid,  " dB");
     setupKnob (eqHiMid,     "Hi-Mid",      ParamID::eqHiMid,  " dB");
     setupKnob (eqHigh,      "High",        ParamID::eqHigh,   " dB");
-
-    // EQ controls render as vertical sliders on the Advanced panel
-    // (visual cue: thumb position = boost/cut around 0 dB centre).
-    // Knob format/attachment is kept from setupKnob so the param + label
-    // wiring is identical; we just swap the slider style and centre the
-    // bipolar value.
-    for (auto* k : { &eqLow, &eqLoMid, &eqHiMid, &eqHigh })
-    {
-        k->knob.setSliderStyle (juce::Slider::LinearBarVertical);
-        k->knob.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 60, 14);
-        k->knob.setColour (juce::Slider::trackColourId,
-                           juce::Colour (0xffb07acc));    // EQ purple
-    }
+    // (Tried LinearBarVertical here — looked wrong for a bipolar param,
+    // since the bar filled from the bottom regardless of cut vs boost.
+    // Keeping rotaries; a dedicated EQ-curve visualiser is a bigger
+    // task tracked separately.)
 
     auto setAdvancedKnobsVisible = [this] (bool on)
     {
         for (auto* k : { &reverbSize, &reverbMod,
-                         &delayFb, &delayTimeMs, &delayTone,
-                         &eqLow, &eqLoMid, &eqHiMid, &eqHigh })
+                         &delayFb, &delayTimeMs, &delayTone })
         {
             k->label.setVisible (on);
             k->knob .setVisible (on);
         }
+        // EQ knobs stay hidden — the EqCurveDisplay drives them now.
+        for (auto* k : { &eqLow, &eqLoMid, &eqHiMid, &eqHigh })
+        {
+            k->label.setVisible (false);
+            k->knob .setVisible (false);
+        }
+        if (eqCurve != nullptr) eqCurve->setVisible (on);
     };
     setAdvancedKnobsVisible (false);
 
@@ -692,31 +694,31 @@ void NorcoastAmbienceEditor::resized()
     // Three groups (Reverb · Delay · EQ) of knobs with section labels.
     if (advExpanded)
     {
-        // All knobs the same size — divide the whole Advanced area by the
-        // total knob count regardless of which group they belong to.
-        // EQ slot at the right is rendered as four vertical bar sliders
-        // so cuts/boosts read at a glance.
+        // Layout: left half = 5 uniform rotary knobs (Reverb Size/Mod ·
+        // Delay Div/Feedback/Tone). Right half = Pro-Q-style EQ curve
+        // display.
         auto adv = mixerArea.reduced (16, 18);
         adv.removeFromTop (8);
 
+        const int leftW  = adv.getWidth() * 5 / 9;
+        auto knobsArea = adv.removeFromLeft (leftW);
+        adv.removeFromLeft (12);                              // gap
+
         ParamKnob* knobs[] = {
-            &reverbSize, &reverbMod,                         // Reverb
-            &delayTimeMs, &delayFb, &delayTone,              // Delay
-            &eqLow, &eqLoMid, &eqHiMid, &eqHigh              // EQ (vertical bars)
+            &reverbSize, &reverbMod,
+            &delayTimeMs, &delayFb, &delayTone
         };
         const int n    = (int) (sizeof (knobs) / sizeof (knobs[0]));
-        const int colW = adv.getWidth() / n;
-
+        const int colW = knobsArea.getWidth() / n;
         for (int i = 0; i < n; ++i)
         {
-            auto c = adv.removeFromLeft (colW);
+            auto c = knobsArea.removeFromLeft (colW);
             knobs[i]->label.setBounds (c.removeFromTop (kKnobLabelH));
-            // EQ bars get more vertical bite; rotary knobs use the same
-            // square box as the FX row.
-            const bool isEq = (i >= 5);
-            knobs[i]->knob.setBounds (isEq ? c.reduced (8, 4)
-                                            : c.reduced (4, 6));
+            knobs[i]->knob .setBounds (c.reduced (4, 6));
         }
+
+        if (eqCurve != nullptr)
+            eqCurve->setBounds (adv.reduced (0, 4));
         qwertyKeyboard.setBounds (getWidth() - 2, getHeight() - 2, 1, 1);
         return;
     }
@@ -789,22 +791,23 @@ void NorcoastAmbienceEditor::resized()
             auto col = cols[(size_t) i];
             strips[i].fader->label.setBounds (col.removeFromTop (kKnobLabelH));
 
-            // Octave-toggle row.
-            const int octH = 18;
+            // Octave-toggle row — taller than the original 18 px so the
+            // button text isn't crushed by the LAF font multiplier.
+            const int octH = 26;
             auto octRow = col.removeFromTop (octH);
             if (octBtnPerCol[i] != nullptr)
-                octBtnPerCol[i]->setBounds (octRow.reduced (4, 1));
+                octBtnPerCol[i]->setBounds (octRow.reduced (4, 2));
             else if (i == 4 && arpOctavesRow != nullptr)
-                arpOctavesRow->setBounds (octRow.reduced (4, 1));
-            col.removeFromTop (2);
+                arpOctavesRow->setBounds (octRow.reduced (4, 2));
+            col.removeFromTop (3);
 
             // Mute pill across the top of the fader column. Sits under
             // the label, just like the web app's mute dot above the
             // slider.
-            const int muteH = 18;
+            const int muteH = 24;
             auto muteRow = col.removeFromTop (muteH);
             if (strips[i].mute != nullptr)
-                strips[i].mute->setBounds (muteRow.reduced (10, 1));
+                strips[i].mute->setBounds (muteRow.reduced (8, 2));
             col.removeFromTop (4);
 
             // The fader fills the rest of the column. Reduce a touch
