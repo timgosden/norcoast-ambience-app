@@ -239,7 +239,14 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     presetBox.onChange = [this]
     {
         const int picked = presetBox.getSelectedId();
-        if (picked <= 0) return;
+        if (picked <= 0)
+        {
+            deleteButton.setEnabled (false);
+            return;
+        }
+
+        // Delete is only meaningful for user presets.
+        deleteButton.setEnabled (picked >= kUserItemBase);
 
         if (picked < kUserItemBase)
         {
@@ -267,6 +274,11 @@ NorcoastAmbienceEditor::NorcoastAmbienceEditor (NorcoastAmbienceProcessor& p)
     addAndMakeVisible (loadButton);
     loadButton.setTooltip ("Load a preset .ncpre file from disk.");
     loadButton.onClick = [this] { loadPresetFromFile(); };
+
+    addAndMakeVisible (deleteButton);
+    deleteButton.setTooltip ("Delete the currently selected user preset.");
+    deleteButton.setEnabled (false);
+    deleteButton.onClick = [this] { confirmDeleteSelectedUserPreset(); };
 
     setupKnob (foundationVol, "Foundation",   ParamID::foundationVol);
     setupKnob (padsVol,       "Anchor",       ParamID::padsVol);
@@ -625,6 +637,43 @@ void NorcoastAmbienceEditor::timerCallback()
     }
     if (changed) repaint();
 
+    // Visual Stop fade — eases toward 0 while stopped, back to 1 when
+    // released. Frame-time-independent (uses real ms delta) so it
+    // matches the audio fade regardless of timer jitter.
+    {
+        const double now = juce::Time::getMillisecondCounterHiRes();
+        const float  dt  = lastVisualStopUpdateMs > 0.0
+                            ? (float) ((now - lastVisualStopUpdateMs) / 1000.0)
+                            : 0.0f;
+        lastVisualStopUpdateMs = now;
+
+        const float fadeTime = juce::jmax (0.05f,
+            owner.getAPVTS().getRawParameterValue (ParamID::fadeTime)->load());
+        const float target = owner.isStopped() ? 0.0f : 1.0f;
+        const float step   = dt / fadeTime;
+        const float prev   = visualStopMult;
+        if (visualStopMult < target)
+            visualStopMult = juce::jmin (target, visualStopMult + step);
+        else if (visualStopMult > target)
+            visualStopMult = juce::jmax (target, visualStopMult - step);
+        if (std::abs (visualStopMult - prev) > 1e-3f)
+        {
+            // Push the new multiplier to the 6 source layer faders.
+            // Master + LPF aren't included — the master fader doesn't
+            // represent a "source" the user said to fade, and LPF is a
+            // filter cutoff, not a level.
+            ParamKnob* sources[6] = {
+                &foundationVol, &padsVol, &padsVol2, &textureVol,
+                &arpVol,        &drumVol
+            };
+            for (auto* k : sources)
+            {
+                k->knob.getProperties().set ("stopFadeMult", visualStopMult);
+                k->knob.repaint();
+            }
+        }
+    }
+
     // Live LPF Hz readout above the fader — same Hz/kHz mapping as the
     // slider's textFromValueFunction.
     {
@@ -752,6 +801,37 @@ void NorcoastAmbienceEditor::rebuildPresetMenu (int selectFactoryIdx,
     else if (selectUserIdx >= 0)
         presetBox.setSelectedId (kUserItemBase + selectUserIdx,
                                  juce::dontSendNotification);
+}
+
+void NorcoastAmbienceEditor::confirmDeleteSelectedUserPreset()
+{
+    const int picked = presetBox.getSelectedId();
+    if (picked < kUserItemBase) return;
+    const int idx = picked - kUserItemBase;
+    if (idx < 0 || idx >= userPresetFiles.size()) return;
+
+    const auto file = userPresetFiles.getReference (idx);
+    const auto name = file.getFileNameWithoutExtension();
+
+    deletePromptWindow = std::make_unique<juce::AlertWindow> (
+        "Delete preset",
+        "Delete \"" + name + "\"?\nThis cannot be undone.",
+        juce::MessageBoxIconType::WarningIcon);
+    deletePromptWindow->addButton ("Delete", 1, juce::KeyPress (juce::KeyPress::returnKey));
+    deletePromptWindow->addButton ("Cancel", 0, juce::KeyPress (juce::KeyPress::escapeKey));
+
+    deletePromptWindow->enterModalState (true,
+        juce::ModalCallbackFunction::create (
+            [this, file] (int result)
+            {
+                deletePromptWindow.reset();
+                if (result != 1) return;
+
+                file.deleteFile();
+                rebuildPresetMenu();
+                presetBox.setText ("Preset", juce::dontSendNotification);
+                deleteButton.setEnabled (false);
+            }));
 }
 
 void NorcoastAmbienceEditor::promptSaveUserPreset()
@@ -983,13 +1063,16 @@ void NorcoastAmbienceEditor::resized()
         auto title = bounds.removeFromTop (kStripH);
         title.removeFromLeft (60);                           // logo space
 
-        auto right = title.removeFromRight (4 * kBtnW + 4 * kGap + 110 /*preset*/)
+        // Five buttons + 5 gaps + 110 px preset combo.
+        auto right = title.removeFromRight (5 * kBtnW + 5 * kGap + 110 /*preset*/)
                           .reduced (0, kBtnInsetV);
         stopButton.setBounds (right.removeFromRight (kBtnW));
         right.removeFromRight (kGap);
         saveButton.setBounds (right.removeFromRight (kBtnW));
         right.removeFromRight (kGap);
         loadButton.setBounds (right.removeFromRight (kBtnW));
+        right.removeFromRight (kGap);
+        deleteButton.setBounds (right.removeFromRight (kBtnW));
         right.removeFromRight (kGap);
         presetBox.setBounds  (right.removeFromRight (110));
         right.removeFromRight (kGap);
@@ -1271,7 +1354,10 @@ void NorcoastAmbienceEditor::resized()
             // than overflow when space is tight.
             const int reserveBelow = 40 + 2;
             const int avail = juce::jmax (0, bounds.getHeight() - reserveBelow);
-            const int seqH  = juce::jmin (96, avail);
+            // Cap was 96 → bumped to 108 so each of the 3 voice rows
+            // gains ~4 px in cell height (rows split the inner area
+            // evenly: +12 px component → +4 px per row).
+            const int seqH  = juce::jmin (108, avail);
             if (seqH > 0)
             {
                 stepSequencer->setBounds (bounds.removeFromTop (seqH).reduced (12, 0));

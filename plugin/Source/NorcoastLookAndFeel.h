@@ -83,6 +83,44 @@ public:
         g.fillPath (tick, juce::AffineTransform::rotation (thumbAngle).translated (cx, cy));
     }
 
+    // Linear faders honour an optional "stopFadeMult" component
+    // property (0..1). When < 1 we visually pull the thumb toward the
+    // zero end of the track without touching the slider's value — the
+    // editor uses this to fade the layer faders down during Stop.
+    void drawLinearSlider (juce::Graphics& g,
+                           int x, int y, int w, int h,
+                           float sliderPos,
+                           float minSliderPos, float maxSliderPos,
+                           const juce::Slider::SliderStyle style,
+                           juce::Slider& slider) override
+    {
+        if (style == juce::Slider::LinearVertical)
+        {
+            const auto prop = slider.getProperties()["stopFadeMult"];
+            if (! prop.isVoid())
+            {
+                const float m = juce::jlimit (0.0f, 1.0f, (float) prop);
+                if (m < 0.999f)
+                {
+                    const float range = maxSliderPos - minSliderPos;
+                    if (std::abs (range) > 1e-3f)
+                    {
+                        // Normalised thumb position in the track (0 at
+                        // minSliderPos, 1 at maxSliderPos). Scale the
+                        // distance from min by the multiplier so the
+                        // thumb visually slides toward zero.
+                        const float n        = (sliderPos - minSliderPos) / range;
+                        const float scaledN  = n * m;
+                        sliderPos            = minSliderPos + scaledN * range;
+                    }
+                }
+            }
+        }
+        juce::LookAndFeel_V4::drawLinearSlider (g, x, y, w, h,
+                                                 sliderPos, minSliderPos, maxSliderPos,
+                                                 style, slider);
+    }
+
     juce::Font getLabelFont (juce::Label& label) override
     {
         return juce::FontOptions ((float) label.getHeight() * 0.7f).withStyle ("Regular");

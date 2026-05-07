@@ -287,7 +287,8 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
     // fixed UI-side, so the user doesn't need to fiddle with this).
     layout.add (std::make_unique<juce::AudioParameterChoice> (
         juce::ParameterID { ParamID::evolveBars, 1 }, "Evolve Bars",
-        juce::StringArray { "1", "2", "4", "8", "16", "32" }, 2));
+        juce::StringArray { "1 bar", "2 bars", "4 bars",
+                            "8 bars", "16 bars", "32 bars" }, 2));
 
     // Drone — ON by default so the synth auto-plays a chord on load
     // (matches the standalone web app's behaviour). When on, a single

@@ -105,10 +105,13 @@ private:
     juce::ComboBox    presetBox;
     juce::TextButton  saveButton  { "Save" };
     juce::TextButton  loadButton  { "Load" };
+    juce::TextButton  deleteButton{ "Delete" };
     std::unique_ptr<juce::FileChooser> fileChooser;
     void applyFactoryPreset (int idx);
     void savePresetToFile();
     void loadPresetFromFile();
+    void confirmDeleteSelectedUserPreset();
+    std::unique_ptr<juce::AlertWindow> deletePromptWindow;
 
     // ─── User-preset storage ────────────────────────────────────────
     // User presets live as .ncpre XML files in a known directory. The
@@ -138,6 +141,13 @@ private:
     // where the other layer columns show their octave toggle. Updated
     // from the LPF slider value in timerCallback().
     juce::Label lpfHzLabel;
+
+    // Visual Stop fade multiplier. Eases toward 0 while the Stop pill
+    // is engaged and back toward 1 when released, using the same
+    // fadeTime as the audio. Drives the dim overlay over each layer
+    // fader so you see the playable headroom drop with the audio.
+    float  visualStopMult        = 1.0f;
+    double lastVisualStopUpdateMs = 0.0;
 
     // Cached last home-root index; used to relabel the Custom Chord
     // pills (1·C, 2·D, …) only when the root actually changes.
